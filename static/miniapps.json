@@ -1,0 +1,16 @@
+[
+  {
+    "name": "Sign Message Demo",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "https://aboutcircles.github.io/miniappDemo/demo-sign/",
+    "description": "Sign an arbitrary message using the connected Safe wallet.",
+    "tags": ["demo", "signing"]
+  },
+  {
+    "name": "ERC20 Transfer Demo",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "https://aboutcircles.github.io/miniappDemo/demo-tx/",
+    "description": "Send an ERC20 token transfer via the connected Safe wallet.",
+    "tags": ["demo", "transactions"]
+  }
+]
