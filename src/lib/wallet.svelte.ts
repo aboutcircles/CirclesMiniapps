@@ -7,36 +7,43 @@ import {
 } from '@cometh/connect-sdk-4337';
 import { createPimlicoClient } from 'permissionless/clients/pimlico';
 
-const PIMLICO_URL = 'https://api.pimlico.io/v2/100/rpc?apikey=pim_2Zdnmr93fLfjgqHF9cDqKb';
-const SAFE_ADDRESS = '0xc7d3dF890952a327Af94D5Ba6fdC1Bf145188a1b';
+const COMETH_API_KEY = import.meta.env.VITE_COMETH_API_KEY;
+const PIMLICO_API_KEY = import.meta.env.VITE_PIMLICO_API_KEY;
+const PIMLICO_URL = `https://api.pimlico.io/v2/100/rpc?apikey=${PIMLICO_API_KEY}`;
+
+const SAFE_ADDRESS_KEY = 'safe_address';
 
 let address = $state<string>('');
 let connected = $state(false);
 let connecting = $state(false);
 
+function getSavedSafeAddress(): string {
+	return localStorage.getItem(SAFE_ADDRESS_KEY) ?? '';
+}
+
 let smartAccountClient: any = null;
 let publicClient: any = null;
 
 function getConfig() {
-	let apiKey = localStorage.getItem('cometh_api_key');
-	if (!apiKey) {
-		apiKey = prompt('Enter COMETH_API_KEY for Gnosis Chain:');
-		if (!apiKey) return null;
-		localStorage.setItem('cometh_api_key', apiKey);
+	if (!COMETH_API_KEY) {
+		console.error('VITE_COMETH_API_KEY is not set in .env');
+		return null;
 	}
 	return {
-		apiKey,
-		bundlerUrl: `https://bundler.cometh.io/100?apikey=${apiKey}`
+		apiKey: COMETH_API_KEY,
+		bundlerUrl: `https://bundler.cometh.io/100?apikey=${COMETH_API_KEY}`
 	};
 }
 
-async function connect() {
+async function connect(safeAddress: string) {
 	const config = getConfig();
 	if (!config) return;
 
 	connecting = true;
 
 	try {
+		localStorage.setItem(SAFE_ADDRESS_KEY, safeAddress);
+
 		publicClient = createPublicClient({
 			chain: gnosis,
 			transport: http(),
@@ -48,7 +55,7 @@ async function connect() {
 			apiKey: config.apiKey,
 			publicClient,
 			chain: gnosis,
-			smartAccountAddress: SAFE_ADDRESS
+			smartAccountAddress: safeAddress
 		});
 
 		const paymasterClient = createPimlicoClient({
@@ -70,13 +77,10 @@ async function connect() {
 			}
 		});
 
-		address = SAFE_ADDRESS;
+		address = safeAddress;
 		connected = true;
 	} catch (error: any) {
 		console.error('Connection error:', error);
-		if (error.message?.includes('API') || error.message?.includes('401')) {
-			localStorage.removeItem('cometh_api_key');
-		}
 		alert('Failed to connect: ' + error.message);
 	} finally {
 		connecting = false;
@@ -107,6 +111,7 @@ export const wallet = {
 	get address() { return address; },
 	get connected() { return connected; },
 	get connecting() { return connecting; },
+	getSavedSafeAddress,
 	connect,
 	sendTransaction,
 	signMessage
