@@ -3,6 +3,7 @@ import { gnosis } from 'viem/chains';
 import {
 	createSafeSmartAccount,
 	createSmartAccountClient,
+	retrieveAccountAddressFromPasskeys,
 	ENTRYPOINT_ADDRESS_V07
 } from '@cometh/connect-sdk-4337';
 import { createPimlicoClient } from 'permissionless/clients/pimlico';
@@ -33,6 +34,25 @@ function getConfig() {
 		apiKey: COMETH_API_KEY,
 		bundlerUrl: `https://bundler.cometh.io/100?apikey=${COMETH_API_KEY}`
 	};
+}
+
+async function connectWithPasskey() {
+	const config = getConfig();
+	if (!config) return;
+
+	connecting = true;
+	try {
+		const resolved = await retrieveAccountAddressFromPasskeys({
+			apiKey: config.apiKey,
+			chain: gnosis
+		});
+		await connect(resolved as string);
+	} catch (error: any) {
+		console.error('Passkey connection error:', error);
+		alert('Failed to connect: ' + error.message);
+	} finally {
+		connecting = false;
+	}
 }
 
 async function connect(safeAddress: string) {
@@ -118,11 +138,10 @@ function disconnect() {
 	connected = false;
 }
 
-/** Call on page mount. Reconnects from saved address in localStorage,
- *  or uses the provided address override (e.g. from ?address= query param). */
-async function autoConnect(addressOverride?: string | null) {
+/** Call on page mount. Reconnects from saved address in localStorage. */
+async function autoConnect() {
 	if (connected) return;
-	const target = addressOverride || getSavedSafeAddress();
+	const target = getSavedSafeAddress();
 	if (target) await connect(target);
 }
 
@@ -143,6 +162,7 @@ export const wallet = {
 	get connecting() { return connecting; },
 	getSavedSafeAddress,
 	connect,
+	connectWithPasskey,
 	disconnect,
 	autoConnect,
 	sendTransaction,

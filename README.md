@@ -147,13 +147,8 @@ Apps listed in `static/miniapps.json` appear on the `/miniapps` page. Each entry
 | URL | Description |
 |---|---|
 | `/miniapps` | App list |
-| `/miniapps?address=0x...` | App list, auto-connects the given Safe address |
 | `/miniapps/<slug>` | Open a specific app directly |
-| `/miniapps/<slug>?address=0x...` | Open app and auto-connect wallet |
 | `/miniapps/<slug>?data=<base64>` | Open app and pass arbitrary data to it |
-| `/miniapps/<slug>?address=0x...&data=<base64>` | Both |
-
-The `?address=` param is intended for external deep links. Once a wallet is connected its address is persisted in `localStorage` and restored automatically on subsequent visits.
 
 ### Passing data to apps
 
@@ -207,8 +202,9 @@ Mini apps communicate with the host via `window.postMessage`. Use `examples/mini
 
 Wallet connection uses [Cometh Connect SDK](https://docs.cometh.io) with a Safe smart account and Pimlico as the paymaster on Gnosis Chain.
 
-- Connecting requires a Safe address — entered manually or passed via `?address=`
-- On successful connect the address is saved to `localStorage` and restored on next visit
+- Connecting triggers a passkey prompt via `navigator.credentials.get()` — the user picks their passkey and Cometh resolves the associated Safe address automatically
+- No address input required — the Safe address is derived from the passkey
+- On successful connect the address is saved to `localStorage` and restored on next visit without prompting the passkey again
 - Disconnecting clears both the in-memory state and `localStorage`
 
 ---

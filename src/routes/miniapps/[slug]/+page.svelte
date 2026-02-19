@@ -24,8 +24,6 @@
 	} | null = $state(null);
 
 	let iframeEl: HTMLIFrameElement = $state() as HTMLIFrameElement;
-	let showConnectModal = $state(false);
-	let safeAddressInput = $state('');
 
 	function truncateAddr(addr: string): string {
 		return addr.slice(0, 6) + '...' + addr.slice(-4);
@@ -108,7 +106,7 @@
 	onMount(() => {
 		window.addEventListener('message', handleMessage);
 
-		wallet.autoConnect($page.url.searchParams.get('address'));
+		wallet.autoConnect();
 
 		fetch('/miniapps.json')
 			.then((r) => r.json())
@@ -158,17 +156,6 @@
 		goto('/miniapps');
 	}
 
-	function openConnectModal() {
-		safeAddressInput = wallet.getSavedSafeAddress();
-		showConnectModal = true;
-	}
-
-	function handleConnect() {
-		const addr = safeAddressInput.trim();
-		if (!addr) return;
-		showConnectModal = false;
-		wallet.connect(addr);
-	}
 
 	async function handleApprove(): Promise<string> {
 		if (!pendingRequest) return '';
@@ -224,7 +211,7 @@
 				{:else}
 					<button
 						class="connect-btn"
-						onclick={openConnectModal}
+						onclick={() => wallet.connectWithPasskey()}
 						disabled={wallet.connecting}
 					>
 						{#if wallet.connecting}
@@ -252,30 +239,6 @@
 	{/if}
 </div>
 
-{#if showConnectModal}
-	<!-- svelte-ignore a11y_click_events_have_key_events -->
-	<!-- svelte-ignore a11y_no_static_element_interactions -->
-	<div class="modal-backdrop" onclick={() => (showConnectModal = false)}>
-		<div class="modal" onclick={(e) => e.stopPropagation()}>
-			<h3>Connect Wallet</h3>
-			<p>Enter your Safe smart account address to connect with passkeys.</p>
-			<input
-				type="text"
-				bind:value={safeAddressInput}
-				placeholder="0x..."
-				onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') handleConnect(); }}
-			/>
-			<div class="modal-buttons">
-				<button class="btn-cancel" onclick={() => (showConnectModal = false)}>Cancel</button>
-				<button
-					class="btn-connect"
-					onclick={handleConnect}
-					disabled={!safeAddressInput.trim()}
-				>Connect</button>
-			</div>
-		</div>
-	</div>
-{/if}
 
 <!-- Approval Popup -->
 {#if pendingRequest}
@@ -461,104 +424,4 @@
 		font-size: 15px;
 	}
 
-	/* Connect modal */
-	.modal-backdrop {
-		position: fixed;
-		inset: 0;
-		background: rgba(0, 0, 0, 0.4);
-		z-index: 9998;
-		display: flex;
-		align-items: flex-end;
-		justify-content: center;
-	}
-
-	.modal {
-		background: var(--bg);
-		border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-		border-top: 1px solid var(--border);
-		width: 100%;
-		max-width: 480px;
-		padding: 24px;
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-		animation: slideUp 0.25s cubic-bezier(0.35, 0.15, 0, 1);
-	}
-
-	@keyframes slideUp {
-		from { transform: translateY(100%); }
-		to { transform: translateY(0); }
-	}
-
-	.modal h3 {
-		margin: 0;
-		font-size: 17px;
-		font-weight: 600;
-		letter-spacing: -0.02em;
-		color: var(--fg);
-	}
-
-	.modal p {
-		margin: 0;
-		font-size: 13px;
-		color: var(--fg-muted);
-	}
-
-	.modal input {
-		width: 100%;
-		padding: 10px 12px;
-		border: 1px solid var(--border);
-		border-radius: 10px;
-		font-family: 'SF Mono', ui-monospace, monospace;
-		font-size: 13px;
-		color: var(--fg);
-		background: var(--bg-subtle);
-		outline: none;
-		box-sizing: border-box;
-		transition: border-color 0.15s;
-	}
-
-	.modal input:focus {
-		border-color: var(--fg-muted);
-	}
-
-	.modal-buttons {
-		display: flex;
-		gap: 10px;
-	}
-
-	.modal-buttons .btn-cancel {
-		flex: 1;
-		padding: 12px;
-		border: 1px solid var(--border);
-		border-radius: var(--radius-full);
-		background: var(--bg-subtle);
-		color: var(--fg);
-		font-size: 15px;
-		font-weight: 500;
-		cursor: pointer;
-	}
-
-	.modal-buttons .btn-connect {
-		flex: 1;
-		padding: 12px;
-		border: none;
-		border-radius: var(--radius-full);
-		background: var(--brand);
-		color: var(--fg-on-dark);
-		font-size: 15px;
-		font-weight: 500;
-		cursor: pointer;
-		transition: opacity 0.15s;
-	}
-
-	.modal-buttons .btn-connect:disabled {
-		opacity: 0.4;
-		cursor: not-allowed;
-	}
-
-	.modal-buttons .btn-connect:hover:not(:disabled) {
-		opacity: 0.85;
-	}
 </style>
