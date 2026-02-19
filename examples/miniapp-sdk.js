@@ -1,5 +1,5 @@
 /**
- * Tiny SDK for mini apps running inside the circles.gnosis.io/miniapps iframe host.
+ * Tiny SDK for mini apps running inside the miniapps iframe host.
  *
  * Usage:
  *   import { onWalletChange, sendTransactions, signMessage } from '../miniapp-sdk.js';

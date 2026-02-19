@@ -2,6 +2,8 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+
+	const baseUrl = import.meta.env.VITE_BASE_URL;
 	import { wallet } from '$lib/wallet.svelte.ts';
 	import ApprovalPopup from '$lib/ApprovalPopup.svelte';
 
@@ -192,7 +194,7 @@
 </script>
 
 <svelte:head>
-	<title>{app ? app.name : 'Mini App'} - circles.gnosis.io</title>
+	<title>{app ? app.name : 'Mini App'} - {baseUrl}</title>
 </svelte:head>
 
 <div class="page">

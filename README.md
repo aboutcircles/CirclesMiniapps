@@ -1,6 +1,6 @@
 # Circles Mini App Host
 
-A SvelteKit app that hosts mini apps in iframes at `https://circles.gnosis.io/miniapps`. Mini apps can request wallet transactions and message signing via a postMessage protocol.
+A SvelteKit app that hosts mini apps in iframes at `https://<VITE_BASE_URL>/miniapps`. Mini apps can request wallet transactions and message signing via a postMessage protocol.
 
 ---
 
@@ -36,9 +36,27 @@ mkcert -install
 
 ---
 
-## 2. Generate TLS certificates
+## 2. Configure environment
 
-Run this from the project root:
+Copy `.env.example` to `.env` and fill in your values:
+
+```sh
+cp .env.example .env
+```
+
+```env
+VITE_COMETH_API_KEY=your_cometh_api_key
+VITE_PIMLICO_API_KEY=your_pimlico_api_key
+VITE_BASE_URL=circles.gnosis.io
+```
+
+`VITE_BASE_URL` is used for page titles and the dev server hostname. It must match the TLS certificate and `/etc/hosts` entry below.
+
+---
+
+## 3. Generate TLS certificates
+
+Run this from the project root, using your `VITE_BASE_URL` value:
 
 ```sh
 mkcert circles.gnosis.io
@@ -53,20 +71,14 @@ These are gitignored and must be generated locally by each developer.
 
 ---
 
-## 3. Add the host to /etc/hosts
+## 4. Add the host to /etc/hosts
 
-The dev server binds to `circles.gnosis.io`, so you need to point that hostname to localhost.
+The dev server binds to the hostname, so you need to point it to localhost.
 
-**macOS / Linux** — edit `/etc/hosts` with sudo:
+**macOS / Linux:**
 
 ```sh
 sudo sh -c 'echo "127.0.0.1 circles.gnosis.io" >> /etc/hosts'
-```
-
-Or open the file manually and add:
-
-```
-127.0.0.1 circles.gnosis.io
 ```
 
 **Windows** — open `C:\Windows\System32\drivers\etc\hosts` as Administrator and add:
@@ -77,7 +89,7 @@ Or open the file manually and add:
 
 ---
 
-## 4. Install dependencies
+## 5. Install dependencies
 
 ```sh
 npm install
@@ -85,10 +97,10 @@ npm install
 
 ---
 
-## 5. Run the dev server
+## 6. Run the dev server
 
 ```sh
-npm run dev
+sudo npm run dev
 ```
 
 The app is now available at **https://circles.gnosis.io** (port 443).
@@ -97,12 +109,31 @@ The app is now available at **https://circles.gnosis.io** (port 443).
 
 ---
 
+## Running example mini apps locally
+
+The `examples/` directory contains demo mini apps you can run alongside the host for testing.
+
+**Sign Message demo** (port 5181):
+```sh
+npm run demo:sign
+```
+
+**ERC20 Transfer demo** (port 5180):
+```sh
+npm run demo:tx
+```
+
+To test locally, update `static/miniapps.json` to point the relevant app URL to `http://localhost:518x/`.
+
+---
+
 ## Mini apps
 
-Apps listed in `static/miniapps.json` appear on the `/miniapps` page. Each entry:
+Apps listed in `static/miniapps.json` appear on the `/miniapps` page. Each entry requires a `slug` which becomes the app's URL path:
 
 ```json
 {
+  "slug": "my-app",
   "name": "My App",
   "logo": "https://example.com/logo.svg",
   "url": "https://example.com/app/",
@@ -111,11 +142,44 @@ Apps listed in `static/miniapps.json` appear on the `/miniapps` page. Each entry
 }
 ```
 
+### URL patterns
+
+| URL | Description |
+|---|---|
+| `/miniapps` | App list |
+| `/miniapps?address=0x...` | App list, auto-connects the given Safe address |
+| `/miniapps/<slug>` | Open a specific app directly |
+| `/miniapps/<slug>?address=0x...` | Open app and auto-connect wallet |
+| `/miniapps/<slug>?data=<base64>` | Open app and pass arbitrary data to it |
+| `/miniapps/<slug>?address=0x...&data=<base64>` | Both |
+
+The `?address=` param is intended for external deep links. Once a wallet is connected its address is persisted in `localStorage` and restored automatically on subsequent visits.
+
+### Passing data to apps
+
+The `?data=` param carries arbitrary base64-encoded data to the mini app. The host decodes it and delivers it via a `app_data` postMessage. The mini app defines its own schema — plain strings, JSON, ABI-encoded bytes, etc.
+
+**Example — base64 JSON:**
+```js
+const data = btoa(JSON.stringify({ message: 'Please sign this', context: 'my-app:v1' }))
+// use in URL: /miniapps/my-app?data=<data>
+```
+
+**Example — ABI-encoded bytes (viem):**
+```js
+import { encodeAbiParameters } from 'viem'
+const encoded = encodeAbiParameters(
+  [{ type: 'string' }, { type: 'address' }],
+  ['Hello', '0xABC...']
+)
+const data = btoa(encoded)
+```
+
 ---
 
 ## postMessage protocol
 
-Mini apps communicate with the host via `window.postMessage`.
+Mini apps communicate with the host via `window.postMessage`. Use `examples/miniapp-sdk.js` for a ready-made client-side SDK.
 
 **From mini app → host:**
 
@@ -131,12 +195,21 @@ Mini apps communicate with the host via `window.postMessage`.
 |---|---|---|
 | `wallet_connected` | `{ address }` | Wallet is connected |
 | `wallet_disconnected` | — | Wallet is not connected |
+| `app_data` | `{ data: string }` | App-specific data from the `?data=` URL param |
 | `tx_success` | `{ hashes, requestId }` | Transactions sent |
 | `tx_rejected` | `{ reason, requestId }` | Transaction rejected |
 | `sign_success` | `{ signature, verified, requestId }` | Message signed |
 | `sign_rejected` | `{ reason, requestId }` | Signing rejected |
 
-See `examples/miniapp-sdk.js` for a ready-made client-side SDK.
+---
+
+## Wallet
+
+Wallet connection uses [Cometh Connect SDK](https://docs.cometh.io) with a Safe smart account and Pimlico as the paymaster on Gnosis Chain.
+
+- Connecting requires a Safe address — entered manually or passed via `?address=`
+- On successful connect the address is saved to `localStorage` and restored on next visit
+- Disconnecting clears both the in-memory state and `localStorage`
 
 ---
 
@@ -146,4 +219,4 @@ See `examples/miniapp-sdk.js` for a ready-made client-side SDK.
 npm run build
 ```
 
-Output goes to `build/`. It is a fully static site (SvelteKit adapter-static).
+Output goes to `build/`. It is a fully static site (SvelteKit adapter-static) with a `404.html` fallback for client-side routing of dynamic slug routes.

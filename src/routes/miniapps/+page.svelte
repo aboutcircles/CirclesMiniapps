@@ -6,6 +6,8 @@
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
 
+	const baseUrl = import.meta.env.VITE_BASE_URL;
+
 	type MiniApp = { slug?: string; name: string; logo: string; url: string; description?: string; tags: string[] };
 
 	let apps: MiniApp[] = $state([]);
@@ -206,7 +208,7 @@
 </script>
 
 <svelte:head>
-	<title>Mini Apps - circles.gnosis.io</title>
+	<title>Mini Apps - {baseUrl}</title>
 </svelte:head>
 
 <div class="page">
@@ -215,7 +217,7 @@
 		<div class="card header">
 			<div class="header-left">
 				<h1>Mini Apps</h1>
-				<p class="subtitle">circles.gnosis.io/miniapps</p>
+				<p class="subtitle">{baseUrl}/miniapps</p>
 			</div>
 			<div class="header-right">
 				{#if wallet.connected}

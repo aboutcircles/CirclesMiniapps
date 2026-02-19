@@ -1,13 +1,14 @@
 <script lang="ts">
+	const baseUrl = import.meta.env.VITE_BASE_URL;
 </script>
 
 <svelte:head>
-	<title>Circles - circles.gnosis.io</title>
+	<title>Circles - {baseUrl}</title>
 </svelte:head>
 
 <div class="landing">
 	<h1>Circles</h1>
-	<p class="subtitle">circles.gnosis.io</p>
+	<p class="subtitle">{baseUrl}</p>
 	<nav>
 		<a href="/miniapps">Mini Apps</a>
 	</nav>
