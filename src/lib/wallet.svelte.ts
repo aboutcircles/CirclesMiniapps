@@ -1,4 +1,4 @@
-import { createPublicClient, http } from 'viem';
+import { createPublicClient, http, getAddress } from 'viem';
 import { gnosis } from 'viem/chains';
 import {
 	createSafeSmartAccount,
@@ -42,6 +42,7 @@ async function connect(safeAddress: string) {
 	connecting = true;
 
 	try {
+		safeAddress = getAddress(safeAddress);
 		localStorage.setItem(SAFE_ADDRESS_KEY, safeAddress);
 
 		publicClient = createPublicClient({
