@@ -133,6 +133,14 @@
 		if (wallet.connected) {
 			postToIframe({ type: 'wallet_connected', address: wallet.address });
 		}
+		const raw = $page.url.searchParams.get('data');
+		if (raw) {
+			try {
+				postToIframe({ type: 'app_data', data: atob(raw) });
+			} catch {
+				postToIframe({ type: 'app_data', data: raw });
+			}
+		}
 	}
 
 	function launchApp(app: MiniApp) {

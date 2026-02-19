@@ -10,6 +10,7 @@
 
 let _address = null;
 let _listeners = [];
+let _dataListeners = [];
 let _requestCounter = 0;
 const _pending = {};
 
@@ -18,6 +19,10 @@ window.addEventListener('message', (event) => {
   if (!d || !d.type) return;
 
   switch (d.type) {
+    case 'app_data':
+      _dataListeners.forEach((fn) => fn(d.data));
+      break;
+
     case 'wallet_connected':
       _address = d.address;
       _listeners.forEach((fn) => fn(_address));
@@ -53,6 +58,14 @@ window.addEventListener('message', (event) => {
 // Ask the host for the current wallet state on load
 if (window.parent !== window) {
   window.parent.postMessage({ type: 'request_address' }, '*');
+}
+
+/**
+ * Register a callback that fires when the host sends app-specific data via ?data= param.
+ * @param {(data: string) => void} fn
+ */
+export function onAppData(fn) {
+  _dataListeners.push(fn);
 }
 
 /**

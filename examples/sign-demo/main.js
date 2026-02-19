@@ -1,4 +1,4 @@
-import { onWalletChange, signMessage } from '../miniapp-sdk.js';
+import { onWalletChange, signMessage, onAppData } from '../miniapp-sdk.js';
 
 const statusEl = document.getElementById('status');
 const signBtn = document.getElementById('signBtn');
@@ -6,6 +6,10 @@ const resultEl = document.getElementById('result');
 const messageInput = document.getElementById('messageInput');
 
 let connectedAddress = null;
+
+onAppData((data) => {
+  messageInput.value = data;
+});
 
 onWalletChange((address) => {
   connectedAddress = address;
