@@ -97,6 +97,18 @@ async function sendTransaction(tx: { to: string; data?: string; value?: string }
 	});
 }
 
+async function sendTransactions(txs: { to: string; data?: string; value?: string }[]) {
+	if (!smartAccountClient) throw new Error('Wallet not connected');
+	if (txs.length === 1) return sendTransaction(txs[0]);
+	return smartAccountClient.sendUserOperation({
+		calls: txs.map((tx) => ({
+			to: tx.to,
+			data: tx.data || '0x',
+			value: tx.value ? BigInt(tx.value) : 0n
+		}))
+	});
+}
+
 async function signMessage(message: string) {
 	if (!smartAccountClient) throw new Error('Wallet not connected');
 	const signature = await smartAccountClient.account.signMessage({ message });
@@ -115,5 +127,6 @@ export const wallet = {
 	getSavedSafeAddress,
 	connect,
 	sendTransaction,
+	sendTransactions,
 	signMessage
 };

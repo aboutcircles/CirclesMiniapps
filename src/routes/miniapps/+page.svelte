@@ -160,16 +160,11 @@
 		if (!pendingRequest) return '';
 
 		if (pendingRequest.kind === 'tx') {
-			const hashes: string[] = [];
-			for (const tx of pendingRequest.transactions!) {
-				const hash = await wallet.sendTransaction(tx);
-				hashes.push(hash);
-			}
-			postTo(pendingSource, { type: 'tx_success', hashes, requestId: pendingRequest.requestId });
-			const result = hashes.join(', ');
+			const hash = await wallet.sendTransactions(pendingRequest.transactions!);
+			postTo(pendingSource, { type: 'tx_success', hashes: [hash], requestId: pendingRequest.requestId });
 			pendingRequest = null;
 			pendingSource = null;
-			return result;
+			return hash;
 		}
 
 		if (pendingRequest.kind === 'sign') {
