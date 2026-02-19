@@ -1,19 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
 	import { wallet } from '$lib/wallet.svelte.ts';
 	import ApprovalPopup from '$lib/ApprovalPopup.svelte';
 
-	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
-
 	type MiniApp = { slug?: string; name: string; logo: string; url: string; description?: string; tags: string[] };
 
-	let apps: MiniApp[] = $state([]);
-	let view: 'list' | 'iframe' = $state('list');
-	let showAdvanced = $state(false);
-
+	let app: MiniApp | null = $state(null);
+	let notFound = $state(false);
 	let iframeSrc = $state('');
-	let urlInput = $state('');
+
 	// pendingSource is kept outside $state to avoid Svelte proxying the cross-origin Window object,
 	// which triggers "Blocked a frame from accessing a cross-origin frame".
 	let pendingSource: MessageEventSource | null = null;
@@ -23,6 +20,7 @@
 		message?: string;
 		requestId: string;
 	} | null = $state(null);
+
 	let iframeEl: HTMLIFrameElement = $state() as HTMLIFrameElement;
 	let showConnectModal = $state(false);
 	let safeAddressInput = $state('');
@@ -99,16 +97,24 @@
 
 	onMount(() => {
 		window.addEventListener('message', handleMessage);
+
+		wallet.autoConnect($page.url.searchParams.get('address'));
+
 		fetch('/miniapps.json')
 			.then((r) => r.json())
 			.then((data: MiniApp[]) => {
-				apps = data;
+				const currentSlug = $page.params.slug;
+				const found = data.find((a) => a.slug === currentSlug);
+				if (found) {
+					app = found;
+					iframeSrc = found.url;
+				} else {
+					notFound = true;
+				}
 			})
 			.catch(() => {
-				// silently ignore fetch errors
+				notFound = true;
 			});
-
-		wallet.autoConnect($page.url.searchParams.get('address'));
 
 		return () => {
 			window.removeEventListener('message', handleMessage);
@@ -124,34 +130,14 @@
 		}
 	});
 
-	function handleLoad() {
-		iframeSrc = urlInput;
-		view = 'iframe';
-	}
-
 	function handleIframeLoad() {
 		if (wallet.connected) {
 			postToIframe({ type: 'wallet_connected', address: wallet.address });
 		}
 	}
 
-	function launchApp(app: MiniApp) {
-		if (app.slug) {
-			goto(`/miniapps/${app.slug}`);
-			return;
-		}
-		iframeSrc = app.url;
-		urlInput = app.url;
-		view = 'iframe';
-	}
-
 	function goBack() {
-		view = 'list';
-		iframeSrc = '';
-	}
-
-	function getInitial(name: string): string {
-		return name.trim().charAt(0).toUpperCase();
+		goto('/miniapps');
 	}
 
 	function openConnectModal() {
@@ -198,96 +184,18 @@
 </script>
 
 <svelte:head>
-	<title>Mini Apps - circles.gnosis.io</title>
+	<title>{app ? app.name : 'Mini App'} - circles.gnosis.io</title>
 </svelte:head>
 
 <div class="page">
-	{#if view === 'list'}
-		<!-- App List View -->
-		<div class="card header">
-			<div class="header-left">
-				<h1>Mini Apps</h1>
-				<p class="subtitle">circles.gnosis.io/miniapps</p>
-			</div>
-			<div class="header-right">
-				{#if wallet.connected}
-					<span class="wallet-address">{truncateAddr(wallet.address)}</span>
-					<span class="status-dot connected"></span>
-					<button class="disconnect-btn" onclick={() => wallet.disconnect()}>Disconnect</button>
-				{:else}
-					<button
-						class="connect-btn"
-						onclick={openConnectModal}
-						disabled={wallet.connecting}
-					>
-						{#if wallet.connecting}
-							<span class="btn-spinner"></span>
-							Connecting...
-						{:else}
-							Connect Wallet
-						{/if}
-					</button>
-				{/if}
-			</div>
+	{#if notFound}
+		<div class="iframe-topbar">
+			<button class="back-btn" onclick={goBack}>&#8592; back</button>
 		</div>
-
-		<div class="app-list">
-			{#each apps as app (app.url)}
-				<div class="app-row">
-					<div class="app-logo-wrap">
-						{#if app.logo}
-							<img
-								class="app-logo"
-								src={app.logo}
-								alt={app.name}
-								onerror={(e) => {
-									const el = e.currentTarget as HTMLImageElement;
-									el.style.display = 'none';
-									const fallback = el.nextElementSibling as HTMLElement | null;
-									if (fallback) fallback.style.display = 'flex';
-								}}
-							/>
-							<span class="app-logo-fallback" style="display:none">{getInitial(app.name)}</span>
-						{:else}
-							<span class="app-logo-fallback">{getInitial(app.name)}</span>
-						{/if}
-					</div>
-					<div class="app-info">
-						<span class="app-name">{app.name}</span>
-						{#if app.description}
-							<span class="app-description">{app.description}</span>
-						{/if}
-						{#if app.tags && app.tags.length > 0}
-							<div class="app-tags">
-								{#each app.tags as tag (tag)}
-									<span class="tag">{tag}</span>
-								{/each}
-							</div>
-						{/if}
-					</div>
-					<button class="launch-btn" onclick={() => launchApp(app)}>Launch</button>
-				</div>
-			{/each}
-		</div>
-
-		<div class="advanced-section">
-			<button class="advanced-toggle" onclick={() => (showAdvanced = !showAdvanced)}>
-				{showAdvanced ? 'Hide Advanced' : 'Advanced'}
-			</button>
-			{#if showAdvanced}
-				<div class="url-bar advanced-bar">
-					<input
-						type="text"
-						bind:value={urlInput}
-						onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') handleLoad(); }}
-						placeholder="Enter app URL..."
-					/>
-					<button class="load-btn" onclick={handleLoad}>Load</button>
-				</div>
-			{/if}
+		<div class="not-found">
+			<p>App not found.</p>
 		</div>
 	{:else}
-		<!-- Iframe View -->
 		<div class="iframe-topbar">
 			<button class="back-btn" onclick={goBack}>&#8592; back</button>
 			<div class="header-right">
@@ -312,26 +220,16 @@
 			</div>
 		</div>
 
-		{#if showAdvanced}
-			<div class="url-bar advanced-bar card">
-				<input
-					type="text"
-					bind:value={urlInput}
-					onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') handleLoad(); }}
-					placeholder="Enter app URL..."
-				/>
-				<button class="load-btn" onclick={handleLoad}>Load</button>
-			</div>
-		{/if}
-
-		<div class="card iframe-card">
-			<iframe
-				bind:this={iframeEl}
-				src={iframeSrc}
-				sandbox="allow-scripts allow-forms allow-same-origin"
-				title="Mini App"
-				onload={handleIframeLoad}
-			></iframe>
+		<div class="iframe-card">
+			{#if iframeSrc}
+				<iframe
+					bind:this={iframeEl}
+					src={iframeSrc}
+					sandbox="allow-scripts allow-forms allow-same-origin"
+					title={app ? app.name : 'Mini App'}
+					onload={handleIframeLoad}
+				></iframe>
+			{/if}
 		</div>
 	{/if}
 </div>
@@ -398,38 +296,43 @@
 	}
 
 	.page {
-		min-height: 100vh;
+		height: 100vh;
 		display: flex;
 		flex-direction: column;
 		max-width: 720px;
 		margin: 0 auto;
 		padding: 24px 16px;
-		gap: 0;
 		box-sizing: border-box;
 	}
 
-	/* Header */
-	.header {
+	/* Topbar */
+	.iframe-topbar {
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 0 0 20px 0;
+		gap: 12px;
+		padding-bottom: 16px;
 		border-bottom: 1px solid var(--border);
-		margin-bottom: 24px;
+		margin-bottom: 16px;
+		flex-shrink: 0;
 	}
 
-	.header-left h1 {
-		margin: 0;
-		font-size: 20px;
-		font-weight: 600;
-		letter-spacing: -0.02em;
+	.back-btn {
+		background: none;
+		border: none;
+		color: var(--fg-muted);
+		font-size: 14px;
+		font-weight: 500;
+		cursor: pointer;
+		padding: 0;
+		display: flex;
+		align-items: center;
+		gap: 4px;
+		transition: color 0.15s;
+	}
+
+	.back-btn:hover {
 		color: var(--fg);
-	}
-
-	.subtitle {
-		margin: 2px 0 0 0;
-		font-size: 13px;
-		color: var(--fg-subtle);
 	}
 
 	.header-right {
@@ -511,222 +414,33 @@
 		color: var(--fg-muted);
 	}
 
-	/* App list */
-	.app-list {
-		display: flex;
-		flex-direction: column;
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		background: var(--bg);
-		overflow: hidden;
-	}
-
-	.app-row {
-		display: flex;
-		align-items: center;
-		gap: 14px;
-		padding: 14px 16px;
-		border-bottom: 1px solid var(--border);
-	}
-
-	.app-row:last-child {
-		border-bottom: none;
-	}
-
-	.app-logo-wrap {
-		width: 44px;
-		height: 44px;
-		flex-shrink: 0;
-	}
-
-	.app-logo {
-		width: 44px;
-		height: 44px;
-		border-radius: 10px;
-		object-fit: contain;
-		background: var(--bg-muted);
-	}
-
-	.app-logo-fallback {
-		width: 44px;
-		height: 44px;
-		border-radius: 10px;
-		background: var(--bg-emphasis);
-		color: var(--fg-muted);
-		font-size: 18px;
-		font-weight: 600;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.app-info {
-		flex: 1;
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 5px;
-	}
-
-	.app-name {
-		font-size: 15px;
-		font-weight: 500;
-		color: var(--fg);
-		letter-spacing: -0.01em;
-	}
-
-	.app-description {
-		font-size: 13px;
-		color: var(--fg-muted);
-		line-height: 1.4;
-	}
-
-	.app-tags {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 4px;
-	}
-
-	.tag {
-		background: var(--bg-muted);
-		color: var(--fg-muted);
-		font-size: 11px;
-		font-weight: 500;
-		padding: 2px 7px;
-		border-radius: var(--radius-full);
-	}
-
-	.launch-btn {
-		background: var(--bg-subtle);
-		color: var(--fg);
-		border: 1px solid var(--border-strong);
-		border-radius: var(--radius-full);
-		padding: 7px 16px;
-		font-size: 13px;
-		font-weight: 500;
-		cursor: pointer;
-		white-space: nowrap;
-		transition: background 0.15s;
-		flex-shrink: 0;
-	}
-
-	.launch-btn:hover {
-		background: var(--bg-emphasis);
-	}
-
-	/* Advanced section */
-	.advanced-section {
-		display: flex;
-		flex-direction: column;
-		gap: 10px;
-		margin-top: 20px;
-	}
-
-	.advanced-toggle {
-		background: none;
-		border: none;
-		color: var(--fg-subtle);
-		font-size: 13px;
-		cursor: pointer;
-		padding: 0;
-		text-align: left;
-		transition: color 0.15s;
-	}
-
-	.advanced-toggle:hover {
-		color: var(--fg-muted);
-	}
-
-	/* URL bar */
-	.url-bar {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		padding: 10px 12px;
-		background: var(--bg);
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-	}
-
-	.url-bar input {
-		flex: 1;
-		padding: 6px 10px;
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		font-family: 'SF Mono', ui-monospace, monospace;
-		font-size: 12px;
-		color: var(--fg);
-		background: var(--bg-subtle);
-		outline: none;
-		transition: border-color 0.15s;
-	}
-
-	.url-bar input:focus {
-		border-color: var(--fg-muted);
-	}
-
-	.load-btn {
-		background: var(--brand);
-		color: var(--fg-on-dark);
-		border: none;
-		border-radius: var(--radius-full);
-		padding: 7px 16px;
-		font-size: 13px;
-		font-weight: 500;
-		cursor: pointer;
-		white-space: nowrap;
-		transition: opacity 0.15s;
-	}
-
-	.load-btn:hover {
-		opacity: 0.85;
-	}
-
-	/* Iframe view */
-	.iframe-topbar {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 12px;
-		padding-bottom: 16px;
-		border-bottom: 1px solid var(--border);
-		margin-bottom: 16px;
-	}
-
-	.back-btn {
-		background: none;
-		border: none;
-		color: var(--fg-muted);
-		font-size: 14px;
-		font-weight: 500;
-		cursor: pointer;
-		padding: 0;
-		display: flex;
-		align-items: center;
-		gap: 4px;
-		transition: color 0.15s;
-	}
-
-	.back-btn:hover {
-		color: var(--fg);
-	}
-
+	/* Iframe card fills remaining space */
 	.iframe-card {
 		flex: 1;
-		min-height: 500px;
 		display: flex;
 		flex-direction: column;
 		border: 1px solid var(--border);
 		border-radius: var(--radius-sm);
 		overflow: hidden;
 		background: var(--bg);
+		min-height: 0;
 	}
 
 	iframe {
 		flex: 1;
 		width: 100%;
+		height: 100%;
 		border: none;
-		min-height: 500px;
+	}
+
+	/* Not found */
+	.not-found {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--fg-muted);
+		font-size: 15px;
 	}
 
 	/* Connect modal */

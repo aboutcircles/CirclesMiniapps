@@ -109,6 +109,23 @@ async function sendTransactions(txs: { to: string; data?: string; value?: string
 	});
 }
 
+function disconnect() {
+	smartAccountClient = null;
+	publicClient = null;
+	localStorage.removeItem(SAFE_ADDRESS_KEY);
+	if (address) localStorage.removeItem(`cometh-connect-${address}`);
+	address = '';
+	connected = false;
+}
+
+/** Call on page mount. Reconnects from saved address in localStorage,
+ *  or uses the provided address override (e.g. from ?address= query param). */
+async function autoConnect(addressOverride?: string | null) {
+	if (connected) return;
+	const target = addressOverride || getSavedSafeAddress();
+	if (target) await connect(target);
+}
+
 async function signMessage(message: string) {
 	if (!smartAccountClient) throw new Error('Wallet not connected');
 	const signature = await smartAccountClient.account.signMessage({ message });
@@ -126,6 +143,8 @@ export const wallet = {
 	get connecting() { return connecting; },
 	getSavedSafeAddress,
 	connect,
+	disconnect,
+	autoConnect,
 	sendTransaction,
 	sendTransactions,
 	signMessage

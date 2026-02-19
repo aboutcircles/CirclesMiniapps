@@ -1,5 +1,6 @@
 [
   {
+    "slug": "sign-message-demo",
     "name": "Sign Message Demo",
     "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
     "url": "https://aboutcircles.github.io/miniappDemo/demo-sign/",
@@ -7,6 +8,7 @@
     "tags": ["demo", "signing"]
   },
   {
+    "slug": "erc20-transfer-demo",
     "name": "ERC20 Transfer Demo",
     "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
     "url": "https://aboutcircles.github.io/miniappDemo/demo-tx/",
