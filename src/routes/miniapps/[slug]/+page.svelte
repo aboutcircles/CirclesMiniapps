@@ -59,6 +59,14 @@
 				} else {
 					postTo(event.source, { type: 'wallet_disconnected' });
 				}
+				const raw = $page.url.searchParams.get('data');
+				if (raw) {
+					try {
+						postTo(event.source, { type: 'app_data', data: atob(raw) });
+					} catch {
+						postTo(event.source, { type: 'app_data', data: raw });
+					}
+				}
 				break;
 
 			case 'send_transactions':
