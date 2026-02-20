@@ -4,6 +4,47 @@ A SvelteKit app that hosts mini apps in iframes at `https://<VITE_BASE_URL>/mini
 
 ---
 
+## Submitting Your App to the Marketplace
+
+Apps are listed in [`static/miniapps.json`](static/miniapps.json). To add yours, open a Pull Request against `master` on [aboutcircles/CirclesMiniapps](https://github.com/aboutcircles/CirclesMiniapps) with two changes:
+
+1. **A new entry in `static/miniapps.json`**
+2. **A brief description of your app added to this README** (optional but appreciated)
+
+### Entry format
+
+```json
+{
+  "slug": "my-cool-app",
+  "name": "My Cool App",
+  "logo": "https://example.com/logo.svg",
+  "url": "https://example.com/app/",
+  "description": "One or two sentences describing what the app does.",
+  "tags": ["defi", "tokens"]
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `slug` | yes | URL-safe, unique identifier. Becomes the path `/miniapps/<slug>`. |
+| `name` | yes | Display name shown in the marketplace. |
+| `logo` | yes | HTTPS URL of a square logo (SVG or PNG, min 64×64 px). |
+| `url` | yes | HTTPS URL of your app. Must load in an iframe. |
+| `description` | yes | Short description shown under the app name. |
+| `tags` | yes | At least one category tag, e.g. `["defi"]`. |
+
+### PR checklist
+
+- [ ] Entry added to `static/miniapps.json` with all required fields
+- [ ] App loads over HTTPS and works inside an iframe
+- [ ] Logo URL resolves to a valid image
+- [ ] `slug` is unique (no duplicate in the existing JSON)
+- [ ] PR title: `feat: add <your app name>`
+
+The Circles team reviews and merges PRs on a best-effort basis.
+
+---
+
 ## Prerequisites
 
 - [Node.js](https://nodejs.org) 18+
@@ -129,18 +170,7 @@ To test locally, update `static/miniapps.json` to point the relevant app URL to 
 
 ## Mini apps
 
-Apps listed in `static/miniapps.json` appear on the `/miniapps` page. Each entry requires a `slug` which becomes the app's URL path:
-
-```json
-{
-  "slug": "my-app",
-  "name": "My App",
-  "logo": "https://example.com/logo.svg",
-  "url": "https://example.com/app/",
-  "description": "Short description.",
-  "tags": ["demo"]
-}
-```
+Apps listed in `static/miniapps.json` appear on the `/miniapps` page. See [Submitting Your App](#submitting-your-app-to-the-marketplace) for the full entry format.
 
 ### URL patterns
 
