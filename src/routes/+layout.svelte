@@ -1,5 +1,9 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
+	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
+	import { wallet } from '$lib/wallet.svelte.ts';
+	import { getAddress } from 'viem';
 
 	interface Props {
 		children: Snippet;
@@ -8,14 +12,27 @@
 	const { children }: Props = $props();
 
 	let disclaimerDismissed = $state(
-		typeof sessionStorage !== 'undefined' &&
-			sessionStorage.getItem('disclaimer-dismissed') === 'true'
+		typeof localStorage !== 'undefined' &&
+			localStorage.getItem('disclaimer-dismissed') === 'true'
 	);
 
 	function dismissDisclaimer() {
-		sessionStorage.setItem('disclaimer-dismissed', 'true');
+		localStorage.setItem('disclaimer-dismissed', 'true');
 		disclaimerDismissed = true;
 	}
+
+	onMount(() => {
+		const addressParam = $page.url.searchParams.get('address');
+		if (addressParam) {
+			try {
+				const normalized = getAddress(addressParam);
+				localStorage.setItem('safe_address', normalized);
+			} catch {
+				// invalid address — ignore
+			}
+		}
+		wallet.autoConnect();
+	});
 </script>
 
 {#if !disclaimerDismissed}
