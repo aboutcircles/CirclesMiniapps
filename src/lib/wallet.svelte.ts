@@ -93,9 +93,10 @@ async function connect(safeAddress: string) {
 			bundlerTransport: http(config.bundlerUrl),
 			paymaster: paymasterClient,
 			userOperation: {
+				// Both fee values must be equal (might result in revert otherwise)
 				estimateFeesPerGas: async () => ({
 					maxFeePerGas: 2000000000n,
-					maxPriorityFeePerGas: 1000000000n
+					maxPriorityFeePerGas: 2000000000n
 				})
 			}
 		});
