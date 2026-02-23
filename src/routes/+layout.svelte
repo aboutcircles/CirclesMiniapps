@@ -1,7 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
 	import { wallet } from '$lib/wallet.svelte.ts';
 	import { getAddress } from 'viem';
 
@@ -21,8 +20,9 @@
 		disclaimerDismissed = true;
 	}
 
-	onMount(() => {
-		const addressParam = $page.url.searchParams.get('address');
+	// Run synchronously so localStorage is set before any onMount (including child pages) calls autoConnect.
+	if (typeof window !== 'undefined') {
+		const addressParam = new URLSearchParams(window.location.search).get('address');
 		if (addressParam) {
 			try {
 				const normalized = getAddress(addressParam);
@@ -31,6 +31,9 @@
 				// invalid address — ignore
 			}
 		}
+	}
+
+	onMount(() => {
 		wallet.autoConnect();
 	});
 </script>

@@ -17,6 +17,8 @@ const SAFE_ADDRESS_KEY = 'safe_address';
 let address = $state<string>('');
 let connected = $state(false);
 let connecting = $state(false);
+let manuallyDisconnected = false;
+let autoConnecting = false;
 
 function getSavedSafeAddress(): string {
 	return localStorage.getItem(SAFE_ADDRESS_KEY) ?? '';
@@ -49,7 +51,7 @@ async function connectWithPasskey() {
 		await connect(resolved as string);
 	} catch (error: any) {
 		console.error('Passkey connection error:', error);
-		alert('Failed to connect: ' + error.message);
+		if (!autoConnecting) alert('Failed to connect: ' + error.message);
 	} finally {
 		connecting = false;
 	}
@@ -102,7 +104,7 @@ async function connect(safeAddress: string) {
 		connected = true;
 	} catch (error: any) {
 		console.error('Connection error:', error);
-		alert('Failed to connect: ' + error.message);
+		if (!autoConnecting) alert('Failed to connect: ' + error.message);
 	} finally {
 		connecting = false;
 	}
@@ -136,13 +138,23 @@ function disconnect() {
 	if (address) localStorage.removeItem(`cometh-connect-${address}`);
 	address = '';
 	connected = false;
+	manuallyDisconnected = true;
 }
 
-/** Call on page mount. Reconnects from saved address in localStorage. */
+/** Call on page mount. Auto-connects from saved address or passkey; skips if user disconnected this session. */
 async function autoConnect() {
-	if (connected) return;
-	const target = getSavedSafeAddress();
-	if (target) await connect(target);
+	if (connected || connecting || manuallyDisconnected) return;
+	autoConnecting = true;
+	try {
+		const target = getSavedSafeAddress();
+		if (target) {
+			await connect(target);
+		} else {
+			await connectWithPasskey();
+		}
+	} finally {
+		autoConnecting = false;
+	}
 }
 
 async function signMessage(message: string) {
