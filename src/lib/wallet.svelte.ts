@@ -1,4 +1,4 @@
-import { createPublicClient, http, getAddress } from 'viem';
+import { createPublicClient, http, getAddress, toHex } from 'viem';
 import { gnosis } from 'viem/chains';
 import {
 	createSafeSmartAccount,
@@ -160,9 +160,23 @@ async function autoConnect() {
 
 async function signMessage(message: string) {
 	if (!smartAccountClient) throw new Error('Wallet not connected');
-	const signature = await smartAccountClient.account.signMessage({ message });
+	// The auth service verifies via Safe.isValidSignature(bytes rawMsgBytes, sig),
+	// which on-chain computes: challenge = SafeMessage EIP-712 of keccak256(rawMsgBytes).
+	//
+	// signTypedData bypasses the SDK's internal generateSafeMessageMessage() wrapper
+	// (which would add an extra EIP-191 hash), letting us pass rawMsgBytes directly
+	// as the SafeMessage content — matching exactly what the auth service verifies.
+	const chainId = smartAccountClient.chain?.id ?? 100;
+	const safeAddress = smartAccountClient.account.address;
+	const rawMsgBytes = toHex(new TextEncoder().encode(message));
+	const signature = await smartAccountClient.account.signTypedData({
+		domain: { chainId, verifyingContract: safeAddress },
+		types: { SafeMessage: [{ name: 'message', type: 'bytes' }] },
+		primaryType: 'SafeMessage',
+		message: { message: rawMsgBytes }
+	});
 	const verified = await publicClient.verifyMessage({
-		address: smartAccountClient.account.address,
+		address: safeAddress,
 		message,
 		signature
 	});
