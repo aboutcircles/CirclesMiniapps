@@ -1,0 +1,25 @@
+{
+  "name": "xmtp-chat-miniapp",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5182",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.21",
+    "@xmtp/browser-sdk": "6.3.0",
+    "@xmtp/content-type-text": "^2.0.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "viem": "^2.46.3",
+    "wagmi": "^3.5.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.4.1"
+  }
+}
