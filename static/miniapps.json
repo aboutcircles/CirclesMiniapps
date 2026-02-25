@@ -14,5 +14,13 @@
     "url": "https://aboutcircles.github.io/miniappDemo/demo-tx/",
     "description": "Send an ERC20 token transfer via the connected Safe wallet.",
     "tags": ["demo", "transactions"]
+  },
+  {
+    "slug": "lending",
+    "name": "Circles Lending",
+    "logo": "",
+    "url": "https://leinss.xyz/circles-lending-miniapp/",
+    "description": "Peer-to-peer uncollateralized lending using the Circles trust graph. Borrow, lend, or relay loans through trusted connections.",
+    "tags": ["lending", "defi"]
   }
 ]
