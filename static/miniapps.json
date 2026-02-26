@@ -14,5 +14,13 @@
     "url": "https://aboutcircles.github.io/miniappDemo/demo-tx/",
     "description": "Send an ERC20 token transfer via the connected Safe wallet.",
     "tags": ["demo", "transactions"]
+  },
+  {
+    "slug": "xmtp-circles-demo",
+    "name": "XMTP Circles Demo",
+    "logo": "https://blog.xmtp.org/content/images/size/w320/format/webp/2025/12/logomark.png",
+    "url": "https://zengzengzenghuy.github.io/xmtp-circles-miniapp/",
+    "description": "Enables XMTP messaging for Safe wallets with native Circles support, allowing users to coordinate and message directly within a secure chat.",
+    "tags": ["xmtp", "circles", "messaging", "safe"]
   }
 ]
