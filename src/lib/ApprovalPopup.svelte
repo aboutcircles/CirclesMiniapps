@@ -10,6 +10,7 @@
 		transactions?: Transaction[];
 		message?: string;
 		requestId: string;
+		signatureType?: 'erc1271' | 'raw';
 	};
 
 	type Phase = 'review' | 'loading' | 'success' | 'error';
@@ -68,7 +69,7 @@
 <div class="backdrop" onclick={handleBackdropClick}>
 	<div class="popup" onclick={(e) => e.stopPropagation()}>
 		{#if phase === 'review'}
-			<h3>{request.kind === 'tx' ? 'Approve Transaction' : 'Sign Message'}</h3>
+			<h3>{request.kind === 'tx' ? 'Approve Transaction' : request.signatureType === 'raw' ? 'Sign Message (Raw)' : 'Sign Message'}</h3>
 
 			{#if request.kind === 'tx' && request.transactions}
 				<div class="details-section">
@@ -100,6 +101,9 @@
 						<div class="tx-label">Message</div>
 						<div class="message-content mono">{request.message}</div>
 					</div>
+					<div class="sig-type-badge">
+						{request.signatureType === 'raw' ? 'Raw bytes · auth service' : 'EIP-191 · ERC-1271 standard'}
+					</div>
 				</div>
 			{/if}
 
@@ -109,7 +113,7 @@
 			</div>
 
 		{:else if phase === 'loading'}
-			<h3>{request.kind === 'tx' ? 'Sending Transaction...' : 'Signing...'}</h3>
+			<h3>{request.kind === 'tx' ? 'Sending Transaction...' : request.signatureType === 'raw' ? 'Signing (raw)...' : 'Signing...'}</h3>
 			<div class="loading-container">
 				<div class="spinner"></div>
 				<p>Waiting for confirmation</p>
@@ -399,5 +403,15 @@
 
 	.scan-link:hover {
 		color: var(--fg);
+	}
+
+	.sig-type-badge {
+		font-size: 11px;
+		color: var(--fg-subtle);
+		margin-top: 6px;
+		padding: 4px 8px;
+		background: var(--bg-muted);
+		border-radius: 6px;
+		display: inline-block;
 	}
 </style>

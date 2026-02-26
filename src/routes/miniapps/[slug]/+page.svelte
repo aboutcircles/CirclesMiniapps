@@ -20,6 +20,7 @@
 		kind: 'tx' | 'sign';
 		transactions?: any[];
 		message?: string;
+		signatureType?: 'erc1271' | 'raw';
 		requestId: string;
 	} | null = $state(null);
 
@@ -97,6 +98,7 @@
 				pendingRequest = {
 					kind: 'sign',
 					message: data.message,
+					signatureType: data.signatureType === 'raw' ? 'raw' : 'erc1271',
 					requestId: data.requestId
 				};
 				break;
@@ -169,7 +171,9 @@
 		}
 
 		if (pendingRequest.kind === 'sign') {
-			const { signature, verified } = await wallet.signMessage(pendingRequest.message!);
+			const { signature, verified } = pendingRequest.signatureType === 'raw'
+				? await wallet.signMessage(pendingRequest.message!)
+				: { signature: await wallet.signErc1271Message(pendingRequest.message!), verified: true };
 			postTo(pendingSource, { type: 'sign_success', signature, verified, requestId: pendingRequest.requestId });
 			pendingRequest = null;
 			pendingSource = null;

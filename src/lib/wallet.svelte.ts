@@ -183,6 +183,27 @@ async function signMessage(message: string) {
 	return { signature, verified };
 }
 
+/**
+ * Sign a message using the standard EIP-191 + ERC-1271 path.
+ *
+ * Use this for any consumer that verifies via isValidSignature(eip191Hash, sig),
+ * including XMTP (libxmtp passes eip191_hash_message(text) to isValidSignature)
+ * and standard EIP-1271 wallets.
+ *
+ * Flow:
+ *   account.signMessage({ message }) → generateSafeMessageMessage(msg) = hashMessage(msg) = eip191Hash
+ *   → signs SafeMessage{ message: eip191Hash } via signTypedData
+ *   Verifier calls isValidSignature(eip191Hash, sig) → Safe reconstructs same SafeMessage hash ✓
+ *
+ * NOTE: This is NOT compatible with the auth service (which calls isValidSignature(rawBytes, sig)).
+ * Use wallet.signMessage() for the auth service flow.
+ */
+async function signErc1271Message(message: string) {
+	if (!smartAccountClient) throw new Error('Wallet not connected');
+	const signature = await smartAccountClient.account.signMessage({ message });
+	return signature as `0x${string}`;
+}
+
 export const wallet = {
 	get address() { return address; },
 	get connected() { return connected; },
@@ -194,5 +215,6 @@ export const wallet = {
 	autoConnect,
 	sendTransaction,
 	sendTransactions,
-	signMessage
+	signMessage,
+	signErc1271Message
 };

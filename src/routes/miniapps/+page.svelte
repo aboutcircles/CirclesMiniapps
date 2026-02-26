@@ -23,6 +23,7 @@
 		kind: 'tx' | 'sign';
 		transactions?: any[];
 		message?: string;
+		signatureType?: 'erc1271' | 'raw';
 		requestId: string;
 	} | null = $state(null);
 	let iframeEl: HTMLIFrameElement = $state() as HTMLIFrameElement;
@@ -99,6 +100,7 @@
 				pendingRequest = {
 					kind: 'sign',
 					message: data.message,
+					signatureType: data.signatureType === 'raw' ? 'raw' : 'erc1271',
 					requestId: data.requestId
 				};
 				break;
@@ -183,7 +185,9 @@
 		}
 
 		if (pendingRequest.kind === 'sign') {
-			const { signature, verified } = await wallet.signMessage(pendingRequest.message!);
+			const { signature, verified } = pendingRequest.signatureType === 'raw'
+				? await wallet.signMessage(pendingRequest.message!)
+				: { signature: await wallet.signErc1271Message(pendingRequest.message!), verified: true };
 			postTo(pendingSource, { type: 'sign_success', signature, verified, requestId: pendingRequest.requestId });
 			pendingRequest = null;
 			pendingSource = null;
@@ -209,6 +213,7 @@
 <div class="page">
 	{#if view === 'list'}
 		<!-- App List View -->
+		<div class="list-scroll">
 		<div class="card header">
 			<div class="header-left">
 				<h1>Mini Apps</h1>
@@ -291,8 +296,10 @@
 				</div>
 			{/if}
 		</div>
+		</div> <!-- /list-scroll -->
 	{:else}
 		<!-- Iframe View -->
+		<div class="iframe-view">
 		<div class="iframe-topbar">
 			<button class="back-btn" onclick={goBack}>&#8592; back</button>
 			<div class="header-right">
@@ -338,6 +345,7 @@
 				onload={handleIframeLoad}
 			></iframe>
 		</div>
+		</div> <!-- /iframe-view -->
 	{/if}
 </div>
 
@@ -379,7 +387,7 @@
 	}
 
 	.page {
-		min-height: 100vh;
+		height: 100vh;
 		display: flex;
 		flex-direction: column;
 		max-width: 720px;
@@ -387,6 +395,7 @@
 		padding: 24px 16px;
 		gap: 0;
 		box-sizing: border-box;
+		overflow: hidden;
 	}
 
 	/* Header */
@@ -663,7 +672,21 @@
 		opacity: 0.85;
 	}
 
+	/* List view scrolls, iframe view does not */
+	.list-scroll {
+		flex: 1;
+		overflow-y: auto;
+		min-height: 0;
+	}
+
 	/* Iframe view */
+	.iframe-view {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+
 	.iframe-topbar {
 		display: flex;
 		align-items: center;
@@ -672,6 +695,7 @@
 		padding-bottom: 16px;
 		border-bottom: 1px solid var(--border);
 		margin-bottom: 16px;
+		flex-shrink: 0;
 	}
 
 	.back-btn {
@@ -694,7 +718,7 @@
 
 	.iframe-card {
 		flex: 1;
-		min-height: 500px;
+		min-height: 0;
 		display: flex;
 		flex-direction: column;
 		border: 1px solid var(--border);
@@ -706,8 +730,9 @@
 	iframe {
 		flex: 1;
 		width: 100%;
+		height: 100%;
 		border: none;
-		min-height: 500px;
+		display: block;
 	}
 
 </style>
