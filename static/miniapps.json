@@ -22,5 +22,13 @@
     "url": "https://zengzengzenghuy.github.io/xmtp-circles-miniapp/",
     "description": "Enables XMTP messaging for Safe wallets with native Circles support, allowing users to coordinate and message directly within a secure chat.",
     "tags": ["xmtp", "circles", "messaging", "safe"]
+  },
+  {
+    "slug": "coinflip-game",
+    "name": "Coinflip Game",
+    "logo": "https://nationaltoday.com/wp-content/uploads/2021/06/Flip-A-Coin-Day-1200x834.jpg",
+    "url": "https://coinflip-miniapp-omega.vercel.app/game",
+    "description": "A simple coin flip mini app game.",
+    "tags": ["game", "coinflip"]
   }
 ]
