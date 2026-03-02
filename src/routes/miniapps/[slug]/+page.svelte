@@ -312,7 +312,7 @@
 		flex-direction: column;
 		max-width: 720px;
 		margin: 0 auto;
-		padding: 24px 16px;
+		padding: 12px 8px;
 		box-sizing: border-box;
 		overflow-x: hidden;
 	}
@@ -323,7 +323,7 @@
 		align-items: center;
 		justify-content: space-between;
 		gap: 12px;
-		padding-bottom: 16px;
+		padding-bottom: 12px;
 		border-bottom: 1px solid var(--border);
 		margin-bottom: 16px;
 		flex-shrink: 0;

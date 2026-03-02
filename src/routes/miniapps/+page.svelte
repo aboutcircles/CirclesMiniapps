@@ -13,6 +13,40 @@
 	let apps: MiniApp[] = $state([]);
 	let view: 'list' | 'iframe' = $state('list');
 	let showAdvanced = $state(false);
+	let selectedApp: MiniApp | null = $state(null);
+	let selectedTags: Set<string> = $state(new Set());
+	let showAllTags = $state(false);
+
+	const TOP_TAG_COUNT = 3;
+
+	function allTags(): { tag: string; count: number }[] {
+		const counts = new Map<string, number>();
+		for (const app of apps) {
+			for (const tag of app.tags ?? []) {
+				counts.set(tag, (counts.get(tag) ?? 0) + 1);
+			}
+		}
+		return [...counts.entries()]
+			.map(([tag, count]) => ({ tag, count }))
+			.sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+	}
+
+	function visibleTags(): { tag: string; count: number }[] {
+		const all = allTags();
+		return showAllTags ? all : all.slice(0, TOP_TAG_COUNT);
+	}
+
+	function toggleTag(tag: string) {
+		const next = new Set(selectedTags);
+		if (next.has(tag)) next.delete(tag);
+		else next.add(tag);
+		selectedTags = next;
+	}
+
+	function filteredApps(): MiniApp[] {
+		if (selectedTags.size === 0) return apps;
+		return apps.filter((app) => [...selectedTags].every((t) => app.tags?.includes(t)));
+	}
 
 	let iframeSrc = $state('');
 	let urlInput = $state('');
@@ -266,44 +300,87 @@
 			</div>
 		</div>
 
-		<div class="app-list">
-			{#each apps as app (app.url)}
-				<div class="app-row">
-					<div class="app-logo-wrap">
+		{#if allTags().length > 0}
+			<div class="tag-cloud">
+				<span class="tag-cloud-label">Filter by tag</span>
+				<div class="tag-cloud-pills">
+					{#each visibleTags() as { tag } (tag)}
+						<button
+							class="tag-filter"
+							class:active={selectedTags.has(tag)}
+							onclick={() => toggleTag(tag)}
+						>{tag}</button>
+					{/each}
+					{#if allTags().length > TOP_TAG_COUNT}
+						<button class="tag-view-all" onclick={() => (showAllTags = !showAllTags)}>
+							{showAllTags ? 'less' : 'view all'}
+						</button>
+					{/if}
+				</div>
+			</div>
+		{/if}
+
+		<div class="app-grid">
+			{#each filteredApps() as app (app.url)}
+				<button class="app-tile" onclick={() => (selectedApp = app)}>
+					<div class="tile-icon-wrap">
 						{#if app.logo}
-							<img
-								class="app-logo"
-								src={app.logo}
-								alt={app.name}
+							<img class="tile-icon" src={app.logo} alt={app.name}
 								onerror={(e) => {
 									const el = e.currentTarget as HTMLImageElement;
 									el.style.display = 'none';
-									const fallback = el.nextElementSibling as HTMLElement | null;
-									if (fallback) fallback.style.display = 'flex';
+									const fb = el.nextElementSibling as HTMLElement | null;
+									if (fb) fb.style.display = 'flex';
 								}}
 							/>
-							<span class="app-logo-fallback" style="display:none">{getInitial(app.name)}</span>
+							<span class="tile-icon-fallback" style="display:none">{getInitial(app.name)}</span>
 						{:else}
-							<span class="app-logo-fallback">{getInitial(app.name)}</span>
+							<span class="tile-icon-fallback">{getInitial(app.name)}</span>
 						{/if}
 					</div>
-					<div class="app-info">
-						<span class="app-name">{app.name}</span>
-						{#if app.description}
-							<span class="app-description">{app.description}</span>
-						{/if}
-						{#if app.tags && app.tags.length > 0}
-							<div class="app-tags">
-								{#each app.tags as tag (tag)}
-									<span class="tag">{tag}</span>
-								{/each}
-							</div>
-						{/if}
-					</div>
-					<button class="launch-btn" onclick={() => launchApp(app)}>Launch</button>
-				</div>
+					<span class="tile-name">{app.name}</span>
+				</button>
+			{:else}
+				<p class="no-results">No apps match the selected tags.</p>
 			{/each}
 		</div>
+
+		{#if selectedApp}
+			<div class="popup-overlay" onclick={() => (selectedApp = null)} role="presentation">
+				<div class="popup-card" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1">
+					<button class="popup-close" onclick={() => (selectedApp = null)} aria-label="Close">&#10005;</button>
+					<div class="popup-icon-wrap">
+						{#if selectedApp.logo}
+							<img class="popup-icon" src={selectedApp.logo} alt={selectedApp.name}
+								onerror={(e) => {
+									const el = e.currentTarget as HTMLImageElement;
+									el.style.display = 'none';
+									const fb = el.nextElementSibling as HTMLElement | null;
+									if (fb) fb.style.display = 'flex';
+								}}
+							/>
+							<span class="popup-icon-fallback" style="display:none">{getInitial(selectedApp.name)}</span>
+						{:else}
+							<span class="popup-icon-fallback">{getInitial(selectedApp.name)}</span>
+						{/if}
+					</div>
+					<h2 class="popup-name">{selectedApp.name}</h2>
+					{#if selectedApp.description}
+						<p class="popup-description">{selectedApp.description}</p>
+					{/if}
+					{#if selectedApp.tags && selectedApp.tags.length > 0}
+						<div class="popup-tags">
+							{#each selectedApp.tags as tag (tag)}
+								<span class="tag">{tag}</span>
+							{/each}
+						</div>
+					{/if}
+					<button class="popup-launch-btn" onclick={() => { launchApp(selectedApp!); selectedApp = null; }}>
+						Start
+					</button>
+				</div>
+			</div>
+		{/if}
 
 		<div class="advanced-section">
 			<button class="advanced-toggle" onclick={() => (showAdvanced = !showAdvanced)}>
@@ -413,13 +490,17 @@
 		--radius-full: 999px;
 	}
 
-	:global(body) {
+	:global(html, body) {
 		margin: 0;
+		max-width: 100%;
+		overflow-x: hidden;
+	}
+
+	:global(body) {
 		background: var(--bg-subtle);
 		color: var(--fg);
 		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 		-webkit-font-smoothing: antialiased;
-		overflow-x: hidden;
 	}
 
 	.page {
@@ -428,7 +509,7 @@
 		flex-direction: column;
 		max-width: 720px;
 		margin: 0 auto;
-		padding: 24px 16px;
+		padding: 12px 8px;
 		gap: 0;
 		box-sizing: border-box;
 		overflow: hidden;
@@ -440,9 +521,9 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 0 0 20px 0;
+		padding: 0 0 12px 0;
 		border-bottom: 1px solid var(--border);
-		margin-bottom: 24px;
+		margin-bottom: 16px;
 	}
 
 	.header-left h1 {
@@ -571,80 +652,144 @@
 		to { transform: rotate(360deg); }
 	}
 
-	/* App list */
-	.app-list {
+	/* Tag cloud */
+	.tag-cloud {
 		display: flex;
 		flex-direction: column;
-		border: 1px solid var(--border);
-		border-radius: var(--radius-sm);
-		background: var(--bg);
-		overflow: hidden;
+		align-items: flex-start;
+		gap: 8px;
+		margin-bottom: 14px;
 	}
 
-	.app-row {
+	.tag-cloud-label {
+		font-size: 11px;
+		font-weight: 600;
+		color: var(--fg-subtle);
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
+	}
+
+	.tag-cloud-pills {
 		display: flex;
+		flex-wrap: wrap;
 		align-items: center;
-		gap: 14px;
-		padding: 14px 16px;
-		border-bottom: 1px solid var(--border);
+		gap: 6px;
 	}
 
-	.app-row:last-child {
-		border-bottom: none;
+	.tag-filter {
+		background: var(--bg-muted);
+		color: var(--fg-muted);
+		border: 1px solid transparent;
+		border-radius: var(--radius-full);
+		padding: 4px 12px;
+		font-size: 12px;
+		font-weight: 500;
+		cursor: pointer;
+		transition: background 0.15s, color 0.15s, border-color 0.15s;
 	}
 
-	.app-logo-wrap {
-		width: 44px;
-		height: 44px;
-		flex-shrink: 0;
+	.tag-filter:hover {
+		background: var(--bg-emphasis);
+		color: var(--fg);
 	}
 
-	.app-logo {
-		width: 44px;
-		height: 44px;
-		border-radius: 10px;
-		object-fit: contain;
+	.tag-filter.active {
+		background: var(--brand);
+		color: var(--fg-on-dark);
+		border-color: var(--brand);
+	}
+
+	.tag-view-all {
+		background: none;
+		border: none;
+		color: var(--fg-subtle);
+		font-size: 12px;
+		font-weight: 500;
+		cursor: pointer;
+		padding: 4px;
+		transition: color 0.15s;
+	}
+
+	.tag-view-all:hover {
+		color: var(--fg-muted);
+	}
+
+	.no-results {
+		grid-column: 1 / -1;
+		text-align: center;
+		color: var(--fg-muted);
+		font-size: 14px;
+		padding: 32px 0;
+		margin: 0;
+	}
+
+	/* App grid */
+	.app-grid {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 16px;
+		min-width: 0;
+		width: 100%;
+	}
+
+	.app-tile {
+		background: none;
+		border: none;
+		padding: 0;
+		cursor: pointer;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 8px;
+		text-align: center;
+	}
+
+	.tile-icon-wrap {
+		width: 100%;
+		aspect-ratio: 1;
+		border-radius: 20px;
+		overflow: hidden;
+		background: var(--bg-emphasis);
+		position: relative;
+		outline: 2px solid transparent;
+		transition: outline-color 0.15s, background 0.15s;
+		padding: 6px;
+		box-sizing: border-box;
+	}
+
+	.app-tile:hover .tile-icon-wrap {
+		outline-color: var(--border-strong);
 		background: var(--bg-muted);
 	}
 
-	.app-logo-fallback {
-		width: 44px;
-		height: 44px;
-		border-radius: 10px;
-		background: var(--bg-emphasis);
+	.tile-icon {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+	}
+
+	.tile-icon-fallback {
+		position: absolute;
+		inset: 0;
+		font-size: 28px;
+		font-weight: 700;
 		color: var(--fg-muted);
-		font-size: 18px;
-		font-weight: 600;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		width: 100%;
+		height: 100%;
 	}
 
-	.app-info {
-		flex: 1;
-		min-width: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 5px;
-	}
-
-	.app-name {
-		font-size: 15px;
+	.tile-name {
+		font-size: 12px;
 		font-weight: 500;
 		color: var(--fg);
-		letter-spacing: -0.01em;
-	}
-
-	.app-description {
-		font-size: 13px;
-		color: var(--fg-muted);
-		line-height: 1.4;
-	}
-
-	.app-tags {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 4px;
+		line-height: 1.3;
+		word-break: break-word;
+		max-width: 100%;
 	}
 
 	.tag {
@@ -656,22 +801,122 @@
 		border-radius: var(--radius-full);
 	}
 
-	.launch-btn {
-		background: var(--bg-subtle);
-		color: var(--fg);
-		border: 1px solid var(--border-strong);
-		border-radius: var(--radius-full);
-		padding: 7px 16px;
-		font-size: 13px;
-		font-weight: 500;
+	/* Popup */
+	.popup-overlay {
+		position: fixed;
+		inset: 0;
+		background: rgba(6, 10, 64, 0.45);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 100;
+		padding: 16px;
+	}
+
+	.popup-card {
+		background: var(--bg);
+		border-radius: 20px;
+		padding: 28px 24px 24px;
+		width: 100%;
+		max-width: 400px;
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 12px;
+	}
+
+	.popup-close {
+		position: absolute;
+		top: 14px;
+		right: 14px;
+		background: var(--bg-emphasis);
+		border: none;
+		width: 28px;
+		height: 28px;
+		border-radius: 50%;
+		font-size: 12px;
+		color: var(--fg-muted);
 		cursor: pointer;
-		white-space: nowrap;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		transition: background 0.15s;
+	}
+
+	.popup-close:hover {
+		background: var(--border-strong);
+	}
+
+	.popup-icon-wrap {
+		width: 80px;
+		height: 80px;
+		border-radius: 18px;
+		overflow: hidden;
+		background: var(--bg-emphasis);
+		position: relative;
 		flex-shrink: 0;
 	}
 
-	.launch-btn:hover {
-		background: var(--bg-emphasis);
+	.popup-icon {
+		position: absolute;
+		inset: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+	}
+
+	.popup-icon-fallback {
+		position: absolute;
+		inset: 0;
+		font-size: 32px;
+		font-weight: 700;
+		color: var(--fg-muted);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.popup-name {
+		margin: 0;
+		font-size: 18px;
+		font-weight: 600;
+		color: var(--fg);
+		letter-spacing: -0.02em;
+		text-align: center;
+	}
+
+	.popup-description {
+		margin: 0;
+		font-size: 14px;
+		color: var(--fg-muted);
+		line-height: 1.5;
+		text-align: center;
+	}
+
+	.popup-tags {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		justify-content: center;
+	}
+
+	.popup-launch-btn {
+		width: 100%;
+		background: var(--brand);
+		color: var(--fg-on-dark);
+		border: none;
+		border-radius: var(--radius-full);
+		padding: 14px;
+		font-size: 15px;
+		font-weight: 600;
+		cursor: pointer;
+		margin-top: 4px;
+		transition: opacity 0.15s;
+	}
+
+	.popup-launch-btn:hover {
+		opacity: 0.85;
 	}
 
 	/* Advanced section */
@@ -747,6 +992,7 @@
 		flex: 1;
 		overflow-y: auto;
 		min-height: 0;
+		padding: 0 4px;
 	}
 
 	/* Iframe view */
