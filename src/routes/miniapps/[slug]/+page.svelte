@@ -12,6 +12,14 @@
 	let app: MiniApp | null = $state(null);
 	let notFound = $state(false);
 	let iframeSrc = $state('');
+	let showLogout = $state(false);
+	let chipEl = $state<HTMLElement>();
+
+	function handleWindowClick(e: MouseEvent) {
+		if (showLogout && chipEl && !chipEl.contains(e.target as Node)) {
+			showLogout = false;
+		}
+	}
 
 	// pendingSource is kept outside $state to avoid Svelte proxying the cross-origin Window object,
 	// which triggers "Blocked a frame from accessing a cross-origin frame".
@@ -28,6 +36,12 @@
 
 	function truncateAddr(addr: string): string {
 		return addr.slice(0, 6) + '...' + addr.slice(-4);
+	}
+
+	function getAvatarInitial(): string {
+		const name = wallet.avatarName;
+		if (name) return name.trim().charAt(0).toUpperCase();
+		return wallet.address ? wallet.address.slice(2, 4).toUpperCase() : '?';
 	}
 
 	/** Post a message to a cross-origin source window safely. */
@@ -192,6 +206,8 @@
 	}
 </script>
 
+<svelte:window onclick={handleWindowClick} />
+
 <svelte:head>
 	<title>{app ? app.name : 'Mini App'} - {baseUrl}</title>
 </svelte:head>
@@ -209,9 +225,19 @@
 			<button class="back-btn" onclick={goBack}>&#8592; back</button>
 			<div class="header-right">
 				{#if wallet.connected}
-					<span class="wallet-address">{truncateAddr(wallet.address)}</span>
-					<span class="status-dot connected"></span>
-					<button class="disconnect-btn" onclick={() => wallet.disconnect()}>Disconnect</button>
+					<div class="user-chip" bind:this={chipEl} class:open={showLogout} onclick={() => (showLogout = !showLogout)} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && (showLogout = !showLogout)}>
+						<div class="avatar-img-wrap">
+							{#if wallet.avatarImageUrl}
+								<img class="avatar-img" src={wallet.avatarImageUrl} alt="avatar" />
+							{:else}
+								<span class="avatar-placeholder">{getAvatarInitial()}</span>
+							{/if}
+						</div>
+						<span class="user-name">{wallet.avatarName || truncateAddr(wallet.address)}</span>
+						{#if showLogout}
+							<button class="logout-btn" onclick={(e) => { e.stopPropagation(); wallet.disconnect(); showLogout = false; }}>Log out</button>
+						{/if}
+					</div>
 				{:else}
 					<button
 						class="connect-btn"
@@ -222,7 +248,7 @@
 							<span class="btn-spinner"></span>
 							Connecting...
 						{:else}
-							Connect Wallet
+							Sign in
 						{/if}
 					</button>
 				{/if}
@@ -267,7 +293,6 @@
 		--fg-subtle: #9b9db3;
 		--fg-on-dark: #ffffff;
 		--brand: #060a40;
-		--green: #22c54b;
 		--radius-sm: 12px;
 		--radius-full: 999px;
 	}
@@ -278,6 +303,7 @@
 		color: var(--fg);
 		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 		-webkit-font-smoothing: antialiased;
+		overflow-x: hidden;
 	}
 
 	.page {
@@ -288,6 +314,7 @@
 		margin: 0 auto;
 		padding: 24px 16px;
 		box-sizing: border-box;
+		overflow-x: hidden;
 	}
 
 	/* Topbar */
@@ -350,21 +377,77 @@
 		cursor: not-allowed;
 	}
 
-	.disconnect-btn {
-		background: none;
-		border: 1px solid var(--border-strong);
+	/* User chip */
+	.user-chip {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 4px 10px 4px 4px;
+		border: 1px solid var(--border);
 		border-radius: var(--radius-full);
-		padding: 6px 14px;
+		background: var(--bg);
+		cursor: pointer;
+		user-select: none;
+		transition: border-color 0.15s, background 0.15s;
+	}
+
+	.user-chip:hover,
+	.user-chip.open {
+		border-color: var(--border-strong);
+		background: var(--bg-subtle);
+	}
+
+	.avatar-img-wrap {
+		width: 26px;
+		height: 26px;
+		border-radius: 50%;
+		overflow: hidden;
+		flex-shrink: 0;
+		background: var(--bg-emphasis);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.avatar-img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+	}
+
+	.avatar-placeholder {
+		font-size: 12px;
+		font-weight: 600;
+		color: var(--fg-muted);
+		line-height: 1;
+	}
+
+	.user-name {
+		font-size: 13px;
+		font-weight: 500;
+		color: var(--fg);
+		max-width: 140px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.logout-btn {
+		background: none;
+		border: none;
+		border-left: 1px solid var(--border);
+		padding: 2px 0 2px 10px;
+		margin-left: 2px;
 		font-size: 13px;
 		font-weight: 500;
 		color: var(--fg-muted);
 		cursor: pointer;
-		transition: color 0.15s, border-color 0.15s;
+		white-space: nowrap;
+		transition: color 0.15s;
 	}
 
-	.disconnect-btn:hover {
+	.logout-btn:hover {
 		color: var(--fg);
-		border-color: var(--fg-muted);
 	}
 
 	.btn-spinner {
@@ -379,24 +462,6 @@
 
 	@keyframes spin {
 		to { transform: rotate(360deg); }
-	}
-
-	.status-dot {
-		width: 7px;
-		height: 7px;
-		border-radius: 50%;
-		background: var(--border-strong);
-		flex-shrink: 0;
-	}
-
-	.status-dot.connected {
-		background: var(--green);
-	}
-
-	.wallet-address {
-		font-family: 'SF Mono', ui-monospace, monospace;
-		font-size: 12px;
-		color: var(--fg-muted);
 	}
 
 	/* Iframe card fills remaining space */

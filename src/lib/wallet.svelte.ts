@@ -13,10 +13,13 @@ const PIMLICO_API_KEY = import.meta.env.VITE_PIMLICO_API_KEY;
 const PIMLICO_URL = `https://api.pimlico.io/v2/100/rpc?apikey=${PIMLICO_API_KEY}`;
 
 const SAFE_ADDRESS_KEY = 'safe_address';
+const CIRCLES_RPC_URL = 'https://rpc.aboutcircles.com/';
 
 let address = $state<string>('');
 let connected = $state(false);
 let connecting = $state(false);
+let avatarName = $state<string>('');
+let avatarImageUrl = $state<string>('');
 let manuallyDisconnected = false;
 let autoConnecting = false;
 
@@ -87,27 +90,48 @@ async function connect(safeAddress: string) {
 			entryPoint: { address: ENTRYPOINT_ADDRESS_V07, version: '0.7' }
 		});
 
+		const gasPrice = await paymasterClient.getUserOperationGasPrice();
+
 		smartAccountClient = createSmartAccountClient({
 			account: smartAccount,
 			chain: gnosis,
 			bundlerTransport: http(config.bundlerUrl),
 			paymaster: paymasterClient,
 			userOperation: {
-				// Both fee values must be equal (might result in revert otherwise)
-				estimateFeesPerGas: async () => ({
-					maxFeePerGas: 2000000000n,
-					maxPriorityFeePerGas: 2000000000n
-				})
+				estimateFeesPerGas: async () => gasPrice.fast
 			}
 		});
 
 		address = safeAddress;
 		connected = true;
+		fetchAvatarInfo(safeAddress);
 	} catch (error: any) {
 		console.error('Connection error:', error);
 		if (!autoConnecting) alert('Failed to connect: ' + error.message);
 	} finally {
 		connecting = false;
+	}
+}
+
+async function fetchAvatarInfo(safeAddress: string) {
+	try {
+		const res = await fetch(CIRCLES_RPC_URL, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				jsonrpc: '2.0',
+				id: 1,
+				method: 'circles_getProfileByAddress',
+				params: [safeAddress]
+			})
+		});
+		const json = await res.json();
+		const result = json?.result;
+		avatarName = result?.name ?? '';
+		avatarImageUrl = result?.previewImageUrl ?? '';
+	} catch {
+		avatarName = '';
+		avatarImageUrl = '';
 	}
 }
 
@@ -122,8 +146,7 @@ async function sendTransaction(tx: { to: string; data?: string; value?: string }
 
 async function sendTransactions(txs: { to: string; data?: string; value?: string }[]) {
 	if (!smartAccountClient) throw new Error('Wallet not connected');
-	if (txs.length === 1) return sendTransaction(txs[0]);
-	return smartAccountClient.sendUserOperation({
+	return smartAccountClient.sendTransaction({
 		calls: txs.map((tx) => ({
 			to: tx.to,
 			data: tx.data || '0x',
@@ -138,6 +161,8 @@ function disconnect() {
 	localStorage.removeItem(SAFE_ADDRESS_KEY);
 	if (address) localStorage.removeItem(`cometh-connect-${address}`);
 	address = '';
+	avatarName = '';
+	avatarImageUrl = '';
 	connected = false;
 	manuallyDisconnected = true;
 }
@@ -208,6 +233,8 @@ export const wallet = {
 	get address() { return address; },
 	get connected() { return connected; },
 	get connecting() { return connecting; },
+	get avatarName() { return avatarName; },
+	get avatarImageUrl() { return avatarImageUrl; },
 	getSavedSafeAddress,
 	connect,
 	connectWithPasskey,
