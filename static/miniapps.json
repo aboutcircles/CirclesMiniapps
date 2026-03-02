@@ -30,5 +30,13 @@
     "url": "https://coinflip-miniapp-omega.vercel.app/game",
     "description": "A simple coin flip mini app game.",
     "tags": ["game", "coinflip"]
+  },
+  {
+    "slug": "miniapps-org-manager",
+    "name": "MiniApps Org Manager",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "https://circles-org-miniapp.vercel.app/",
+    "description": "Builder-focused setup tool for miniapp organizations, including org creation, accepted CRC configuration, signer management, and withdrawals.",
+    "tags": ["circles", "organization", "builder", "tools"]
   }
 ]
