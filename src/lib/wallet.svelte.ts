@@ -10,6 +10,7 @@ import { createPimlicoClient } from 'permissionless/clients/pimlico';
 
 const COMETH_API_KEY = import.meta.env.VITE_COMETH_API_KEY;
 const PIMLICO_API_KEY = import.meta.env.VITE_PIMLICO_API_KEY;
+const PIMLICO_SPONSORSHIP_POLICY_ID = import.meta.env.VITE_PIMLICO_SPONSORSHIP_POLICY_ID;
 const PIMLICO_URL = `https://api.pimlico.io/v2/100/rpc?apikey=${PIMLICO_API_KEY}`;
 
 const SAFE_ADDRESS_KEY = 'safe_address';
@@ -90,15 +91,19 @@ async function connect(safeAddress: string) {
 			entryPoint: { address: ENTRYPOINT_ADDRESS_V07, version: '0.7' }
 		});
 
-		const gasPrice = await paymasterClient.getUserOperationGasPrice();
-
 		smartAccountClient = createSmartAccountClient({
 			account: smartAccount,
 			chain: gnosis,
-			bundlerTransport: http(config.bundlerUrl),
+			bundlerTransport: http(PIMLICO_URL),
 			paymaster: paymasterClient,
+			paymasterContext: PIMLICO_SPONSORSHIP_POLICY_ID
+				? { sponsorshipPolicyId: PIMLICO_SPONSORSHIP_POLICY_ID }
+				: undefined,
 			userOperation: {
-				estimateFeesPerGas: async () => gasPrice.fast
+				estimateFeesPerGas: async () => {
+					const gasPrice = await paymasterClient.getUserOperationGasPrice();
+					return gasPrice.fast;
+				}
 			}
 		});
 
