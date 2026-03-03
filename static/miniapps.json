@@ -62,5 +62,13 @@
     "url": "https://circles-quests.vercel.app/game",
     "description": "Daily Circles quests with in-app actions, on-chain tasks, and server-side verification with XP and leaderboard progression.",
     "tags": ["circles", "quests", "game", "leaderboard"]
+  },
+  {
+    "slug": "pixelize",
+    "name": "My Cool App",
+    "logo": "https://example.com/logo.svg",
+    "url": "https://extraordinary-smakager-566785.netlify.app/miniappDemo/",
+    "description": "Mint pixel and discover your new avatar",
+    "tags": ["defi", "tokens"]
   }
 ]
