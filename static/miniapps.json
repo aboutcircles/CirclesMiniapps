@@ -8,6 +8,14 @@
     "tags": ["demo", "signing"]
   },
   {
+  "slug": "honeypot",
+  "name": "My Cool App",
+  "logo": "https://example.com/logo.svg",
+  "url": "https://honey-pot-create.vercel.app/honey-pot/",
+  "description": "Grow honey pots for the creators you love",
+  "tags": ["defi", "tokens"]
+},
+  {
     "slug": "erc20-transfer-demo",
     "name": "ERC20 Transfer Demo",
     "logo": "/app-logos/erc20.png",
