@@ -263,7 +263,6 @@
 <div class="page">
 	{#if view === 'list'}
 		<!-- App List View -->
-		<div class="list-scroll">
 		<div class="card header">
 			<div class="header-left">
 				<h1>Mini Apps</h1>
@@ -299,6 +298,7 @@
 				{/if}
 			</div>
 		</div>
+		<div class="list-scroll">
 
 		{#if allTags().length > 0}
 			<div class="tag-cloud">
@@ -524,6 +524,7 @@
 		padding: 0 0 12px 0;
 		border-bottom: 1px solid var(--border);
 		margin-bottom: 16px;
+		flex-shrink: 0;
 	}
 
 	.header-left h1 {
