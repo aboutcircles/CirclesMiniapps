@@ -54,5 +54,13 @@
     "url": "https://circles-org-miniapp.vercel.app/",
     "description": "Builder-focused setup tool for miniapp organizations, including org creation, accepted CRC configuration, signer management, and withdrawals.",
     "tags": ["circles", "organization", "builder", "tools"]
+  },
+  {
+    "slug": "circles-daily-quest",
+    "name": "Circles Daily Quest",
+    "logo": "/app-logos/quests.png",
+    "url": "https://circles-quests.vercel.app/game",
+    "description": "Daily Circles quests with in-app actions, on-chain tasks, and server-side verification with XP and leaderboard progression.",
+    "tags": ["circles", "quests", "game", "leaderboard"]
   }
 ]
