@@ -2,7 +2,7 @@
   {
     "slug": "sign-message-demo",
     "name": "Sign Message Demo",
-    "logo": "/miniapps/sign.png",
+    "logo": "/app-logos/sign.png",
     "url": "https://aboutcircles.github.io/miniappDemo/demo-sign/",
     "description": "Sign an arbitrary message using the connected Safe wallet.",
     "tags": ["demo", "signing"]
@@ -10,7 +10,7 @@
   {
     "slug": "erc20-transfer-demo",
     "name": "ERC20 Transfer Demo",
-    "logo": "/miniapps/erc20.png",
+    "logo": "/app-logos/erc20.png",
     "url": "https://aboutcircles.github.io/miniappDemo/demo-tx/",
     "description": "Send an ERC20 token transfer via the connected Safe wallet.",
     "tags": ["demo", "transactions"]
@@ -18,7 +18,7 @@
   {
     "slug": "xmtp-circles-demo",
     "name": "XMTP Circles Demo",
-    "logo": "/miniapps/xmtp.png",
+    "logo": "/app-logos/xmtp.png",
     "url": "https://zengzengzenghuy.github.io/xmtp-circles-miniapp/",
     "description": "Enables XMTP messaging for Safe wallets with native Circles support, allowing users to coordinate and message directly within a secure chat.",
     "tags": ["xmtp", "circles", "messaging", "safe"]
@@ -26,7 +26,7 @@
   {
     "slug": "coinflip-game",
     "name": "Coinflip Game",
-    "logo": "/miniapps/coinflip.png",
+    "logo": "/app-logos/coinflip.png",
     "url": "https://coinflip-miniapp-omega.vercel.app/game",
     "description": "A simple coin flip mini app game.",
     "tags": ["game", "coinflip"]
@@ -34,7 +34,7 @@
   {
     "slug": "miniapps-org-manager",
     "name": "MiniApps Org Manager",
-    "logo": "/miniapps/org-manager.png",
+    "logo": "/app-logos/org-manager.png",
     "url": "https://circles-org-miniapp.vercel.app/",
     "description": "Builder-focused setup tool for miniapp organizations, including org creation, accepted CRC configuration, signer management, and withdrawals.",
     "tags": ["circles", "organization", "builder", "tools"]
