@@ -1,60 +1,93 @@
 <script lang="ts">
-	const baseUrl = import.meta.env.VITE_BASE_URL;
+	import { onMount } from 'svelte';
+
+	const TARGET_URL = 'https://app.aboutcircles.com';
+
+	let status = $state<'redirecting' | 'done'>('redirecting');
+
+	onMount(() => {
+		window.location.href = TARGET_URL;
+		status = 'done';
+	});
 </script>
 
 <svelte:head>
-	<title>Circles - {baseUrl}</title>
+	<title>Circles – Redirecting…</title>
 </svelte:head>
 
-<div class="landing">
-	<h1>Circles</h1>
-	<p class="subtitle">{baseUrl}</p>
-	<nav>
-		<a href="/miniapps">Mini Apps</a>
-	</nav>
+<div class="page-wrap">
+	<div class="card">
+		<div class="spinner"></div>
+		<p>Redirecting to Circles&hellip;</p>
+		<a class="btn" href={TARGET_URL}>Open manually</a>
+	</div>
 </div>
 
 <style>
-	.landing {
+	* {
+		margin: 0;
+		padding: 0;
+		box-sizing: border-box;
+	}
+
+	:global(body) {
+		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+		background: #f5f5f5;
+	}
+
+	.page-wrap {
 		min-height: 100vh;
 		display: flex;
-		flex-direction: column;
 		align-items: center;
 		justify-content: center;
-		background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-		color: white;
 	}
 
-	h1 {
-		font-size: 48px;
-		margin: 0 0 8px 0;
-	}
-
-	.subtitle {
-		font-size: 16px;
-		opacity: 0.8;
-		margin: 0 0 40px 0;
-	}
-
-	nav {
-		display: flex;
-		gap: 16px;
-	}
-
-	nav a {
-		padding: 14px 28px;
-		background: rgba(255, 255, 255, 0.2);
-		color: white;
-		text-decoration: none;
+	.card {
+		background: #fff;
 		border-radius: 12px;
-		font-weight: 600;
-		font-size: 16px;
-		backdrop-filter: blur(10px);
-		transition: background 0.2s;
+		padding: 48px 40px;
+		text-align: center;
+		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+		max-width: 420px;
+		width: 90%;
+		margin: auto;
 	}
 
-	nav a:hover {
-		background: rgba(255, 255, 255, 0.35);
+	.card p {
+		margin-bottom: 24px;
+		color: #555;
+		font-size: 15px;
+	}
+
+	.spinner {
+		width: 36px;
+		height: 36px;
+		border: 3px solid #e0e0e0;
+		border-top-color: #3e6957;
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+		margin: 0 auto 20px;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	.btn {
+		display: inline-block;
+		background: #3e6957;
+		color: #fff;
+		border: none;
+		padding: 12px 28px;
+		border-radius: 8px;
+		font-size: 15px;
+		cursor: pointer;
+		text-decoration: none;
+	}
+
+	.btn:hover {
+		background: #335a49;
 	}
 </style>

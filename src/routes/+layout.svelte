@@ -1,7 +1,5 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import { onMount } from 'svelte';
-	import { wallet } from '$lib/wallet.svelte.ts';
 	import { getAddress } from 'viem';
 
 	interface Props {
@@ -33,9 +31,6 @@
 		}
 	}
 
-	onMount(() => {
-		wallet.autoConnect();
-	});
 </script>
 
 {#if !disclaimerDismissed}
