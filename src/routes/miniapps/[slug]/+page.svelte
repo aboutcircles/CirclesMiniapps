@@ -6,6 +6,7 @@
 	const baseUrl = import.meta.env.VITE_BASE_URL;
 	import { wallet } from '$lib/wallet.svelte.ts';
 	import ApprovalPopup from '$lib/ApprovalPopup.svelte';
+	import Disclaimer from '$lib/Disclaimer.svelte';
 
 	type MiniApp = { slug?: string; name: string; logo: string; url: string; description?: string; tags: string[] };
 
@@ -212,6 +213,7 @@
 	<title>{app ? app.name : 'Mini App'} - {baseUrl}</title>
 </svelte:head>
 
+<Disclaimer />
 <div class="page">
 	{#if notFound}
 		<div class="iframe-topbar">

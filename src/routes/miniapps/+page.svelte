@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { wallet } from '$lib/wallet.svelte.ts';
 	import ApprovalPopup from '$lib/ApprovalPopup.svelte';
+	import Disclaimer from '$lib/Disclaimer.svelte';
 
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
@@ -260,6 +261,7 @@
 	<title>Mini Apps - {baseUrl}</title>
 </svelte:head>
 
+<Disclaimer />
 <div class="page">
 	{#if view === 'list'}
 		<!-- App List View -->
