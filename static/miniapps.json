@@ -8,7 +8,7 @@
     "tags": ["demo", "signing"]
   },
   {
-  "slug": "ps_vting",
+  "slug": "ps_voting",
   "name": "Parallel Society Voting App",
   "logo": "https://example.com/logo.svg",
   "url": "https://pboes.github.io/ps_voting/",
