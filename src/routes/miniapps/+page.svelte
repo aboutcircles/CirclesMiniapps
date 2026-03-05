@@ -9,7 +9,7 @@
 
 	const baseUrl = import.meta.env.VITE_BASE_URL;
 
-	type MiniApp = { slug?: string; name: string; logo: string; url: string; description?: string; tags: string[] };
+	type MiniApp = { slug?: string; name: string; logo: string; url: string; description?: string; tags: string[]; isHidden?: boolean };
 
 	let apps: MiniApp[] = $state([]);
 	let view: 'list' | 'iframe' = $state('list');
@@ -22,7 +22,7 @@
 
 	function allTags(): { tag: string; count: number }[] {
 		const counts = new Map<string, number>();
-		for (const app of apps) {
+		for (const app of apps.filter((a) => !a.isHidden)) {
 			for (const tag of app.tags ?? []) {
 				counts.set(tag, (counts.get(tag) ?? 0) + 1);
 			}
@@ -45,8 +45,9 @@
 	}
 
 	function filteredApps(): MiniApp[] {
-		if (selectedTags.size === 0) return apps;
-		return apps.filter((app) => [...selectedTags].every((t) => app.tags?.includes(t)));
+		const visible = apps.filter((app) => !app.isHidden);
+		if (selectedTags.size === 0) return visible;
+		return visible.filter((app) => [...selectedTags].every((t) => app.tags?.includes(t)));
 	}
 
 	let iframeSrc = $state('');

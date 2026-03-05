@@ -32,6 +32,7 @@ Apps are listed in [`static/miniapps.json`](static/miniapps.json). To add yours,
 | `url` | yes | HTTPS URL of your app. Must load in an iframe. |
 | `description` | yes | Short description shown under the app name. |
 | `tags` | yes | At least one category tag, e.g. `["defi"]`. |
+| `isHidden` | no | If `true`, hides the app from the marketplace list. The app is still accessible via its direct URL `/miniapps/<slug>`. Omit or set to `false` to show the app normally. |
 
 ### PR checklist
 

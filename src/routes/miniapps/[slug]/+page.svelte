@@ -8,7 +8,7 @@
 	import ApprovalPopup from '$lib/ApprovalPopup.svelte';
 	import Disclaimer from '$lib/Disclaimer.svelte';
 
-	type MiniApp = { slug?: string; name: string; logo: string; url: string; description?: string; tags: string[] };
+	type MiniApp = { slug?: string; name: string; logo: string; url: string; description?: string; tags: string[]; isHidden?: boolean };
 
 	let app: MiniApp | null = $state(null);
 	let notFound = $state(false);
