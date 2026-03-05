@@ -11,6 +11,7 @@
     "demo:sign": "cd examples/sign-demo && npx vite --port 5181"
   },
   "dependencies": {
+    "@aboutcircles/sdk-utils": "^0.1.23",
     "@cometh/connect-sdk-4337": "^1.0.24",
     "viem": "^2.41.2"
   },
