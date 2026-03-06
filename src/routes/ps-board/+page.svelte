@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { createPublicClient, http, type Address } from 'viem';
 	import { gnosis } from 'viem/chains';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
@@ -24,6 +25,12 @@
 	// ----- View toggle -----
 	type View = 'leaderboard' | 'appreciations';
 	let activeView = $state<View>('leaderboard');
+
+	// ----- Recipient from query param -----
+	const recipientAddress = $derived(page.url.searchParams.get('address') ?? null);
+	$effect(() => {
+		if (recipientAddress) activeView = 'appreciations';
+	});
 
 	// ----- Snapshot JSON shape -----
 	interface SnapshotFile {
@@ -319,6 +326,10 @@
 	$effect(() => {
 		loadHistory();
 	});
+
+	$effect(() => {
+		if (recipientAddress) fetchProfiles([recipientAddress]);
+	});
 </script>
 
 <svelte:head>
@@ -340,7 +351,7 @@
 				class="toggle-btn {activeView === 'appreciations' ? 'active' : ''}"
 				onclick={() => (activeView = 'appreciations')}
 			>
-				APPRECIATIONS
+				KUDOS
 			</button>
 		</div>
 
@@ -425,9 +436,43 @@
 			</div>
 		{/if}
 
-		<!-- ===== APPRECIATIONS ===== -->
+		<!-- ===== KUDOS ===== -->
 		{#if activeView === 'appreciations'}
-			<p class="subtitle">Who shared hearts with whom</p>
+			{#if recipientAddress}
+				{@const recipientProfile = getProfile(recipientAddress)}
+				<a
+					class="kudos-btn"
+					href="https://app.gnosis.io/transfer/{ORG_ADDRESS}/crc/1?data={recipientAddress}"
+					target="_blank"
+					rel="noopener noreferrer"
+				>
+					<span class="kudos-arrow">
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+							<path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+						</svg>
+					</span>
+					<span class="kudos-label">Send kudos to</span>
+					<div class="kudos-avatar">
+						{#if recipientProfile.imageUrl}
+							<img
+								src={recipientProfile.imageUrl}
+								alt={recipientProfile.name ?? recipientAddress}
+								onerror={(e) => {
+									const el = e.currentTarget as HTMLElement;
+									el.style.display = 'none';
+									const next = el.nextElementSibling as HTMLElement | null;
+									if (next) next.style.display = 'block';
+								}}
+							/>
+							<img src="/person.svg" alt="avatar" style="display:none" />
+						{:else}
+							<img src="/person.svg" alt="avatar" />
+						{/if}
+					</div>
+					<strong class="kudos-name">{recipientProfile.name ?? recipientAddress.slice(0, 8) + '…' + recipientAddress.slice(-6)}</strong>
+				</a>
+			{/if}
+			<p class="subtitle">Who shared kudos with whom</p>
 
 			{#if txLoading}
 				<div class="loading-state">
@@ -722,6 +767,61 @@
 	.show-more-btn:hover {
 		color: #6a6c8c;
 		background: #faf5f1;
+	}
+
+	/* ----- Kudos button ----- */
+	.kudos-btn {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		gap: 10px;
+		background: #3a3f7a;
+		color: #ffffff;
+		border-radius: 16px;
+		padding: 14px 18px;
+		text-decoration: none;
+		margin-bottom: 20px;
+		transition: opacity 0.15s;
+		cursor: pointer;
+	}
+
+	.kudos-btn:hover { opacity: 0.85; }
+
+	.kudos-arrow {
+		color: #c0c4f0;
+		flex-shrink: 0;
+		display: flex;
+		align-items: center;
+	}
+
+	.kudos-label {
+		font-size: 1rem;
+		color: #d8daff;
+		flex-shrink: 0;
+	}
+
+	.kudos-avatar {
+		width: 34px;
+		height: 34px;
+		flex-shrink: 0;
+	}
+
+	.kudos-avatar img {
+		width: 34px;
+		height: 34px;
+		border-radius: 50%;
+		object-fit: cover;
+		display: block;
+	}
+
+	.kudos-name {
+		font-size: 1rem;
+		font-weight: 700;
+		color: #ffffff;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 
 	/* ----- Appreciations ----- */

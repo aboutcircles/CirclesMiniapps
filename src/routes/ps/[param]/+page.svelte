@@ -84,7 +84,7 @@
 				}
 
 				status = 'redirecting';
-				window.location.href = `https://app.gnosis.io/transfer/${ORG_ADDRESS}/crc/1?data=${checksummed}`;
+				window.location.href = `/ps-board?address=${checksummed}`;
 
 			} else if (isBytes32(param)) {
 				// ── Case 2: bytes32 private key ────────────────────────────────────
@@ -119,7 +119,7 @@
 
 				status = 'redirecting';
 				if (claimed) {
-					window.location.href = `https://app.gnosis.io/transfer/${ORG_ADDRESS}/crc/1?data=${account}`;
+					window.location.href = `/ps-board?address=${account}`;
 				} else {
 					window.location.href = `https://app.gnosis.io/referral/${param}`;
 				}
