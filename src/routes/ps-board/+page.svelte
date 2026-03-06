@@ -20,15 +20,19 @@
 		}
 	] as const;
 	const REFRESH_INTERVAL_MS = 15_000;
+	const GROUP_ADDRESS = '0x6F99506cD91560305bD4859DcDdcb422EAA81F02';
 
 	// ----- View toggle -----
 	type View = 'leaderboard' | 'appreciations';
-	let activeView = $state<View>('leaderboard');
 
-	// ----- Recipient from query param -----
+	// ----- Query params -----
+	const hasBoard = $derived(page.url.searchParams.has('hasBoard'));
 	const recipientAddress = $derived(page.url.searchParams.get('address') ?? null);
+
+	let activeView = $state<View>('appreciations');
 	$effect(() => {
 		if (recipientAddress) activeView = 'appreciations';
+		else if (hasBoard) activeView = 'leaderboard';
 	});
 
 	// ----- Snapshot JSON shape -----
@@ -50,6 +54,24 @@
 		diff: bigint;
 	}
 
+	interface TxEntry {
+		blockNumber: number;
+		timestamp: number;
+		transactionIndex: number;
+		logIndex: number;
+		transactionHash: string;
+		version: number;
+		from: string;
+		to: string;
+		value: string;
+		circles: string;
+		attoCircles: string;
+		crc: string;
+		attoCrc: string;
+		staticCircles: string;
+		staticAttoCircles: string;
+	}
+
 	interface TransferData {
 		transactionHash: string;
 		blockNumber: number;
@@ -61,9 +83,10 @@
 
 	interface TxPair {
 		transactionHash: string;
-		blockNumber: number;
+		timestamp: number;
 		sender: string;
 		recipient: string;
+		circles: string;
 		message: string;
 	}
 
@@ -80,11 +103,13 @@
 	let showUnidentified = $state(false);
 
 	// ----- Appreciations state -----
-	let payments = $state<TransferData[]>([]);
+	let txs = $state<TxEntry[]>([]);
+	let transferDataMap = $state<Map<string, string>>(new Map()); // hash -> data hex
 	let txLoading = $state(false);
 	let txError = $state('');
 	let hasMore = $state(false);
 	let kudosMessage = $state('');
+	let groupImageUrl = $state<string | null>(null);
 
 	// ----- Shared profile cache -----
 	const profileCache = new SvelteMap<string, { name: string | null; imageUrl: string | null }>();
@@ -103,14 +128,32 @@
 	const unidentifiedRows = $derived(sortedRows.filter(r => !r.name && !r.imageUrl));
 
 	// ----- Appreciations derived -----
+	const FILTER_FROM = '0x8586b48d6f773e8536823182a7abfa82d5a51f47';
 	const pairedTxs = $derived.by((): TxPair[] => {
-		return payments.map((p) => ({
-			transactionHash: p.transactionHash,
-			blockNumber: p.blockNumber,
-			sender: p.from,
-			recipient: decodeAddress(p.data),
-			message: decodeMessage(p.data)
-		}));
+		const relevant = txs.filter((t) => t.from.toLowerCase() !== FILTER_FROM);
+		const byHash = new Map<string, TxEntry[]>();
+		for (const t of relevant) {
+			const bucket = byHash.get(t.transactionHash) ?? [];
+			bucket.push(t);
+			byHash.set(t.transactionHash, bucket);
+		}
+		const pairs: TxPair[] = [];
+		for (const [hash, legs] of byHash) {
+			const incoming = legs.find((l) => l.to.toLowerCase() === orgLower);
+			const outgoing = legs.find((l) => l.from.toLowerCase() === orgLower);
+			if (!incoming || !outgoing) continue;
+			const rawData = transferDataMap.get(hash) ?? '';
+			pairs.push({
+				transactionHash: hash,
+				timestamp: incoming.timestamp,
+				sender: incoming.from,
+				recipient: outgoing.to,
+				circles: incoming.circles,
+				message: decodeMessage(rawData)
+			});
+		}
+		pairs.sort((a, b) => b.timestamp - a.timestamp || a.transactionHash.localeCompare(b.transactionHash));
+		return pairs;
 	});
 
 	// ----- Helpers -----
@@ -299,18 +342,27 @@
 		txLoading = true;
 		txError = '';
 		try {
-			const result = (await jsonRpc(TX_RPC_URL, 'circles_getTransferData', [ORG_ADDRESS, null, null, null, null, 500])) as {
-				results: TransferData[];
-				hasMore: boolean;
-			};
-			hasMore = result.hasMore ?? false;
-			payments = (result.results ?? []).map((r) => ({
-				...r,
-				from: r.from.toLowerCase(),
-				to: r.to.toLowerCase()
-			}));
-			const addrs = Array.from(new Set(payments.flatMap((p) => [p.from, decodeAddress(p.data)])));
+			// 1. Transaction history
+			const histResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransactionHistory', [ORG_ADDRESS, 150])) as { results: TxEntry[]; hasMore: boolean };
+			txs = histResult.results ?? [];
+			hasMore = histResult.hasMore ?? false;
+
+			// 2. Transfer data for messages
+			const transferResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransferData', [ORG_ADDRESS, null, null, null, null, 500])) as { results: TransferData[]; hasMore: boolean };
+			const map = new Map<string, string>();
+			for (const t of (transferResult.results ?? [])) {
+				if (t.data && t.data.length > 2) map.set(t.transactionHash, t.data);
+			}
+			transferDataMap = map;
+
+			// 3. Batch all profiles (tx participants + group avatar) in one request
+			const relevant = txs.filter((t) => t.from.toLowerCase() !== FILTER_FROM);
+			const addrs = Array.from(new Set([
+				GROUP_ADDRESS.toLowerCase(),
+				...relevant.flatMap((t) => [t.from.toLowerCase(), t.to.toLowerCase()])
+			]));
 			await fetchProfiles(addrs);
+			groupImageUrl = getProfile(GROUP_ADDRESS).imageUrl;
 		} catch (e: unknown) {
 			txError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -345,24 +397,28 @@
 	<div class="card">
 
 		<!-- Toggle -->
+		{#if !recipientAddress}
 		<div class="toggle-bar">
-			<button
-				class="toggle-btn {activeView === 'leaderboard' ? 'active' : ''}"
-				onclick={() => (activeView = 'leaderboard')}
-			>
-				LEADERBOARD
-			</button>
+			{#if hasBoard}
+				<button
+					class="toggle-btn {activeView === 'leaderboard' ? 'active' : ''}"
+					onclick={() => (activeView = 'leaderboard')}
+				>
+					BOARD
+				</button>
+			{/if}
 			<button
 				class="toggle-btn {activeView === 'appreciations' ? 'active' : ''}"
 				onclick={() => (activeView = 'appreciations')}
 			>
-				KUDOS
+				FEED
 			</button>
 		</div>
+		{/if}
 
 		<!-- ===== LEADERBOARD ===== -->
 		{#if activeView === 'leaderboard'}
-			<p class="subtitle">Get more thanks to move up the leaderboard</p>
+			<p class="subtitle">Get more kudos</p>
 
 			{#if mountLoading}
 				<div class="loading-state">
@@ -485,8 +541,34 @@
 					</div>
 					<strong class="kudos-name">{recipientProfile.name ?? recipientAddress.slice(0, 8) + '…' + recipientAddress.slice(-6)}</strong>
 				</a>
+				<a
+					class="trust-btn"
+					href="https://app.gnosis.io/{recipientAddress}"
+					target="_blank"
+					rel="noopener noreferrer"
+				>
+					<span class="trust-label">Trust</span>
+					<div class="kudos-avatar">
+						{#if recipientProfile.imageUrl}
+							<img
+								src={recipientProfile.imageUrl}
+								alt={recipientProfile.name ?? recipientAddress}
+								onerror={(e) => {
+									const el = e.currentTarget as HTMLElement;
+									el.style.display = 'none';
+									const next = el.nextElementSibling as HTMLElement | null;
+									if (next) next.style.display = 'block';
+								}}
+							/>
+							<img src="/person.svg" alt="avatar" style="display:none" />
+						{:else}
+							<img src="/person.svg" alt="avatar" />
+						{/if}
+					</div>
+					<strong class="trust-name">{recipientProfile.name ?? recipientAddress.slice(0, 8) + '…' + recipientAddress.slice(-6)}</strong>
+					<span class="trust-label"> on Circles</span>
+				</a>
 			{/if}
-			<p class="subtitle">Who shared kudos with whom</p>
 
 			{#if txLoading}
 				<div class="loading-state">
@@ -549,7 +631,12 @@
 							<div class="tx-body">
 								<p class="tx-sentence">
 									<span class="tx-name" title={tx.sender}>{displayName(tx.sender)}</span>
-									<span class="tx-verb"> sends kudos to </span>
+									<span class="tx-verb"> sent </span>
+									<span class="tx-amount">{formatAmount(tx.circles)}</span>
+									{#if groupImageUrl}
+										<img class="group-avatar-inline" src={groupImageUrl} alt="CRC" />
+									{/if}
+									<span class="tx-verb"> CRC to </span>
 									<span class="tx-name" title={tx.recipient}>{displayName(tx.recipient)}</span>
 								</p>
 								{#if tx.message}
@@ -839,6 +926,41 @@
 		white-space: nowrap;
 	}
 
+	.trust-name {
+		font-size: 1rem;
+		font-weight: 700;
+		color: #060a40;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* ----- Trust button ----- */
+	.trust-btn {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		background: #f0e8dc;
+		color: #060a40;
+		border: 1.5px solid #c8caeb;
+		border-radius: 16px;
+		padding: 12px 18px;
+		text-decoration: none;
+		margin-bottom: 16px;
+		transition: opacity 0.15s;
+		cursor: pointer;
+	}
+
+	.trust-btn:hover { opacity: 0.75; }
+
+	.trust-label {
+		font-size: 1rem;
+		color: #060a40;
+		flex-shrink: 0;
+	}
+
 	/* ----- Kudos message input ----- */
 	.kudos-msg-wrap {
 		margin-bottom: 10px;
@@ -919,6 +1041,16 @@
 		font-size: 0.88rem;
 		color: #060a40;
 		line-height: 1.4;
+	}
+
+	.group-avatar-inline {
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		object-fit: cover;
+		vertical-align: text-bottom;
+		display: inline-block;
+		margin: 0 1px;
 	}
 
 	.tx-msg {
