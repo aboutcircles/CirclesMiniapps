@@ -8,21 +8,22 @@
     "tags": ["demo", "signing"]
   },
   {
-  "slug": "ps-voting",
-  "name": "Parallel Society Voting App",
-  "logo": "https://example.com/logo.svg",
-  "url": "https://pboes.github.io/ps_voting/",
-  "description": "Voting app for Parallel Society.",
-  "tags": ["internal"]
-}
+    "slug": "ps-voting",
+    "name": "Parallel Society Voting App",
+    "logo": "https://example.com/logo.svg",
+    "url": "https://pboes.github.io/ps_voting/",
+    "description": "Voting app for Parallel Society.",
+    "tags": ["internal"],
+    "isHidden": true
+  },
   {
-  "slug": "honeypot",
-  "name": "My Cool App",
-  "logo": "https://example.com/logo.svg",
-  "url": "https://honey-pot-create.vercel.app/honey-pot/",
-  "description": "Grow honey pots for the creators you love",
-  "tags": ["defi", "tokens"]
-},
+    "slug": "honeypot",
+    "name": "My Cool App",
+    "logo": "https://example.com/logo.svg",
+    "url": "https://honey-pot-create.vercel.app/honey-pot/",
+    "description": "Grow honey pots for the creators you love",
+    "tags": ["defi", "tokens"]
+  },
   {
     "slug": "erc20-transfer-demo",
     "name": "ERC20 Transfer Demo",
