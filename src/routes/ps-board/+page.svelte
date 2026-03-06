@@ -10,7 +10,6 @@
 	const ONCHAIN_RPC_URL = 'https://rpc.aboutcircles.com/';
 	const CIRCLES_RPC_URL = 'https://staging.circlesubi.network/';
 	const TX_RPC_URL = 'https://staging.circlesubi.network/';
-	const FILTER_FROM = '0x8586b48d6f773e8536823182a7abfa82d5a51f47';
 	const ERC20_ABI = [
 		{
 			type: 'function',
@@ -51,30 +50,21 @@
 		diff: bigint;
 	}
 
-	interface TxEntry {
+	interface TransferData {
+		transactionHash: string;
 		blockNumber: number;
 		timestamp: number;
-		transactionIndex: number;
-		logIndex: number;
-		transactionHash: string;
-		version: number;
 		from: string;
 		to: string;
-		value: string;
-		circles: string;
-		attoCircles: string;
-		crc: string;
-		attoCrc: string;
-		staticCircles: string;
-		staticAttoCircles: string;
+		data: string;
 	}
 
 	interface TxPair {
 		transactionHash: string;
-		timestamp: number;
+		blockNumber: number;
 		sender: string;
 		recipient: string;
-		circles: string;
+		message: string;
 	}
 
 	// ----- Leaderboard state -----
@@ -90,10 +80,11 @@
 	let showUnidentified = $state(false);
 
 	// ----- Appreciations state -----
-	let txs = $state<TxEntry[]>([]);
+	let payments = $state<TransferData[]>([]);
 	let txLoading = $state(false);
 	let txError = $state('');
 	let hasMore = $state(false);
+	let kudosMessage = $state('');
 
 	// ----- Shared profile cache -----
 	const profileCache = new SvelteMap<string, { name: string | null; imageUrl: string | null }>();
@@ -113,28 +104,13 @@
 
 	// ----- Appreciations derived -----
 	const pairedTxs = $derived.by((): TxPair[] => {
-		const relevant = txs.filter((t) => t.from.toLowerCase() !== FILTER_FROM);
-		const byHash = new Map<string, TxEntry[]>();
-		for (const t of relevant) {
-			const bucket = byHash.get(t.transactionHash) ?? [];
-			bucket.push(t);
-			byHash.set(t.transactionHash, bucket);
-		}
-		const pairs: TxPair[] = [];
-		for (const [hash, legs] of byHash) {
-			const incoming = legs.find((l) => l.to.toLowerCase() === orgLower);
-			const outgoing = legs.find((l) => l.from.toLowerCase() === orgLower);
-			if (!incoming || !outgoing) continue;
-			pairs.push({
-				transactionHash: hash,
-				timestamp: incoming.timestamp,
-				sender: incoming.from,
-				recipient: outgoing.to,
-				circles: incoming.circles
-			});
-		}
-		pairs.sort((a, b) => b.timestamp - a.timestamp || a.transactionHash.localeCompare(b.transactionHash));
-		return pairs;
+		return payments.map((p) => ({
+			transactionHash: p.transactionHash,
+			blockNumber: p.blockNumber,
+			sender: p.from,
+			recipient: decodeAddress(p.data),
+			message: decodeMessage(p.data)
+		}));
 	});
 
 	// ----- Helpers -----
@@ -303,24 +279,53 @@
 	});
 
 	// ----- Appreciations logic -----
+	function decodeAddress(data: string): string {
+		const hex = data.startsWith('0x') ? data.slice(2) : data;
+		if (hex.length < 40) return '';
+		return '0x' + hex.slice(0, 40).toLowerCase();
+	}
+
+	function decodeMessage(data: string): string {
+		const hex = data.startsWith('0x') ? data.slice(2) : data;
+		if (hex.length <= 40) return '';
+		try {
+			const msgHex = hex.slice(40);
+			const bytes = new Uint8Array(msgHex.match(/.{1,2}/g)!.map(b => parseInt(b, 16)));
+			return new TextDecoder().decode(bytes).trim();
+		} catch { return ''; }
+	}
+
 	async function loadHistory() {
 		txLoading = true;
 		txError = '';
 		try {
-			const result = (await jsonRpc(TX_RPC_URL, 'circles_getTransactionHistory', [ORG_ADDRESS, 150])) as {
-				results: TxEntry[];
+			const result = (await jsonRpc(TX_RPC_URL, 'circles_getTransferData', [ORG_ADDRESS, null, null, null, null, 500])) as {
+				results: TransferData[];
 				hasMore: boolean;
 			};
-			txs = result.results ?? [];
 			hasMore = result.hasMore ?? false;
-			const relevant = txs.filter((t) => t.from.toLowerCase() !== FILTER_FROM);
-			const addrs = Array.from(new Set(relevant.flatMap((t) => [t.from.toLowerCase(), t.to.toLowerCase()])));
+			payments = (result.results ?? []).map((r) => ({
+				...r,
+				from: r.from.toLowerCase(),
+				to: r.to.toLowerCase()
+			}));
+			const addrs = Array.from(new Set(payments.flatMap((p) => [p.from, decodeAddress(p.data)])));
 			await fetchProfiles(addrs);
 		} catch (e: unknown) {
 			txError = e instanceof Error ? e.message : String(e);
 		} finally {
 			txLoading = false;
 		}
+	}
+
+	// ----- Kudos data encoding -----
+	function encodeKudosData(address: string, message: string): string {
+		// Encode: raw address hex (40 chars) + optional UTF-8 message as hex
+		const addrHex = address.replace(/^0x/i, '').toLowerCase();
+		if (!message) return '0x' + addrHex;
+		const msgBytes = new TextEncoder().encode(message);
+		const msgHex = Array.from(msgBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+		return '0x' + addrHex + msgHex;
 	}
 
 	$effect(() => {
@@ -440,9 +445,18 @@
 		{#if activeView === 'appreciations'}
 			{#if recipientAddress}
 				{@const recipientProfile = getProfile(recipientAddress)}
+				<div class="kudos-msg-wrap">
+					<input
+						class="kudos-msg-input"
+						type="text"
+						maxlength="120"
+						placeholder="Add a short message… (optional)"
+						bind:value={kudosMessage}
+					/>
+				</div>
 				<a
 					class="kudos-btn"
-					href="https://app.gnosis.io/transfer/{ORG_ADDRESS}/crc/1?data={recipientAddress}"
+					href="https://app.gnosis.io/transfer/{ORG_ADDRESS}/crc/1?data={encodeKudosData(recipientAddress, kudosMessage)}"
 					target="_blank"
 					rel="noopener noreferrer"
 				>
@@ -535,11 +549,12 @@
 							<div class="tx-body">
 								<p class="tx-sentence">
 									<span class="tx-name" title={tx.sender}>{displayName(tx.sender)}</span>
-									<span class="tx-verb"> shares </span>
-									<span class="tx-amount">{formatAmount(tx.circles)} ❤️</span>
-									<span class="tx-verb"> with </span>
+									<span class="tx-verb"> sends kudos to </span>
 									<span class="tx-name" title={tx.recipient}>{displayName(tx.recipient)}</span>
 								</p>
+								{#if tx.message}
+									<p class="tx-msg">"{tx.message}"</p>
+								{/if}
 							</div>
 						</div>
 					{/each}
@@ -824,6 +839,32 @@
 		white-space: nowrap;
 	}
 
+	/* ----- Kudos message input ----- */
+	.kudos-msg-wrap {
+		margin-bottom: 10px;
+	}
+
+	.kudos-msg-input {
+		width: 100%;
+		box-sizing: border-box;
+		padding: 10px 14px;
+		border: 1.5px solid #c8caeb;
+		border-radius: 10px;
+		font-size: 0.92rem;
+		color: #060a40;
+		background: #ffffff;
+		outline: none;
+		transition: border-color 0.15s;
+	}
+
+	.kudos-msg-input:focus {
+		border-color: #3a3f7a;
+	}
+
+	.kudos-msg-input::placeholder {
+		color: #b0b2cc;
+	}
+
 	/* ----- Appreciations ----- */
 	.tx-list {
 		border: 1.5px solid #ede1d8;
@@ -878,6 +919,14 @@
 		font-size: 0.88rem;
 		color: #060a40;
 		line-height: 1.4;
+	}
+
+	.tx-msg {
+		margin: 4px 0 0;
+		font-size: 0.82rem;
+		color: #6a6c8c;
+		font-style: italic;
+		line-height: 1.3;
 	}
 
 	.tx-name {
