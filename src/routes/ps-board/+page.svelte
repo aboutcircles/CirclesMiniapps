@@ -397,7 +397,7 @@
 	<div class="card">
 
 		<!-- Toggle -->
-		{#if !recipientAddress}
+		{#if !recipientAddress || hasBoard}
 		<div class="toggle-bar">
 			{#if hasBoard}
 				<button
