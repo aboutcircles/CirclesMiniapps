@@ -67,7 +67,7 @@
 	let iframeEl: HTMLIFrameElement = $state() as HTMLIFrameElement;
 	let showLogout = $state(false);
 	let chipEl = $state<HTMLElement>();
-	let lastHandledUrlParam: string | null = null;
+	let lastProcessedUrlQueryParam: string | null = null;
 
 	function handleWindowClick(e: MouseEvent) {
 		if (showLogout && chipEl && !chipEl.contains(e.target as Node)) {
@@ -211,6 +211,16 @@
 		return safeUrl;
 	}
 
+	function clearUrlError() {
+		urlError = '';
+	}
+
+	function loadIframeFromUrl(safeUrl: string) {
+		iframeSrc = safeUrl;
+		view = 'iframe';
+		showAdvanced = true;
+	}
+
 	function updateUrlParam(nextUrl: string | null) {
 		const currentParam = $page.url.searchParams.get('url');
 		if (nextUrl === currentParam) return;
@@ -230,27 +240,24 @@
 
 	$effect(() => {
 		const paramUrl = $page.url.searchParams.get('url');
-		if (paramUrl === lastHandledUrlParam) return;
-		lastHandledUrlParam = paramUrl;
+		if (paramUrl === lastProcessedUrlQueryParam) return;
+		lastProcessedUrlQueryParam = paramUrl;
 		if (!paramUrl) {
-			urlError = '';
+			clearUrlError();
 			return;
 		}
 		showAdvanced = true;
 		const safeUrl = validateAppUrl(paramUrl);
 		if (!safeUrl) return;
 		urlInput = safeUrl;
-		iframeSrc = safeUrl;
-		view = 'iframe';
+		loadIframeFromUrl(safeUrl);
 	});
 
 	function handleLoad() {
 		const safeUrl = validateAppUrl(urlInput);
 		if (!safeUrl) return;
-		iframeSrc = safeUrl;
-		view = 'iframe';
-		showAdvanced = true;
-		lastHandledUrlParam = safeUrl;
+		loadIframeFromUrl(safeUrl);
+		lastProcessedUrlQueryParam = safeUrl;
 		updateUrlParam(safeUrl);
 	}
 
@@ -281,7 +288,7 @@
 	function goBack() {
 		view = 'list';
 		iframeSrc = '';
-		urlError = '';
+		clearUrlError();
 		updateUrlParam(null);
 	}
 
