@@ -8,7 +8,7 @@
 	import { goto } from '$app/navigation';
 
 	const baseUrl = import.meta.env.VITE_BASE_URL;
-	const INVALID_URL_MESSAGE = 'Enter a valid http(s) URL.';
+	const INVALID_URL_MESSAGE = 'Enter a valid URL starting with http:// or https://.';
 
 	type MiniApp = { slug?: string; name: string; logo: string; url: string; description?: string; tags: string[]; isHidden?: boolean };
 
@@ -282,7 +282,6 @@
 		view = 'list';
 		iframeSrc = '';
 		urlError = '';
-		processedUrlParam = null;
 		updateUrlParam(null);
 	}
 
