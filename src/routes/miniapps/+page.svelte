@@ -221,9 +221,7 @@
 		if (paramUrl === lastUrlParam) return;
 		lastUrlParam = paramUrl;
 		if (!paramUrl) return;
-		const trimmed = paramUrl.trim();
-		if (!trimmed) return;
-		const safeUrl = normalizeAppUrl(trimmed);
+		const safeUrl = normalizeAppUrl(paramUrl);
 		if (!safeUrl) {
 			showAdvanced = true;
 			return;
