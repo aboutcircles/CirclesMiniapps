@@ -241,14 +241,15 @@
 	$effect(() => {
 		const paramUrl = $page.url.searchParams.get('url');
 		if (paramUrl === lastProcessedUrlQueryParam) return;
+		lastProcessedUrlQueryParam = paramUrl;
 		if (!paramUrl) {
+			lastProcessedUrlQueryParam = null;
 			clearUrlError();
 			return;
 		}
 		showAdvanced = true;
 		const safeUrl = validateAppUrl(paramUrl);
 		if (!safeUrl) return;
-		lastProcessedUrlQueryParam = paramUrl;
 		urlInput = safeUrl;
 		loadIframeFromUrl(safeUrl);
 	});
