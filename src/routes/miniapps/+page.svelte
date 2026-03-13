@@ -67,7 +67,7 @@
 	let iframeEl: HTMLIFrameElement = $state() as HTMLIFrameElement;
 	let showLogout = $state(false);
 	let chipEl = $state<HTMLElement>();
-	let processedUrlParam: string | null = null;
+	let lastHandledUrlParam: string | null = null;
 
 	function handleWindowClick(e: MouseEvent) {
 		if (showLogout && chipEl && !chipEl.contains(e.target as Node)) {
@@ -230,8 +230,8 @@
 
 	$effect(() => {
 		const paramUrl = $page.url.searchParams.get('url');
-		if (paramUrl === processedUrlParam) return;
-		processedUrlParam = paramUrl;
+		if (paramUrl === lastHandledUrlParam) return;
+		lastHandledUrlParam = paramUrl;
 		if (!paramUrl) return;
 		const safeUrl = validateAppUrl(paramUrl);
 		if (!safeUrl) {
@@ -561,6 +561,7 @@
 		--fg: #060a40;
 		--fg-muted: #6a6c8c;
 		--fg-subtle: #9b9db3;
+		--fg-error: #b42318;
 		--fg-on-dark: #ffffff;
 		--brand: #060a40;
 		--green: #22c54b;
@@ -1053,7 +1054,7 @@
 		margin: 0;
 		padding-left: 4px;
 		font-size: 12px;
-		color: #b42318;
+		color: var(--fg-error);
 	}
 
 	.load-btn {
