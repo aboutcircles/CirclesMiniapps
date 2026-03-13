@@ -184,9 +184,59 @@
 		}
 	});
 
+	function normalizeAppUrl(value: string): string | null {
+		const trimmed = value.trim();
+		if (!trimmed) return null;
+		try {
+			const parsed = new URL(trimmed);
+			if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+				return null;
+			}
+			return parsed.toString();
+		} catch {
+			return null;
+		}
+	}
+
+	function updateUrlParam(nextUrl: string | null) {
+		const currentParam = $page.url.searchParams.get('url');
+		if (nextUrl === currentParam) return;
+		const next = new URL($page.url);
+		if (nextUrl) {
+			next.searchParams.set('url', nextUrl);
+		} else {
+			next.searchParams.delete('url');
+		}
+		const search = next.searchParams.toString();
+		goto(search ? `${next.pathname}?${search}` : next.pathname, {
+			replaceState: true,
+			keepFocus: true,
+			noScroll: true
+		});
+	}
+
+	$effect(() => {
+		const paramUrl = $page.url.searchParams.get('url');
+		if (!paramUrl) return;
+		const trimmed = paramUrl.trim();
+		if (!trimmed) return;
+		const safeUrl = normalizeAppUrl(trimmed);
+		urlInput = safeUrl ?? trimmed;
+		showAdvanced = true;
+		if (safeUrl) {
+			iframeSrc = safeUrl;
+			view = 'iframe';
+		}
+	});
+
 	function handleLoad() {
-		iframeSrc = urlInput;
+		const safeUrl = normalizeAppUrl(urlInput);
+		if (!safeUrl) return;
+		urlInput = safeUrl;
+		iframeSrc = safeUrl;
 		view = 'iframe';
+		showAdvanced = true;
+		updateUrlParam(safeUrl);
 	}
 
 	function handleIframeLoad() {
@@ -216,6 +266,7 @@
 	function goBack() {
 		view = 'list';
 		iframeSrc = '';
+		updateUrlParam(null);
 	}
 
 	function getInitial(name: string): string {
