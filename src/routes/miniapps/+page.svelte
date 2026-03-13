@@ -52,6 +52,7 @@
 
 	let iframeSrc = $state('');
 	let urlInput = $state('');
+	let urlError = $state('');
 	// pendingSource is kept outside $state to avoid Svelte proxying the cross-origin Window object,
 	// which triggers "Blocked a frame from accessing a cross-origin frame".
 	let pendingSource: MessageEventSource | null = null;
@@ -65,7 +66,7 @@
 	let iframeEl: HTMLIFrameElement = $state() as HTMLIFrameElement;
 	let showLogout = $state(false);
 	let chipEl = $state<HTMLElement>();
-	let lastUrlParam: string | null = null;
+	let lastProcessedUrlParam: string | null = null;
 
 	function handleWindowClick(e: MouseEvent) {
 		if (showLogout && chipEl && !chipEl.contains(e.target as Node)) {
@@ -218,14 +219,16 @@
 
 	$effect(() => {
 		const paramUrl = $page.url.searchParams.get('url');
-		if (paramUrl === lastUrlParam) return;
-		lastUrlParam = paramUrl;
+		if (paramUrl === lastProcessedUrlParam) return;
+		lastProcessedUrlParam = paramUrl;
 		if (!paramUrl) return;
 		const safeUrl = normalizeAppUrl(paramUrl);
 		if (!safeUrl) {
+			urlError = 'Enter a valid http(s) URL.';
 			showAdvanced = true;
 			return;
 		}
+		urlError = '';
 		urlInput = safeUrl;
 		showAdvanced = true;
 		iframeSrc = safeUrl;
@@ -234,7 +237,11 @@
 
 	function handleLoad() {
 		const safeUrl = normalizeAppUrl(urlInput);
-		if (!safeUrl) return;
+		if (!safeUrl) {
+			urlError = 'Enter a valid http(s) URL.';
+			return;
+		}
+		urlError = '';
 		urlInput = safeUrl;
 		iframeSrc = safeUrl;
 		view = 'iframe';
@@ -269,6 +276,7 @@
 	function goBack() {
 		view = 'list';
 		iframeSrc = '';
+		urlError = '';
 		updateUrlParam(null);
 	}
 
@@ -448,11 +456,15 @@
 					<input
 						type="text"
 						bind:value={urlInput}
+						oninput={() => (urlError = '')}
 						onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') handleLoad(); }}
 						placeholder="Enter app URL..."
 					/>
 					<button class="load-btn" onclick={handleLoad}>Load</button>
 				</div>
+				{#if urlError}
+					<p class="url-error">{urlError}</p>
+				{/if}
 			{/if}
 		</div>
 		</div> <!-- /list-scroll -->
@@ -498,11 +510,15 @@
 				<input
 					type="text"
 					bind:value={urlInput}
+					oninput={() => (urlError = '')}
 					onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') handleLoad(); }}
 					placeholder="Enter app URL..."
 				/>
 				<button class="load-btn" onclick={handleLoad}>Load</button>
 			</div>
+			{#if urlError}
+				<p class="url-error">{urlError}</p>
+			{/if}
 		{/if}
 
 		<div class="card iframe-card">
@@ -1026,6 +1042,13 @@
 
 	.url-bar input:focus {
 		border-color: var(--fg-muted);
+	}
+
+	.url-error {
+		margin: 0;
+		padding-left: 4px;
+		font-size: 12px;
+		color: #b42318;
 	}
 
 	.load-btn {
