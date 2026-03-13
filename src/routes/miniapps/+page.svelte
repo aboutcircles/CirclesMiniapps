@@ -8,6 +8,7 @@
 	import { goto } from '$app/navigation';
 
 	const baseUrl = import.meta.env.VITE_BASE_URL;
+	const INVALID_URL_MESSAGE = 'Enter a valid http(s) URL.';
 
 	type MiniApp = { slug?: string; name: string; logo: string; url: string; description?: string; tags: string[]; isHidden?: boolean };
 
@@ -66,7 +67,7 @@
 	let iframeEl: HTMLIFrameElement = $state() as HTMLIFrameElement;
 	let showLogout = $state(false);
 	let chipEl = $state<HTMLElement>();
-	let lastProcessedUrlParam: string | null = null;
+	let processedUrlParam: string | null = null;
 
 	function handleWindowClick(e: MouseEvent) {
 		if (showLogout && chipEl && !chipEl.contains(e.target as Node)) {
@@ -219,12 +220,12 @@
 
 	$effect(() => {
 		const paramUrl = $page.url.searchParams.get('url');
-		if (paramUrl === lastProcessedUrlParam) return;
-		lastProcessedUrlParam = paramUrl;
+		if (paramUrl === processedUrlParam) return;
+		processedUrlParam = paramUrl;
 		if (!paramUrl) return;
 		const safeUrl = normalizeAppUrl(paramUrl);
 		if (!safeUrl) {
-			urlError = 'Enter a valid http(s) URL.';
+			urlError = INVALID_URL_MESSAGE;
 			showAdvanced = true;
 			return;
 		}
@@ -238,7 +239,7 @@
 	function handleLoad() {
 		const safeUrl = normalizeAppUrl(urlInput);
 		if (!safeUrl) {
-			urlError = 'Enter a valid http(s) URL.';
+			urlError = INVALID_URL_MESSAGE;
 			return;
 		}
 		urlError = '';
