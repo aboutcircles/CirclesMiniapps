@@ -201,6 +201,16 @@
 		}
 	}
 
+	function validateAppUrl(value: string): string | null {
+		const safeUrl = normalizeAppUrl(value);
+		if (!safeUrl) {
+			urlError = INVALID_URL_MESSAGE;
+			return null;
+		}
+		urlError = '';
+		return safeUrl;
+	}
+
 	function updateUrlParam(nextUrl: string | null) {
 		const currentParam = $page.url.searchParams.get('url');
 		if (nextUrl === currentParam) return;
@@ -223,13 +233,11 @@
 		if (paramUrl === processedUrlParam) return;
 		processedUrlParam = paramUrl;
 		if (!paramUrl) return;
-		const safeUrl = normalizeAppUrl(paramUrl);
+		const safeUrl = validateAppUrl(paramUrl);
 		if (!safeUrl) {
-			urlError = INVALID_URL_MESSAGE;
 			showAdvanced = true;
 			return;
 		}
-		urlError = '';
 		urlInput = safeUrl;
 		showAdvanced = true;
 		iframeSrc = safeUrl;
@@ -237,12 +245,8 @@
 	});
 
 	function handleLoad() {
-		const safeUrl = normalizeAppUrl(urlInput);
-		if (!safeUrl) {
-			urlError = INVALID_URL_MESSAGE;
-			return;
-		}
-		urlError = '';
+		const safeUrl = validateAppUrl(urlInput);
+		if (!safeUrl) return;
 		urlInput = safeUrl;
 		iframeSrc = safeUrl;
 		view = 'iframe';
@@ -278,6 +282,7 @@
 		view = 'list';
 		iframeSrc = '';
 		urlError = '';
+		processedUrlParam = null;
 		updateUrlParam(null);
 	}
 
