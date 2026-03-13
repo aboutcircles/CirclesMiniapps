@@ -223,12 +223,12 @@
 		showAdvanced = true;
 	}
 
-	function updateUrlParam(nextUrl: string | null) {
+	function updateUrlParam(targetAppUrl: string | null) {
 		const currentParam = $page.url.searchParams.get('url');
-		if (nextUrl === currentParam) return;
+		if (targetAppUrl === currentParam) return;
 		const next = new URL($page.url);
-		if (nextUrl) {
-			next.searchParams.set('url', nextUrl);
+		if (targetAppUrl) {
+			next.searchParams.set('url', targetAppUrl);
 		} else {
 			next.searchParams.delete('url');
 		}
@@ -250,6 +250,7 @@
 		showAdvanced = true;
 		if (!safeUrl) return;
 		urlInput = safeUrl;
+		if (iframeSrc === safeUrl) return;
 		loadIframeFromUrl(safeUrl);
 	});
 
