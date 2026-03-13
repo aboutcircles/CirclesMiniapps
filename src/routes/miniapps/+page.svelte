@@ -233,13 +233,10 @@
 		if (paramUrl === lastHandledUrlParam) return;
 		lastHandledUrlParam = paramUrl;
 		if (!paramUrl) return;
-		const safeUrl = validateAppUrl(paramUrl);
-		if (!safeUrl) {
-			showAdvanced = true;
-			return;
-		}
-		urlInput = safeUrl;
 		showAdvanced = true;
+		const safeUrl = validateAppUrl(paramUrl);
+		if (!safeUrl) return;
+		urlInput = safeUrl;
 		iframeSrc = safeUrl;
 		view = 'iframe';
 	});
@@ -247,7 +244,6 @@
 	function handleLoad() {
 		const safeUrl = validateAppUrl(urlInput);
 		if (!safeUrl) return;
-		urlInput = safeUrl;
 		iframeSrc = safeUrl;
 		view = 'iframe';
 		showAdvanced = true;
