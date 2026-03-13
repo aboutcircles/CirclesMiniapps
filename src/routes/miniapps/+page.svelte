@@ -243,7 +243,6 @@
 		if (paramUrl === lastProcessedUrlQueryParam) return;
 		lastProcessedUrlQueryParam = paramUrl;
 		if (!paramUrl) {
-			lastProcessedUrlQueryParam = null;
 			clearUrlError();
 			return;
 		}
@@ -468,7 +467,7 @@
 					<input
 						type="text"
 						bind:value={urlInput}
-						oninput={() => (urlError = '')}
+						oninput={clearUrlError}
 						onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') handleLoad(); }}
 						placeholder="Enter app URL..."
 					/>
@@ -522,7 +521,7 @@
 				<input
 					type="text"
 					bind:value={urlInput}
-					oninput={() => (urlError = '')}
+					oninput={clearUrlError}
 					onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') handleLoad(); }}
 					placeholder="Enter app URL..."
 				/>
