@@ -65,6 +65,7 @@
 	let iframeEl: HTMLIFrameElement = $state() as HTMLIFrameElement;
 	let showLogout = $state(false);
 	let chipEl = $state<HTMLElement>();
+	let lastUrlParam: string | null = null;
 
 	function handleWindowClick(e: MouseEvent) {
 		if (showLogout && chipEl && !chipEl.contains(e.target as Node)) {
@@ -217,16 +218,20 @@
 
 	$effect(() => {
 		const paramUrl = $page.url.searchParams.get('url');
+		if (paramUrl === lastUrlParam) return;
+		lastUrlParam = paramUrl;
 		if (!paramUrl) return;
 		const trimmed = paramUrl.trim();
 		if (!trimmed) return;
 		const safeUrl = normalizeAppUrl(trimmed);
-		urlInput = safeUrl ?? trimmed;
-		showAdvanced = true;
-		if (safeUrl) {
-			iframeSrc = safeUrl;
-			view = 'iframe';
+		if (!safeUrl) {
+			showAdvanced = true;
+			return;
 		}
+		urlInput = safeUrl;
+		showAdvanced = true;
+		iframeSrc = safeUrl;
+		view = 'iframe';
 	});
 
 	function handleLoad() {
