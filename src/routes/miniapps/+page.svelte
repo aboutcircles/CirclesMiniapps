@@ -8,7 +8,7 @@
 	import { goto } from '$app/navigation';
 
 	const baseUrl = import.meta.env.VITE_BASE_URL;
-	const INVALID_URL_MESSAGE = 'Enter a valid URL starting with http:// or https://.';
+	const INVALID_URL_MESSAGE = 'Enter a valid https:// URL (http:// allowed for localhost).';
 
 	type MiniApp = { slug?: string; name: string; logo: string; url: string; description?: string; tags: string[]; isHidden?: boolean };
 
@@ -67,7 +67,6 @@
 	let iframeEl: HTMLIFrameElement = $state() as HTMLIFrameElement;
 	let showLogout = $state(false);
 	let chipEl = $state<HTMLElement>();
-	let lastProcessedUrlQueryParam: string | null = null;
 
 	function handleWindowClick(e: MouseEvent) {
 		if (showLogout && chipEl && !chipEl.contains(e.target as Node)) {
@@ -192,10 +191,13 @@
 		if (!trimmed) return null;
 		try {
 			const parsed = new URL(trimmed);
-			if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-				return null;
+			if (parsed.protocol === 'https:') {
+				return parsed.toString();
 			}
-			return parsed.toString();
+			if (parsed.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(parsed.hostname)) {
+				return parsed.toString();
+			}
+			return null;
 		} catch {
 			return null;
 		}
@@ -240,14 +242,12 @@
 
 	$effect(() => {
 		const paramUrl = $page.url.searchParams.get('url');
-		if (paramUrl === lastProcessedUrlQueryParam) return;
-		lastProcessedUrlQueryParam = paramUrl;
 		if (!paramUrl) {
 			clearUrlError();
 			return;
 		}
-		showAdvanced = true;
 		const safeUrl = validateAppUrl(paramUrl);
+		showAdvanced = true;
 		if (!safeUrl) return;
 		urlInput = safeUrl;
 		loadIframeFromUrl(safeUrl);
