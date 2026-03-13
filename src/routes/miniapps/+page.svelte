@@ -8,6 +8,7 @@
 	import { goto } from '$app/navigation';
 
 	const baseUrl = import.meta.env.VITE_BASE_URL;
+	const INVALID_URL_MESSAGE = 'Enter a valid https:// URL (http:// allowed for localhost).';
 
 	type MiniApp = { slug?: string; name: string; logo: string; url: string; description?: string; tags: string[]; isHidden?: boolean };
 
@@ -52,6 +53,7 @@
 
 	let iframeSrc = $state('');
 	let urlInput = $state('');
+	let urlError = $state('');
 	// pendingSource is kept outside $state to avoid Svelte proxying the cross-origin Window object,
 	// which triggers "Blocked a frame from accessing a cross-origin frame".
 	let pendingSource: MessageEventSource | null = null;
@@ -184,9 +186,79 @@
 		}
 	});
 
-	function handleLoad() {
-		iframeSrc = urlInput;
+	function normalizeAppUrl(value: string): string | null {
+		const trimmed = value.trim();
+		if (!trimmed) return null;
+		try {
+			const parsed = new URL(trimmed);
+			if (parsed.protocol === 'https:') {
+				return parsed.toString();
+			}
+			if (parsed.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(parsed.hostname)) {
+				return parsed.toString();
+			}
+			return null;
+		} catch {
+			return null;
+		}
+	}
+
+	function validateAppUrl(value: string): string | null {
+		const safeUrl = normalizeAppUrl(value);
+		if (!safeUrl) {
+			urlError = INVALID_URL_MESSAGE;
+			return null;
+		}
+		urlError = '';
+		return safeUrl;
+	}
+
+	function clearUrlError() {
+		urlError = '';
+	}
+
+	function loadIframeFromUrl(safeUrl: string) {
+		iframeSrc = safeUrl;
 		view = 'iframe';
+		showAdvanced = true;
+	}
+
+	function updateUrlParam(targetAppUrl: string | null) {
+		const currentParam = $page.url.searchParams.get('url');
+		if (targetAppUrl === currentParam) return;
+		const next = new URL($page.url);
+		if (targetAppUrl) {
+			next.searchParams.set('url', targetAppUrl);
+		} else {
+			next.searchParams.delete('url');
+		}
+		const search = next.searchParams.toString();
+		goto(search ? `${next.pathname}?${search}` : next.pathname, {
+			replaceState: true,
+			keepFocus: true,
+			noScroll: true
+		});
+	}
+
+	$effect(() => {
+		const paramUrl = $page.url.searchParams.get('url');
+		if (!paramUrl) {
+			clearUrlError();
+			return;
+		}
+		const safeUrl = validateAppUrl(paramUrl);
+		showAdvanced = true;
+		if (!safeUrl) return;
+		urlInput = safeUrl;
+		if (iframeSrc === safeUrl) return;
+		loadIframeFromUrl(safeUrl);
+	});
+
+	function handleLoad() {
+		const safeUrl = validateAppUrl(urlInput);
+		if (!safeUrl) return;
+		loadIframeFromUrl(safeUrl);
+		updateUrlParam(safeUrl);
 	}
 
 	function handleIframeLoad() {
@@ -216,6 +288,8 @@
 	function goBack() {
 		view = 'list';
 		iframeSrc = '';
+		clearUrlError();
+		updateUrlParam(null);
 	}
 
 	function getInitial(name: string): string {
@@ -394,11 +468,15 @@
 					<input
 						type="text"
 						bind:value={urlInput}
+						oninput={clearUrlError}
 						onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') handleLoad(); }}
 						placeholder="Enter app URL..."
 					/>
 					<button class="load-btn" onclick={handleLoad}>Load</button>
 				</div>
+				{#if urlError}
+					<p class="url-error">{urlError}</p>
+				{/if}
 			{/if}
 		</div>
 		</div> <!-- /list-scroll -->
@@ -444,11 +522,15 @@
 				<input
 					type="text"
 					bind:value={urlInput}
+					oninput={clearUrlError}
 					onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') handleLoad(); }}
 					placeholder="Enter app URL..."
 				/>
 				<button class="load-btn" onclick={handleLoad}>Load</button>
 			</div>
+			{#if urlError}
+				<p class="url-error">{urlError}</p>
+			{/if}
 		{/if}
 
 		<div class="card iframe-card">
@@ -486,6 +568,7 @@
 		--fg: #060a40;
 		--fg-muted: #6a6c8c;
 		--fg-subtle: #9b9db3;
+		--fg-error: #b42318;
 		--fg-on-dark: #ffffff;
 		--brand: #060a40;
 		--green: #22c54b;
@@ -972,6 +1055,13 @@
 
 	.url-bar input:focus {
 		border-color: var(--fg-muted);
+	}
+
+	.url-error {
+		margin: 0;
+		padding-left: 4px;
+		font-size: 12px;
+		color: var(--fg-error);
 	}
 
 	.load-btn {
