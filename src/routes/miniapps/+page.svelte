@@ -241,7 +241,6 @@
 	$effect(() => {
 		const paramUrl = $page.url.searchParams.get('url');
 		if (paramUrl === lastProcessedUrlQueryParam) return;
-		lastProcessedUrlQueryParam = paramUrl;
 		if (!paramUrl) {
 			clearUrlError();
 			return;
@@ -249,6 +248,7 @@
 		showAdvanced = true;
 		const safeUrl = validateAppUrl(paramUrl);
 		if (!safeUrl) return;
+		lastProcessedUrlQueryParam = paramUrl;
 		urlInput = safeUrl;
 		loadIframeFromUrl(safeUrl);
 	});
@@ -257,7 +257,6 @@
 		const safeUrl = validateAppUrl(urlInput);
 		if (!safeUrl) return;
 		loadIframeFromUrl(safeUrl);
-		lastProcessedUrlQueryParam = safeUrl;
 		updateUrlParam(safeUrl);
 	}
 
