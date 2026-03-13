@@ -232,7 +232,10 @@
 		const paramUrl = $page.url.searchParams.get('url');
 		if (paramUrl === lastHandledUrlParam) return;
 		lastHandledUrlParam = paramUrl;
-		if (!paramUrl) return;
+		if (!paramUrl) {
+			urlError = '';
+			return;
+		}
 		showAdvanced = true;
 		const safeUrl = validateAppUrl(paramUrl);
 		if (!safeUrl) return;
@@ -247,6 +250,7 @@
 		iframeSrc = safeUrl;
 		view = 'iframe';
 		showAdvanced = true;
+		lastHandledUrlParam = safeUrl;
 		updateUrlParam(safeUrl);
 	}
 
