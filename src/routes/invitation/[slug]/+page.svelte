@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { env } from '$env/dynamic/public';
 
-	const REFERRALS_BASE = env.PUBLIC_REFERRALS_BASE ?? 'https://staging.circlesubi.network/referrals';
+	const REFERRALS_BASE = env.PUBLIC_REFERRALS_BASE ?? 'https://referrals.aboutcircles.com';
 	const DESTINATION_BASE = 'https://app.gnosis.io/referral';
 
 	type Status = 'loading' | 'redirecting' | 'exhausted' | 'paused' | 'error';
