@@ -65,6 +65,14 @@
     "tags": ["circles", "organization", "builder", "tools"]
   },
   {
+    "slug": "invitations-manager",
+    "name": "Invitations Manager",
+    "logo": "/app-logos/org-manager.png",
+    "url": "https://aboutcircles.github.io/circles-invitation-links-manager/",
+    "description": "Manage invitations",
+    "tags": ["circles", "invitations", "tools"]
+  },
+  {
     "slug": "circles-daily-quest",
     "name": "Circles Daily Quest",
     "logo": "/app-logos/quests.png",
