@@ -119,13 +119,6 @@
 </div>
 
 <style>
-	:global(body) {
-		margin: 0;
-		background: #0d0d1a;
-		color: #f0eeff;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-	}
-
 	.page {
 		min-height: 100vh;
 		display: flex;
@@ -136,14 +129,15 @@
 	}
 
 	.card {
-		background: #1a1a2e;
-		border: 1px solid #2a2a4a;
-		border-radius: 20px;
+		background: rgba(255, 255, 255, 0.92);
+		backdrop-filter: blur(6px);
+		border: 1px solid var(--line);
+		border-radius: var(--radius-card);
 		padding: 48px 40px;
 		max-width: 420px;
 		width: 100%;
 		text-align: center;
-		box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+		box-shadow: var(--shadow-card);
 	}
 
 	.logo {
@@ -155,7 +149,7 @@
 	.title {
 		font-size: 1.4rem;
 		font-weight: 700;
-		color: #e0d8ff;
+		color: var(--ink);
 		margin: 0 0 24px;
 	}
 
@@ -164,61 +158,55 @@
 		align-items: center;
 		justify-content: center;
 		gap: 10px;
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		padding: 18px 20px;
 		font-size: 1rem;
 		font-weight: 600;
 	}
 
 	.status.loading {
-		background: #1e1e3a;
-		color: #8888cc;
+		background: var(--accent-soft);
+		color: var(--accent-mid);
 	}
 
 	.status.muted {
-		background: #1a1a2e;
-		color: #6e6e99;
-		border: 1px solid #2a2a4a;
+		background: var(--bg-a);
+		color: var(--muted);
+		border: 1px solid var(--line);
 	}
 
 	.status.error {
-		background: #2b0d0d;
-		color: #f87171;
-		border: 1px solid #7f1d1d;
+		background: var(--error-bg);
+		color: var(--error-ink);
+		border: 1px solid var(--error-bg);
 	}
 
 	.spinner {
 		display: inline-block;
 		width: 16px;
 		height: 16px;
-		border: 2px solid rgba(136, 136, 204, 0.3);
-		border-top-color: #8888cc;
+		border: 2px solid rgba(67, 53, 223, 0.3);
+		border-top-color: var(--accent-mid);
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
 		flex-shrink: 0;
 	}
 
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
-	}
-
 	.manual-link {
 		margin-top: 16px;
 		font-size: 0.875rem;
-		color: #6e6e99;
+		color: var(--muted);
 	}
 
 	.manual-link a {
-		color: #8888cc;
+		color: var(--accent-mid);
 		text-decoration: underline;
 	}
 
 	.error-detail {
 		margin-top: 12px;
 		font-size: 0.875rem;
-		color: #f87171;
+		color: var(--error-ink);
 		opacity: 0.8;
 		word-break: break-word;
 	}
@@ -226,10 +214,10 @@
 	.retry-btn {
 		margin-top: 20px;
 		padding: 10px 28px;
-		background: #2a2a4a;
-		color: #c0b8ff;
-		border: 1px solid #3a3a6a;
-		border-radius: 10px;
+		background: var(--card);
+		color: var(--accent);
+		border: 1px solid var(--line);
+		border-radius: var(--radius-pill);
 		font-size: 0.95rem;
 		font-weight: 600;
 		cursor: pointer;
@@ -237,6 +225,6 @@
 	}
 
 	.retry-btn:hover {
-		background: #32325a;
+		background: var(--accent-soft);
 	}
 </style>

@@ -101,13 +101,13 @@ VITE_BASE_URL=circles.gnosis.io
 Run this from the project root, using your `VITE_BASE_URL` value:
 
 ```sh
-mkcert circles.gnosis.io
+mkcert circles-dev.gnosis.io
 ```
 
 This produces two files in the current directory:
 
-- `circles.gnosis.io.pem` — certificate
-- `circles.gnosis.io-key.pem` — private key
+- `circles-dev.gnosis.io.pem` — certificate
+- `circles-dev.gnosis.io-key.pem` — private key
 
 These are gitignored and must be generated locally by each developer.
 
@@ -120,13 +120,13 @@ The dev server binds to the hostname, so you need to point it to localhost.
 **macOS / Linux:**
 
 ```sh
-sudo sh -c 'echo "127.0.0.1 circles.gnosis.io" >> /etc/hosts'
+sudo sh -c 'echo "127.0.0.1 circles-dev.gnosis.io" >> /etc/hosts'
 ```
 
 **Windows** — open `C:\Windows\System32\drivers\etc\hosts` as Administrator and add:
 
 ```
-127.0.0.1 circles.gnosis.io
+127.0.0.1 circles-dev.gnosis.io
 ```
 
 ---
@@ -145,7 +145,7 @@ npm install
 sudo npm run dev
 ```
 
-The app is now available at **https://circles.gnosis.io** (port 443).
+The app is now available at **https://circles-dev.gnosis.io** (port 443).
 
 > Your browser will trust the certificate because mkcert adds its CA to the system trust store.
 

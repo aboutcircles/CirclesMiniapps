@@ -33,15 +33,15 @@
 
 <style>
 	.disclaimer-banner {
-		background: #7c2d00;
-		border-bottom: 2px solid #dc6803;
+		background: var(--warn-ink);
+		border-bottom: 2px solid #d97706;
 		padding: 28px 24px 20px;
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		gap: 16px;
 		text-align: center;
-		box-shadow: 0 4px 24px rgba(124, 45, 0, 0.3);
+		box-shadow: 0 4px 24px rgba(138, 72, 44, 0.3);
 		position: sticky;
 		top: 0;
 		z-index: 9999;
@@ -55,11 +55,10 @@
 	.disclaimer-title {
 		font-size: 1.35rem;
 		font-weight: 800;
-		color: #fef3c7;
+		color: var(--warn-bg);
 		margin: 0 0 10px;
 		letter-spacing: -0.01em;
 		text-transform: uppercase;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 	}
 
 	.disclaimer-text {
@@ -68,25 +67,23 @@
 		line-height: 1.65;
 		margin: 0;
 		max-width: 680px;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 	}
 
 	.disclaimer-text strong {
-		color: #fef3c7;
+		color: var(--warn-bg);
 		font-weight: 700;
 	}
 
 	.disclaimer-close {
 		margin-top: 8px;
-		background: #dc6803;
+		background: #d97706;
 		color: #fff;
 		border: none;
-		border-radius: 8px;
+		border-radius: var(--radius-pill);
 		padding: 12px 28px;
 		font-size: 1rem;
 		font-weight: 700;
 		cursor: pointer;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 		transition: background 0.15s;
 	}
 

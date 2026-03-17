@@ -101,17 +101,6 @@
 </div>
 
 <style>
-	* {
-		margin: 0;
-		padding: 0;
-		box-sizing: border-box;
-	}
-
-	:global(body) {
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-		background: #f5f5f5;
-	}
-
 	.page-wrap {
 		min-height: 100vh;
 		display: flex;
@@ -120,18 +109,20 @@
 	}
 
 	.card {
-		background: #fff;
-		border-radius: 12px;
+		background: rgba(255, 255, 255, 0.92);
+		backdrop-filter: blur(6px);
+		border: 1px solid var(--line);
+		border-radius: var(--radius-card);
 		padding: 48px 40px;
 		text-align: center;
-		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+		box-shadow: var(--shadow-card);
 		max-width: 420px;
 		width: 90%;
 		margin: auto;
 	}
 
 	.card p {
-		color: #555;
+		color: var(--muted);
 		font-size: 15px;
 		margin-bottom: 24px;
 	}
@@ -139,28 +130,22 @@
 	.spinner {
 		width: 36px;
 		height: 36px;
-		border: 3px solid #e0e0e0;
-		border-top-color: #3e6957;
+		border: 3px solid var(--line);
+		border-top-color: var(--accent-mid);
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
 		margin: 0 auto 20px;
 	}
 
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
-	}
-
 	.error-heading {
 		font-weight: 600;
 		font-size: 17px;
-		color: #333;
+		color: var(--ink);
 		margin-bottom: 8px;
 	}
 
 	.error {
-		color: #c0392b;
+		color: var(--error-ink);
 		font-size: 14px;
 		margin-bottom: 24px;
 		word-break: break-word;
@@ -175,27 +160,30 @@
 
 	.btn {
 		display: inline-block;
-		background: #3e6957;
+		background: linear-gradient(130deg, var(--accent), var(--accent-mid));
 		color: #fff;
 		border: none;
 		padding: 12px 28px;
-		border-radius: 8px;
+		border-radius: var(--radius-pill);
 		font-size: 15px;
+		font-weight: 600;
 		cursor: pointer;
 		text-decoration: none;
+		transition: opacity 0.15s;
 	}
 
 	.btn:hover {
-		background: #335a49;
+		opacity: 0.85;
 	}
 
 	.btn-secondary {
-		background: transparent;
-		color: #3e6957;
-		border: 2px solid #3e6957;
+		background: var(--card);
+		color: var(--ink);
+		border: 1px solid var(--line);
 	}
 
 	.btn-secondary:hover {
-		background: #f0f7f4;
+		background: var(--bg-a);
+		opacity: 1;
 	}
 </style>
