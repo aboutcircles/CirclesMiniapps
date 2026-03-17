@@ -247,3 +247,10 @@ npm run build
 ```
 
 Output goes to `build/`. It is a fully static site (SvelteKit adapter-static) with a `404.html` fallback for client-side routing of dynamic slug routes.
+
+
+## Developer responsibilities
+By submitting a mini-app for listing, you confirm that:
+Your app and its use of Circles / Gnosis tooling complies with all applicable laws and regulations in the jurisdictions .
+You have not introduced, and will not introduce, any malicious code, backdoors or other potentially technologically harmful content or software designed to compromise users’’ assets, rights, wallets or the Circles/Gnosis infrastructure, and you will take reasonable care in accordance with industry practice to avoid the existence of any bugs or vulnerabilities in the mini-apps you develop that could lead to loss of user funds or disruption to our systems.
+The Circles / Gnosis team may reject, de-list, disable or restrict the availability of any mini-app at any time, in its sole discretion, including where we suspect any legal or  security risks, or where we have reason to believe you are engaging in abusive or prohibited behaviour.
