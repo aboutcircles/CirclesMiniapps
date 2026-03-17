@@ -178,6 +178,7 @@ Apps listed in `static/miniapps.json` appear on the `/miniapps` page. See [Submi
 | URL | Description |
 |---|---|
 | `/miniapps` | App list |
+| `/miniapps?url=<https-url>` | Open a custom app URL via the Advanced loader |
 | `/miniapps/<slug>` | Open a specific app directly |
 | `/miniapps/<slug>?data=<base64>` | Open app and pass arbitrary data to it |
 
