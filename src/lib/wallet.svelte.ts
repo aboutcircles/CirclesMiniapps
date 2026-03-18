@@ -48,7 +48,10 @@ async function connectWithPasskey() {
 
 	connecting = true;
 	try {
-		const resolved = await retrieveAccountAddressFromPasskeys(config.apiKey, gnosis);
+		const resolved = await retrieveAccountAddressFromPasskeys({
+			apiKey: config.apiKey,
+			chain: gnosis
+		});
 		await connect(resolved as string);
 	} catch (error: any) {
 		console.error('Passkey connection error:', error);
