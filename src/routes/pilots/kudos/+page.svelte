@@ -4,7 +4,7 @@
 	import { gnosis } from 'viem/chains';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import { CirclesConverter } from '@aboutcircles/sdk-utils/circlesConverter';
-	import { ORG_ADDRESS as PS_ORG_ADDRESS } from '../ps/config';
+
 
 	// ----- Constants -----
 	const ONCHAIN_RPC_URL = 'https://rpc.aboutcircles.com/';
@@ -22,7 +22,8 @@
 	const REFRESH_INTERVAL_MS = 15_000;
 
 	// ----- Group config dictionary -----
-	// Add new groups here. The key is the value of the ?group= URL param.
+	// Add entries here for each group this page supports.
+	// The key is the value of the ?group= URL param.
 	// Both groupAddress and orgAddress must be specified together.
 	interface GroupConfig {
 		groupAddress: string;
@@ -30,18 +31,20 @@
 	}
 
 	const GROUP_CONFIGS: Record<string, GroupConfig> = {
-		ps: {
+		'parallel-society': {
 			groupAddress: '0x6F99506cD91560305bD4859DcDdcb422EAA81F02',
-			orgAddress: PS_ORG_ADDRESS
+			orgAddress:   '0x62532eeB3779fDA75554e1EeEce552D0a9FF1C56'
+		},
+		'dandelion': {
+		    groupAddress: '0x1d3663CebF6c7f54bE62B210d68eeA0E38838582',
+			orgAddress: '0x33aa31e1392FFB37b1b3572A1E2cc0651D0BCb7F'
 		}
-		// Example — add more entries like this:
+		// Add more entries like this:
 		// myevent: {
 		//   groupAddress: '0xAAAA...',
 		//   orgAddress:   '0xBBBB...'
 		// }
 	};
-
-	const DEFAULT_CONFIG: GroupConfig = GROUP_CONFIGS.ps;
 
 	// ----- View toggle -----
 	type View = 'leaderboard' | 'appreciations';
@@ -52,13 +55,20 @@
 	const recipientAddress = $derived(page.url.searchParams.get('address') ?? null);
 
 	// ----- Dynamic group / org resolution -----
-	// Pass ?group=<key> to load a different group config from the dictionary above.
-	// If the key is missing or unrecognised, the default PS config is used.
+	// ?group=<key> is required. The key must match an entry in GROUP_CONFIGS above.
 	const activeConfig = $derived(
-		GROUP_CONFIGS[page.url.searchParams.get('group') ?? ''] ?? DEFAULT_CONFIG
+		GROUP_CONFIGS[page.url.searchParams.get('group') ?? ''] ?? null
 	);
-	const GROUP_ADDRESS = $derived(activeConfig.groupAddress);
-	const ORG_ADDRESS = $derived(activeConfig.orgAddress);
+	const GROUP_ADDRESS = $derived(activeConfig?.groupAddress ?? '');
+	const ORG_ADDRESS = $derived(activeConfig?.orgAddress ?? '');
+	const groupParam = $derived(page.url.searchParams.get('group'));
+	const configError = $derived(
+		!groupParam
+			? 'Missing required URL parameter: ?group=<key>'
+			: !activeConfig
+				? `Unknown group "${groupParam}". Add it to GROUP_CONFIGS in the source.`
+				: null
+	);
 
 	let activeView = $state<View>('appreciations');
 	$effect(() => {
@@ -327,6 +337,7 @@
 	$effect(() => () => stopAutoRefresh());
 
 	$effect(() => {
+		if (!activeConfig) return;
 		mountLoading = true;
 		snapshotError = '';
 		lbError = '';
@@ -413,6 +424,7 @@
 
 	// Re-run whenever ORG_ADDRESS or GROUP_ADDRESS changes (e.g. URL param update).
 	$effect(() => {
+		if (!activeConfig) return;
 		const orgAddr = ORG_ADDRESS;
 		const groupAddr = GROUP_ADDRESS;
 		loadHistory(orgAddr, groupAddr);
@@ -424,11 +436,16 @@
 </script>
 
 <svelte:head>
-	<title>PS Board</title>
+	<title>Kudos</title>
 </svelte:head>
 
 <div class="page">
 	<div class="card">
+
+		<!-- Config error -->
+		{#if configError}
+			<div class="error-banner">{configError}</div>
+		{/if}
 
 		<!-- Toggle -->
 		{#if !recipientAddress || hasBoard}
@@ -698,6 +715,14 @@
 </div>
 
 <style>
+	:global(body) {
+		margin: 0;
+		background: #f0e8dc;
+		color: #060a40;
+		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+		-webkit-font-smoothing: antialiased;
+	}
+
 	.page {
 		min-height: 100vh;
 		display: flex;
@@ -705,25 +730,24 @@
 		justify-content: center;
 		padding: 48px 16px 80px;
 		box-sizing: border-box;
+		background: #f0e8dc;
 	}
 
 	.card {
-		background: rgba(255, 255, 255, 0.92);
-		backdrop-filter: blur(6px);
-		border: 1px solid var(--line);
-		border-radius: var(--radius-card);
-		box-shadow: var(--shadow-card);
+		background: #faf5f1;
+		border-radius: 24px;
+		box-shadow: 0 8px 40px rgba(6, 10, 64, 0.12);
 		max-width: 480px;
 		width: 100%;
-		padding: 22px;
+		padding: 28px 28px 28px;
 		box-sizing: border-box;
 	}
 
 	/* ----- Toggle ----- */
 	.toggle-bar {
 		display: flex;
-		background: var(--line-soft);
-		border-radius: var(--radius-sm);
+		background: #ede1d8;
+		border-radius: 12px;
 		padding: 4px;
 		gap: 4px;
 		margin-bottom: 20px;
@@ -740,20 +764,20 @@
 		cursor: pointer;
 		transition: background 0.15s, color 0.15s, box-shadow 0.15s;
 		background: transparent;
-		color: var(--muted);
+		color: #9b9db3;
 	}
 
 	.toggle-btn.active {
-		background: var(--card);
-		color: var(--ink);
-		box-shadow: 0 1px 4px rgba(5, 6, 26, 0.10);
+		background: #faf5f1;
+		color: #060a40;
+		box-shadow: 0 1px 4px rgba(6, 10, 64, 0.10);
 	}
 
 	/* ----- Shared ----- */
 	.subtitle {
 		text-align: center;
 		font-size: 0.85rem;
-		color: var(--muted);
+		color: #9b9db3;
 		margin: 0 0 20px;
 		font-style: italic;
 	}
@@ -763,7 +787,7 @@
 		align-items: center;
 		gap: 10px;
 		padding: 16px 0;
-		color: var(--muted);
+		color: #6a6c8c;
 		font-size: 0.9rem;
 	}
 
@@ -771,36 +795,38 @@
 		display: inline-block;
 		width: 18px;
 		height: 18px;
-		border: 2.5px solid var(--line);
-		border-top-color: var(--accent-mid);
+		border: 2.5px solid #ede1d8;
+		border-top-color: #060a40;
 		border-radius: 50%;
 		animation: spin 0.75s linear infinite;
 		flex-shrink: 0;
 	}
 
+	@keyframes spin { to { transform: rotate(360deg); } }
+
 	.error-banner {
 		padding: 12px 16px;
-		background: var(--error-bg);
-		border: 1.5px solid var(--error-bg);
+		background: #fff0f0;
+		border: 1.5px solid #fca5a5;
 		border-radius: 10px;
-		color: var(--error-ink);
+		color: #991b1b;
 		font-size: 0.88rem;
 		margin-bottom: 16px;
 	}
 
 	.empty {
 		text-align: center;
-		color: var(--muted);
+		color: #9b9db3;
 		font-size: 0.9rem;
 		padding: 24px 0;
 	}
 
-	.row-even { background: var(--card); }
-	.row-odd  { background: var(--bg-a); }
+	.row-even { background: #ffffff; }
+	.row-odd  { background: #faf5f1; }
 
 	/* ----- Leaderboard ----- */
 	.lb-list {
-		border: 1.5px solid var(--line);
+		border: 1.5px solid #ede1d8;
 		border-radius: 14px;
 		overflow: hidden;
 		margin-bottom: 4px;
@@ -811,7 +837,7 @@
 		align-items: center;
 		gap: 12px;
 		padding: 12px 16px;
-		border-bottom: 1px solid var(--line);
+		border-bottom: 1px solid #ede1d8;
 		text-decoration: none;
 		cursor: pointer;
 		transition: filter 0.12s;
@@ -821,7 +847,7 @@
 	.lb-row:hover { filter: brightness(0.96); }
 
 	.row-zero { opacity: 0.55; }
-	.row-zero .lb-name { color: var(--muted); }
+	.row-zero .lb-name { color: #8a8ca8; }
 
 	.lb-avatar {
 		width: 40px;
@@ -849,7 +875,7 @@
 	.lb-name {
 		flex: 1;
 		font-weight: 600;
-		color: var(--ink);
+		color: #060a40;
 		font-size: 0.92rem;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -859,20 +885,20 @@
 	.lb-name-addr {
 		font-family: 'SF Mono', ui-monospace, monospace;
 		font-size: 0.78rem;
-		color: var(--muted);
+		color: #8a8ca8;
 	}
 
 	.lb-score {
 		font-size: 1.3rem;
 		font-weight: 800;
-		color: var(--ink);
+		color: #060a40;
 		min-width: 60px;
 		text-align: right;
 		flex-shrink: 0;
 	}
 
 	.lb-score-zero {
-		color: var(--muted);
+		color: #b0b0c0;
 		font-weight: 600;
 	}
 
@@ -880,11 +906,11 @@
 		width: 100%;
 		background: none;
 		border: none;
-		border-top: 1px solid var(--line);
+		border-top: 1px solid #ede1d8;
 		padding: 10px 16px;
 		font-size: 0.8rem;
 		font-weight: 600;
-		color: var(--muted);
+		color: #8a8ca8;
 		cursor: pointer;
 		text-align: center;
 		letter-spacing: 0.04em;
@@ -892,8 +918,8 @@
 	}
 
 	.show-more-btn:hover {
-		color: var(--ink);
-		background: var(--bg-a);
+		color: #6a6c8c;
+		background: #faf5f1;
 	}
 
 	/* ----- Kudos button ----- */
@@ -903,9 +929,9 @@
 		align-items: center;
 		justify-content: center;
 		gap: 10px;
-		background: linear-gradient(130deg, var(--accent), var(--accent-mid));
+		background: #3a3f7a;
 		color: #ffffff;
-		border-radius: var(--radius-pill);
+		border-radius: 16px;
 		padding: 14px 18px;
 		text-decoration: none;
 		margin-bottom: 20px;
@@ -916,7 +942,7 @@
 	.kudos-btn:hover { opacity: 0.85; }
 
 	.kudos-arrow {
-		color: rgba(255, 255, 255, 0.6);
+		color: #c0c4f0;
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
@@ -924,7 +950,7 @@
 
 	.kudos-label {
 		font-size: 1rem;
-		color: rgba(255, 255, 255, 0.8);
+		color: #d8daff;
 		flex-shrink: 0;
 	}
 
@@ -954,7 +980,7 @@
 	.trust-name {
 		font-size: 1rem;
 		font-weight: 700;
-		color: var(--ink);
+		color: #060a40;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -967,10 +993,10 @@
 		align-items: center;
 		justify-content: center;
 		gap: 6px;
-		background: var(--card);
-		color: var(--ink);
-		border: 1.5px solid var(--line);
-		border-radius: var(--radius-pill);
+		background: #f0e8dc;
+		color: #060a40;
+		border: 1.5px solid #c8caeb;
+		border-radius: 16px;
 		padding: 12px 18px;
 		text-decoration: none;
 		margin-bottom: 16px;
@@ -982,7 +1008,7 @@
 
 	.trust-label {
 		font-size: 1rem;
-		color: var(--ink);
+		color: #060a40;
 		flex-shrink: 0;
 	}
 
@@ -995,26 +1021,26 @@
 		width: 100%;
 		box-sizing: border-box;
 		padding: 10px 14px;
-		border: 1.5px solid var(--line);
+		border: 1.5px solid #c8caeb;
 		border-radius: 10px;
 		font-size: 0.92rem;
-		color: var(--ink);
-		background: var(--card);
+		color: #060a40;
+		background: #ffffff;
 		outline: none;
 		transition: border-color 0.15s;
 	}
 
 	.kudos-msg-input:focus {
-		border-color: var(--accent-mid);
+		border-color: #3a3f7a;
 	}
 
 	.kudos-msg-input::placeholder {
-		color: var(--muted);
+		color: #b0b2cc;
 	}
 
 	/* ----- Appreciations ----- */
 	.tx-list {
-		border: 1.5px solid var(--line);
+		border: 1.5px solid #ede1d8;
 		border-radius: 14px;
 		overflow: hidden;
 		margin-bottom: 4px;
@@ -1025,7 +1051,7 @@
 		align-items: center;
 		gap: 14px;
 		padding: 14px 16px;
-		border-bottom: 1px solid var(--line);
+		border-bottom: 1px solid #ede1d8;
 	}
 
 	.tx-row:last-child { border-bottom: none; }
@@ -1054,7 +1080,7 @@
 
 	.arrow {
 		font-size: 0.85rem;
-		color: var(--muted);
+		color: #9b9db3;
 		font-weight: 700;
 		padding: 0 2px;
 	}
@@ -1064,7 +1090,7 @@
 	.tx-sentence {
 		margin: 0;
 		font-size: 0.88rem;
-		color: var(--ink);
+		color: #060a40;
 		line-height: 1.4;
 	}
 
@@ -1081,30 +1107,30 @@
 	.tx-msg {
 		margin: 4px 0 0;
 		font-size: 0.82rem;
-		color: var(--muted);
+		color: #6a6c8c;
 		font-style: italic;
 		line-height: 1.3;
 	}
 
 	.tx-name {
 		font-weight: 700;
-		color: var(--ink);
+		color: #060a40;
 	}
 
 	.tx-verb {
-		color: var(--muted);
+		color: #6a6c8c;
 		font-weight: 400;
 	}
 
 	.tx-amount {
 		font-weight: 400;
-		color: var(--muted);
+		color: #6a6c8c;
 	}
 
 	.has-more {
 		text-align: center;
 		font-size: 0.78rem;
-		color: var(--muted);
+		color: #9b9db3;
 		font-style: italic;
 		margin: 8px 0 4px;
 	}
@@ -1116,7 +1142,7 @@
 		align-items: center;
 		margin-top: 16px;
 		padding-top: 12px;
-		border-top: 1px solid var(--line);
+		border-top: 1px solid #ede1d8;
 	}
 
 	.auto-label {
@@ -1125,7 +1151,7 @@
 		gap: 6px;
 		font-size: 0.72rem;
 		font-weight: 700;
-		color: var(--muted);
+		color: #8a8ca8;
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
 	}
@@ -1134,8 +1160,8 @@
 		display: inline-block;
 		width: 10px;
 		height: 10px;
-		border: 2px solid var(--line);
-		border-top-color: var(--success-ink);
+		border: 2px solid #ede1d8;
+		border-top-color: #15803d;
 		border-radius: 50%;
 		animation: spin 0.75s linear infinite;
 		flex-shrink: 0;
@@ -1143,10 +1169,10 @@
 
 	.btn-refresh {
 		padding: 6px 14px;
-		background: linear-gradient(130deg, var(--accent), var(--accent-mid));
+		background: #060a40;
 		color: #ffffff;
 		border: none;
-		border-radius: var(--radius-pill);
+		border-radius: 8px;
 		font-size: 0.8rem;
 		font-weight: 600;
 		cursor: pointer;
