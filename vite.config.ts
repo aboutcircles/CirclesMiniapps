@@ -2,7 +2,7 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { defineConfig } from 'vite';
 
-const isDev = process.env.NODE_ENV !== 'production';
+const baseUrl = process.env.NODE_ENV !== 'production' ? 'circles-dev.gnosis.io' : 'circles.gnosis.io';
 
 export default defineConfig({
   plugins: [
@@ -12,23 +12,14 @@ export default defineConfig({
       globals: { Buffer: true, global: true, process: true }
     })
   ],
-  server: isDev
-    ? {
-        host: 'circles-dev.gnosis.io',
-        port: 443,
-        https: {
-          key: './circles-dev.gnosis.io-key.pem',
-          cert: './circles-dev.gnosis.io.pem'
-        }
-      }
-    : {
-        host: 'circles.gnosis.io',
-        port: 443,
-        https: {
-          key: './circles.gnosis.io-key.pem',
-          cert: './circles.gnosis.io.pem'
-        }
-      },
+  server: {
+	host: baseUrl,
+	port: 443,
+	https: {
+		key: `./${baseUrl}-key.pem`,
+		cert: `./${baseUrl}.pem`
+	}
+},
   optimizeDeps: {
     esbuildOptions: {
       define: { global: 'globalThis' }
