@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { createPublicClient, http, type Address } from 'viem';
 	import { gnosis } from 'viem/chains';
@@ -8,7 +9,8 @@
 
 	// ----- Constants -----
 	const ONCHAIN_RPC_URL = 'https://rpc.aboutcircles.com/';
-	const CIRCLES_RPC_URL = 'https://staging.circlesubi.network/';
+	const CIRCLES_RPC_URL = 'https://rpc.aboutcircles.com/';
+	const CIRCLES_QUERY_URL = 'https://staging.circlesubi.network/';
 	const TX_RPC_URL = 'https://staging.circlesubi.network/';
 	const ERC20_ABI = [
 		{
@@ -267,7 +269,7 @@
 
 	// ----- Leaderboard logic -----
 	async function getCurrentMembers(group: string): Promise<string[]> {
-		const result = (await jsonRpc(CIRCLES_RPC_URL, 'circles_query', [
+		const result = (await jsonRpc(CIRCLES_QUERY_URL, 'circles_query', [
 			{
 				Namespace: 'V_CrcV2',
 				Table: 'GroupMemberships',
@@ -338,29 +340,31 @@
 
 	$effect(() => {
 		if (!activeConfig) return;
-		mountLoading = true;
-		snapshotError = '';
-		lbError = '';
-		(async () => {
-			try {
-				statusMsg = 'Loading snapshot…';
-				const res = await fetch('/snapshot.json');
-				if (!res.ok) throw new Error(`snapshot.json not found (HTTP ${res.status})`);
-				const snap = (await res.json()) as SnapshotFile;
-				snapshot = snap;
-				statusMsg = 'Fetching profiles…';
-				await fetchProfiles(snap.accounts.filter(a => a.toLowerCase() !== snap.group.toLowerCase()));
-				statusMsg = 'Fetching live balances…';
-				mountLoading = false;
-				await refreshLive();
-				startAutoRefresh();
-			} catch (e: unknown) {
-				snapshotError = e instanceof Error ? e.message : String(e);
-				mountLoading = false;
-			} finally {
-				statusMsg = '';
-			}
-		})();
+		untrack(() => {
+			mountLoading = true;
+			snapshotError = '';
+			lbError = '';
+			(async () => {
+				try {
+					statusMsg = 'Loading snapshot…';
+					const res = await fetch('/snapshot.json');
+					if (!res.ok) throw new Error(`snapshot.json not found (HTTP ${res.status})`);
+					const snap = (await res.json()) as SnapshotFile;
+					snapshot = snap;
+					statusMsg = 'Fetching profiles…';
+					await fetchProfiles(snap.accounts.filter(a => a.toLowerCase() !== snap.group.toLowerCase()));
+					statusMsg = 'Fetching live balances…';
+					mountLoading = false;
+					await refreshLive();
+					startAutoRefresh();
+				} catch (e: unknown) {
+					snapshotError = e instanceof Error ? e.message : String(e);
+					mountLoading = false;
+				} finally {
+					statusMsg = '';
+				}
+			})();
+		});
 	});
 
 	// ----- Appreciations logic -----
@@ -427,11 +431,11 @@
 		if (!activeConfig) return;
 		const orgAddr = ORG_ADDRESS;
 		const groupAddr = GROUP_ADDRESS;
-		loadHistory(orgAddr, groupAddr);
+		untrack(() => loadHistory(orgAddr, groupAddr));
 	});
 
 	$effect(() => {
-		if (recipientAddress) fetchProfiles([recipientAddress]);
+		if (recipientAddress) untrack(() => fetchProfiles([recipientAddress]));
 	});
 </script>
 
