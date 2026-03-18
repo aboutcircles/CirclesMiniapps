@@ -664,14 +664,6 @@
 </div>
 
 <style>
-	:global(body) {
-		margin: 0;
-		background: #f0e8dc;
-		color: #060a40;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-		-webkit-font-smoothing: antialiased;
-	}
-
 	.page {
 		min-height: 100vh;
 		display: flex;
@@ -679,24 +671,25 @@
 		justify-content: center;
 		padding: 48px 16px 80px;
 		box-sizing: border-box;
-		background: #f0e8dc;
 	}
 
 	.card {
-		background: #faf5f1;
-		border-radius: 24px;
-		box-shadow: 0 8px 40px rgba(6, 10, 64, 0.12);
+		background: rgba(255, 255, 255, 0.92);
+		backdrop-filter: blur(6px);
+		border: 1px solid var(--line);
+		border-radius: var(--radius-card);
+		box-shadow: var(--shadow-card);
 		max-width: 480px;
 		width: 100%;
-		padding: 28px 28px 28px;
+		padding: 22px;
 		box-sizing: border-box;
 	}
 
 	/* ----- Toggle ----- */
 	.toggle-bar {
 		display: flex;
-		background: #ede1d8;
-		border-radius: 12px;
+		background: var(--line-soft);
+		border-radius: var(--radius-sm);
 		padding: 4px;
 		gap: 4px;
 		margin-bottom: 20px;
@@ -713,20 +706,20 @@
 		cursor: pointer;
 		transition: background 0.15s, color 0.15s, box-shadow 0.15s;
 		background: transparent;
-		color: #9b9db3;
+		color: var(--muted);
 	}
 
 	.toggle-btn.active {
-		background: #faf5f1;
-		color: #060a40;
-		box-shadow: 0 1px 4px rgba(6, 10, 64, 0.10);
+		background: var(--card);
+		color: var(--ink);
+		box-shadow: 0 1px 4px rgba(5, 6, 26, 0.10);
 	}
 
 	/* ----- Shared ----- */
 	.subtitle {
 		text-align: center;
 		font-size: 0.85rem;
-		color: #9b9db3;
+		color: var(--muted);
 		margin: 0 0 20px;
 		font-style: italic;
 	}
@@ -736,7 +729,7 @@
 		align-items: center;
 		gap: 10px;
 		padding: 16px 0;
-		color: #6a6c8c;
+		color: var(--muted);
 		font-size: 0.9rem;
 	}
 
@@ -744,38 +737,36 @@
 		display: inline-block;
 		width: 18px;
 		height: 18px;
-		border: 2.5px solid #ede1d8;
-		border-top-color: #060a40;
+		border: 2.5px solid var(--line);
+		border-top-color: var(--accent-mid);
 		border-radius: 50%;
 		animation: spin 0.75s linear infinite;
 		flex-shrink: 0;
 	}
 
-	@keyframes spin { to { transform: rotate(360deg); } }
-
 	.error-banner {
 		padding: 12px 16px;
-		background: #fff0f0;
-		border: 1.5px solid #fca5a5;
+		background: var(--error-bg);
+		border: 1.5px solid var(--error-bg);
 		border-radius: 10px;
-		color: #991b1b;
+		color: var(--error-ink);
 		font-size: 0.88rem;
 		margin-bottom: 16px;
 	}
 
 	.empty {
 		text-align: center;
-		color: #9b9db3;
+		color: var(--muted);
 		font-size: 0.9rem;
 		padding: 24px 0;
 	}
 
-	.row-even { background: #ffffff; }
-	.row-odd  { background: #faf5f1; }
+	.row-even { background: var(--card); }
+	.row-odd  { background: var(--bg-a); }
 
 	/* ----- Leaderboard ----- */
 	.lb-list {
-		border: 1.5px solid #ede1d8;
+		border: 1.5px solid var(--line);
 		border-radius: 14px;
 		overflow: hidden;
 		margin-bottom: 4px;
@@ -786,7 +777,7 @@
 		align-items: center;
 		gap: 12px;
 		padding: 12px 16px;
-		border-bottom: 1px solid #ede1d8;
+		border-bottom: 1px solid var(--line);
 		text-decoration: none;
 		cursor: pointer;
 		transition: filter 0.12s;
@@ -796,7 +787,7 @@
 	.lb-row:hover { filter: brightness(0.96); }
 
 	.row-zero { opacity: 0.55; }
-	.row-zero .lb-name { color: #8a8ca8; }
+	.row-zero .lb-name { color: var(--muted); }
 
 	.lb-avatar {
 		width: 40px;
@@ -824,7 +815,7 @@
 	.lb-name {
 		flex: 1;
 		font-weight: 600;
-		color: #060a40;
+		color: var(--ink);
 		font-size: 0.92rem;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -834,20 +825,20 @@
 	.lb-name-addr {
 		font-family: 'SF Mono', ui-monospace, monospace;
 		font-size: 0.78rem;
-		color: #8a8ca8;
+		color: var(--muted);
 	}
 
 	.lb-score {
 		font-size: 1.3rem;
 		font-weight: 800;
-		color: #060a40;
+		color: var(--ink);
 		min-width: 60px;
 		text-align: right;
 		flex-shrink: 0;
 	}
 
 	.lb-score-zero {
-		color: #b0b0c0;
+		color: var(--muted);
 		font-weight: 600;
 	}
 
@@ -855,11 +846,11 @@
 		width: 100%;
 		background: none;
 		border: none;
-		border-top: 1px solid #ede1d8;
+		border-top: 1px solid var(--line);
 		padding: 10px 16px;
 		font-size: 0.8rem;
 		font-weight: 600;
-		color: #8a8ca8;
+		color: var(--muted);
 		cursor: pointer;
 		text-align: center;
 		letter-spacing: 0.04em;
@@ -867,8 +858,8 @@
 	}
 
 	.show-more-btn:hover {
-		color: #6a6c8c;
-		background: #faf5f1;
+		color: var(--ink);
+		background: var(--bg-a);
 	}
 
 	/* ----- Kudos button ----- */
@@ -878,9 +869,9 @@
 		align-items: center;
 		justify-content: center;
 		gap: 10px;
-		background: #3a3f7a;
+		background: linear-gradient(130deg, var(--accent), var(--accent-mid));
 		color: #ffffff;
-		border-radius: 16px;
+		border-radius: var(--radius-pill);
 		padding: 14px 18px;
 		text-decoration: none;
 		margin-bottom: 20px;
@@ -891,7 +882,7 @@
 	.kudos-btn:hover { opacity: 0.85; }
 
 	.kudos-arrow {
-		color: #c0c4f0;
+		color: rgba(255, 255, 255, 0.6);
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
@@ -899,7 +890,7 @@
 
 	.kudos-label {
 		font-size: 1rem;
-		color: #d8daff;
+		color: rgba(255, 255, 255, 0.8);
 		flex-shrink: 0;
 	}
 
@@ -929,7 +920,7 @@
 	.trust-name {
 		font-size: 1rem;
 		font-weight: 700;
-		color: #060a40;
+		color: var(--ink);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -942,10 +933,10 @@
 		align-items: center;
 		justify-content: center;
 		gap: 6px;
-		background: #f0e8dc;
-		color: #060a40;
-		border: 1.5px solid #c8caeb;
-		border-radius: 16px;
+		background: var(--card);
+		color: var(--ink);
+		border: 1.5px solid var(--line);
+		border-radius: var(--radius-pill);
 		padding: 12px 18px;
 		text-decoration: none;
 		margin-bottom: 16px;
@@ -957,7 +948,7 @@
 
 	.trust-label {
 		font-size: 1rem;
-		color: #060a40;
+		color: var(--ink);
 		flex-shrink: 0;
 	}
 
@@ -970,26 +961,26 @@
 		width: 100%;
 		box-sizing: border-box;
 		padding: 10px 14px;
-		border: 1.5px solid #c8caeb;
+		border: 1.5px solid var(--line);
 		border-radius: 10px;
 		font-size: 0.92rem;
-		color: #060a40;
-		background: #ffffff;
+		color: var(--ink);
+		background: var(--card);
 		outline: none;
 		transition: border-color 0.15s;
 	}
 
 	.kudos-msg-input:focus {
-		border-color: #3a3f7a;
+		border-color: var(--accent-mid);
 	}
 
 	.kudos-msg-input::placeholder {
-		color: #b0b2cc;
+		color: var(--muted);
 	}
 
 	/* ----- Appreciations ----- */
 	.tx-list {
-		border: 1.5px solid #ede1d8;
+		border: 1.5px solid var(--line);
 		border-radius: 14px;
 		overflow: hidden;
 		margin-bottom: 4px;
@@ -1000,7 +991,7 @@
 		align-items: center;
 		gap: 14px;
 		padding: 14px 16px;
-		border-bottom: 1px solid #ede1d8;
+		border-bottom: 1px solid var(--line);
 	}
 
 	.tx-row:last-child { border-bottom: none; }
@@ -1029,7 +1020,7 @@
 
 	.arrow {
 		font-size: 0.85rem;
-		color: #9b9db3;
+		color: var(--muted);
 		font-weight: 700;
 		padding: 0 2px;
 	}
@@ -1039,7 +1030,7 @@
 	.tx-sentence {
 		margin: 0;
 		font-size: 0.88rem;
-		color: #060a40;
+		color: var(--ink);
 		line-height: 1.4;
 	}
 
@@ -1056,30 +1047,30 @@
 	.tx-msg {
 		margin: 4px 0 0;
 		font-size: 0.82rem;
-		color: #6a6c8c;
+		color: var(--muted);
 		font-style: italic;
 		line-height: 1.3;
 	}
 
 	.tx-name {
 		font-weight: 700;
-		color: #060a40;
+		color: var(--ink);
 	}
 
 	.tx-verb {
-		color: #6a6c8c;
+		color: var(--muted);
 		font-weight: 400;
 	}
 
 	.tx-amount {
 		font-weight: 400;
-		color: #6a6c8c;
+		color: var(--muted);
 	}
 
 	.has-more {
 		text-align: center;
 		font-size: 0.78rem;
-		color: #9b9db3;
+		color: var(--muted);
 		font-style: italic;
 		margin: 8px 0 4px;
 	}
@@ -1091,7 +1082,7 @@
 		align-items: center;
 		margin-top: 16px;
 		padding-top: 12px;
-		border-top: 1px solid #ede1d8;
+		border-top: 1px solid var(--line);
 	}
 
 	.auto-label {
@@ -1100,7 +1091,7 @@
 		gap: 6px;
 		font-size: 0.72rem;
 		font-weight: 700;
-		color: #8a8ca8;
+		color: var(--muted);
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
 	}
@@ -1109,8 +1100,8 @@
 		display: inline-block;
 		width: 10px;
 		height: 10px;
-		border: 2px solid #ede1d8;
-		border-top-color: #15803d;
+		border: 2px solid var(--line);
+		border-top-color: var(--success-ink);
 		border-radius: 50%;
 		animation: spin 0.75s linear infinite;
 		flex-shrink: 0;
@@ -1118,10 +1109,10 @@
 
 	.btn-refresh {
 		padding: 6px 14px;
-		background: #060a40;
+		background: linear-gradient(130deg, var(--accent), var(--accent-mid));
 		color: #ffffff;
 		border: none;
-		border-radius: 8px;
+		border-radius: var(--radius-pill);
 		font-size: 0.8rem;
 		font-weight: 600;
 		cursor: pointer;

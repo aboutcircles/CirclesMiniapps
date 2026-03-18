@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { getAddress } from 'viem';
+	import '../style.css';
 
 	interface Props {
 		children: Snippet;

@@ -24,13 +24,11 @@
     let showAdvanced = $state(false);
     let selectedApp: MiniApp | null = $state(null);
     function visibleApps(): MiniApp[] {
-        return apps.filter((app) => !app.isHidden && app.category !== "admin");
+        return apps.filter((app) => !app.isHidden && app.category === "admin");
     }
 
     let iframeSrc = $state("");
     let urlInput = $state("");
-    // pendingSource is kept outside $state to avoid Svelte proxying the cross-origin Window object,
-    // which triggers "Blocked a frame from accessing a cross-origin frame".
     let pendingSource: MessageEventSource | null = null;
     let pendingRequest: {
         kind: "tx" | "sign";
@@ -59,12 +57,11 @@
         return wallet.address ? wallet.address.slice(2, 4).toUpperCase() : "?";
     }
 
-    /** Post a message to a cross-origin source window safely. */
     function postTo(source: MessageEventSource | null, data: any) {
         try {
             (source as Window)?.postMessage(data, "*");
         } catch {
-            // cross-origin access blocked — ignore
+            // cross-origin access blocked
         }
     }
 
@@ -72,7 +69,7 @@
         try {
             iframeEl?.contentWindow?.postMessage(data, "*");
         } catch {
-            // cross-origin access blocked — ignore
+            // cross-origin access blocked
         }
     }
 
@@ -175,7 +172,6 @@
         };
     });
 
-    // Push wallet status to iframe whenever connection changes
     $effect(() => {
         if (wallet.connected) {
             postToIframe({ type: "wallet_connected", address: wallet.address });
@@ -205,7 +201,7 @@
 
     function launchApp(app: MiniApp) {
         if (app.slug) {
-            goto(`/miniapps/${app.slug}`);
+            goto(`/admin/${app.slug}`);
             return;
         }
         iframeSrc = app.url;
@@ -280,15 +276,14 @@
 <svelte:window onclick={handleWindowClick} />
 
 <svelte:head>
-    <title>Circles Mini Apps - {baseUrl}</title>
+    <title>Admin - {baseUrl}</title>
 </svelte:head>
 
 <div class="page">
     {#if view === "list"}
-        <!-- App List View -->
         <div class="card header">
             <div class="header-left">
-                <h1>Circles Mini Apps</h1>
+                <h1>Circles Admin Apps</h1>
             </div>
             <div class="header-right">
                 {#if wallet.connected}
@@ -479,9 +474,7 @@
                 {/if}
             </div>
         </div>
-        <!-- /list-scroll -->
     {:else}
-        <!-- Iframe View -->
         <div class="iframe-view">
             <div class="iframe-topbar">
                 <button class="back-btn" onclick={goBack}>&#8592; back</button>
@@ -566,11 +559,9 @@
                 ></iframe>
             </div>
         </div>
-        <!-- /iframe-view -->
     {/if}
 </div>
 
-<!-- Approval Popup -->
 {#if pendingRequest}
     <ApprovalPopup
         request={pendingRequest}
@@ -593,7 +584,6 @@
         overflow-x: hidden;
     }
 
-    /* Header */
     .header {
         display: flex;
         align-items: center;
@@ -642,7 +632,6 @@
         cursor: not-allowed;
     }
 
-    /* User chip */
     .user-chip {
         display: flex;
         align-items: center;
@@ -728,7 +717,6 @@
         animation: spin 0.7s linear infinite;
     }
 
-    /* App grid */
     .app-grid {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
@@ -808,7 +796,6 @@
         border-radius: var(--radius-pill);
     }
 
-    /* Popup */
     .popup-overlay {
         position: fixed;
         inset: 0;
@@ -929,7 +916,6 @@
         opacity: 0.85;
     }
 
-    /* Advanced section */
     .advanced-section {
         display: flex;
         flex-direction: column;
@@ -952,7 +938,6 @@
         color: var(--ink);
     }
 
-    /* URL bar */
     .url-bar {
         display: flex;
         align-items: center;
@@ -998,7 +983,6 @@
         opacity: 0.85;
     }
 
-    /* List view scrolls, iframe view does not */
     .list-scroll {
         flex: 1;
         overflow-y: auto;
@@ -1006,7 +990,6 @@
         padding: 0 4px;
     }
 
-    /* Iframe view */
     .iframe-view {
         flex: 1;
         min-height: 0;

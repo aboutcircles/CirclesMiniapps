@@ -189,14 +189,6 @@
 </div>
 
 <style>
-	:global(body) {
-		margin: 0;
-		background: #0d0d1a;
-		color: #f0eeff;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-		-webkit-font-smoothing: antialiased;
-	}
-
 	.page {
 		min-height: 100vh;
 		display: flex;
@@ -207,14 +199,15 @@
 	}
 
 	.card {
-		background: #1a1a2e;
-		border: 1px solid #2a2a4a;
-		border-radius: 20px;
+		background: rgba(255, 255, 255, 0.92);
+		backdrop-filter: blur(6px);
+		border: 1px solid var(--line);
+		border-radius: var(--radius-card);
 		padding: 48px 40px;
 		max-width: 420px;
 		width: 100%;
 		text-align: center;
-		box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+		box-shadow: var(--shadow-card);
 	}
 
 	.logo {
@@ -226,21 +219,21 @@
 	.title {
 		font-size: 1.4rem;
 		font-weight: 700;
-		color: #e0d8ff;
+		color: var(--ink);
 		margin: 0 0 24px;
 		letter-spacing: -0.01em;
 	}
 
 	.address {
 		font-size: 0.85rem;
-		color: #6e6e99;
+		color: var(--muted);
 		margin: 0 0 28px;
 	}
 
 	.address code {
 		font-family: 'SF Mono', ui-monospace, monospace;
-		color: #a0a0cc;
-		background: #12122a;
+		color: var(--accent-mid);
+		background: var(--accent-soft);
 		padding: 2px 6px;
 		border-radius: 4px;
 	}
@@ -250,27 +243,27 @@
 		align-items: center;
 		justify-content: center;
 		gap: 10px;
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		padding: 18px 20px;
 		font-size: 1rem;
 		font-weight: 600;
 	}
 
 	.status.loading {
-		background: #1e1e3a;
-		color: #8888cc;
+		background: var(--accent-soft);
+		color: var(--accent-mid);
 	}
 
 	.status.muted {
-		background: #1a1a2e;
-		color: #6e6e99;
-		border: 1px solid #2a2a4a;
+		background: var(--bg-a);
+		color: var(--muted);
+		border: 1px solid var(--line);
 	}
 
 	.status.error {
-		background: #2b0d0d;
-		color: #f87171;
-		border: 1px solid #7f1d1d;
+		background: var(--error-bg);
+		color: var(--error-ink);
+		border: 1px solid var(--error-bg);
 	}
 
 	.icon {
@@ -283,14 +276,10 @@
 		display: inline-block;
 		width: 16px;
 		height: 16px;
-		border: 2px solid rgba(136, 136, 204, 0.3);
-		border-top-color: #8888cc;
+		border: 2px solid rgba(67, 53, 223, 0.3);
+		border-top-color: var(--accent-mid);
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
 		flex-shrink: 0;
-	}
-
-	@keyframes spin {
-		to { transform: rotate(360deg); }
 	}
 </style>

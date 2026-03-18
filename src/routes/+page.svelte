@@ -1,93 +1,97 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-
-	const TARGET_URL = 'https://app.aboutcircles.com';
-
-	let status = $state<'redirecting' | 'done'>('redirecting');
-
-	onMount(() => {
-		window.location.href = TARGET_URL;
-		status = 'done';
-	});
+	import Disclaimer from '$lib/Disclaimer.svelte';
 </script>
 
 <svelte:head>
-	<title>Circles – Redirecting…</title>
+	<title>Circles</title>
 </svelte:head>
+
+<Disclaimer />
 
 <div class="page-wrap">
 	<div class="card">
-		<div class="spinner"></div>
-		<p>Redirecting to Circles&hellip;</p>
-		<a class="btn" href={TARGET_URL}>Open manually</a>
+		<img class="logo" src="/circles-token.svg" alt="Circles" />
+		<h1>Circles</h1>
+		<p>Choose where you'd like to go</p>
+		<div class="buttons">
+			<a class="btn" href="/miniapps">Mini Apps</a>
+			<a class="btn btn-outline" href="/admin">Admin</a>
+		</div>
 	</div>
 </div>
 
 <style>
-	* {
-		margin: 0;
-		padding: 0;
-		box-sizing: border-box;
-	}
-
-	:global(body) {
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-		background: #f5f5f5;
-	}
-
 	.page-wrap {
 		min-height: 100vh;
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		padding: 16px;
 	}
 
 	.card {
-		background: #fff;
-		border-radius: 12px;
+		background: rgba(255, 255, 255, 0.92);
+		backdrop-filter: blur(6px);
+		border: 1px solid var(--line);
+		border-radius: var(--radius-card);
 		padding: 48px 40px;
 		text-align: center;
-		box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+		box-shadow: var(--shadow-card);
 		max-width: 420px;
-		width: 90%;
-		margin: auto;
+		width: 100%;
 	}
 
-	.card p {
-		margin-bottom: 24px;
-		color: #555;
+	.logo {
+		width: 64px;
+		height: 64px;
+		margin-bottom: 16px;
+	}
+
+	h1 {
+		margin: 0 0 8px;
+		font-size: 24px;
+		font-weight: 600;
+		letter-spacing: -0.02em;
+		color: var(--ink);
+	}
+
+	p {
+		margin: 0 0 28px;
+		color: var(--muted);
 		font-size: 15px;
 	}
 
-	.spinner {
-		width: 36px;
-		height: 36px;
-		border: 3px solid #e0e0e0;
-		border-top-color: #3e6957;
-		border-radius: 50%;
-		animation: spin 0.8s linear infinite;
-		margin: 0 auto 20px;
-	}
-
-	@keyframes spin {
-		to {
-			transform: rotate(360deg);
-		}
+	.buttons {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
 	}
 
 	.btn {
-		display: inline-block;
-		background: #3e6957;
-		color: #fff;
-		border: none;
-		padding: 12px 28px;
-		border-radius: 8px;
+		display: block;
+		padding: 14px 28px;
+		border-radius: var(--radius-pill);
 		font-size: 15px;
-		cursor: pointer;
+		font-weight: 600;
 		text-decoration: none;
+		text-align: center;
+		cursor: pointer;
+		transition: opacity 0.15s;
 	}
 
 	.btn:hover {
-		background: #335a49;
+		opacity: 0.85;
+	}
+
+	.btn:not(.btn-outline) {
+		background: linear-gradient(130deg, var(--accent), var(--accent-mid));
+		color: #fff;
+		border: none;
+	}
+
+	.btn-outline {
+		background: transparent;
+		color: var(--accent);
+		border: 2px solid var(--accent);
 	}
 </style>
