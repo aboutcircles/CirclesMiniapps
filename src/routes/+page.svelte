@@ -1,25 +1,22 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-
-	const TARGET_URL = 'https://app.aboutcircles.com';
-
-	let status = $state<'redirecting' | 'done'>('redirecting');
-
-	onMount(() => {
-		window.location.href = TARGET_URL;
-		status = 'done';
-	});
+	import Disclaimer from '$lib/Disclaimer.svelte';
 </script>
 
 <svelte:head>
-	<title>Circles – Redirecting…</title>
+	<title>Circles</title>
 </svelte:head>
+
+<Disclaimer />
 
 <div class="page-wrap">
 	<div class="card">
-		<div class="spinner"></div>
-		<p>Redirecting to Circles&hellip;</p>
-		<a class="btn" href={TARGET_URL}>Open manually</a>
+		<img class="logo" src="/circles-token.svg" alt="Circles" />
+		<h1>Circles</h1>
+		<p>Choose where you'd like to go</p>
+		<div class="buttons">
+			<a class="btn" href="/miniapps">Mini Apps</a>
+			<a class="btn btn-outline" href="/admin">Admin</a>
+		</div>
 	</div>
 </div>
 
@@ -29,6 +26,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		padding: 16px;
 	}
 
 	.card {
@@ -40,41 +38,60 @@
 		text-align: center;
 		box-shadow: var(--shadow-card);
 		max-width: 420px;
-		width: 90%;
-		margin: auto;
+		width: 100%;
 	}
 
-	.card p {
-		margin-bottom: 24px;
+	.logo {
+		width: 64px;
+		height: 64px;
+		margin-bottom: 16px;
+	}
+
+	h1 {
+		margin: 0 0 8px;
+		font-size: 24px;
+		font-weight: 600;
+		letter-spacing: -0.02em;
+		color: var(--ink);
+	}
+
+	p {
+		margin: 0 0 28px;
 		color: var(--muted);
 		font-size: 15px;
 	}
 
-	.spinner {
-		width: 36px;
-		height: 36px;
-		border: 3px solid var(--line);
-		border-top-color: var(--accent-mid);
-		border-radius: 50%;
-		animation: spin 0.8s linear infinite;
-		margin: 0 auto 20px;
+	.buttons {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
 	}
 
 	.btn {
-		display: inline-block;
-		background: linear-gradient(130deg, var(--accent), var(--accent-mid));
-		color: #fff;
-		border: none;
-		padding: 12px 28px;
+		display: block;
+		padding: 14px 28px;
 		border-radius: var(--radius-pill);
 		font-size: 15px;
 		font-weight: 600;
-		cursor: pointer;
 		text-decoration: none;
+		text-align: center;
+		cursor: pointer;
 		transition: opacity 0.15s;
 	}
 
 	.btn:hover {
 		opacity: 0.85;
+	}
+
+	.btn:not(.btn-outline) {
+		background: linear-gradient(130deg, var(--accent), var(--accent-mid));
+		color: #fff;
+		border: none;
+	}
+
+	.btn-outline {
+		background: transparent;
+		color: var(--accent);
+		border: 2px solid var(--accent);
 	}
 </style>
