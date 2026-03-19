@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import AppNavigation from "$lib/AppNavigation.svelte";
     import { wallet } from "$lib/wallet.svelte.ts";
     import ApprovalPopup from "$lib/ApprovalPopup.svelte";
 
@@ -283,6 +284,7 @@
     {#if view === "list"}
         <div class="card header">
             <div class="header-left">
+                <AppNavigation />
                 <h1>Circles Admin Apps</h1>
             </div>
             <div class="header-right">
@@ -477,7 +479,12 @@
     {:else}
         <div class="iframe-view">
             <div class="iframe-topbar">
-                <button class="back-btn" onclick={goBack}>&#8592; back</button>
+                <div class="topbar-left">
+                    <button class="back-btn" onclick={goBack}
+                        >&#8592; back</button
+                    >
+                    <AppNavigation />
+                </div>
                 <div class="header-right">
                     {#if wallet.connected}
                         <div
@@ -588,10 +595,18 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 12px;
         padding: 0 0 12px 0;
         border-bottom: 1px solid var(--line);
         margin-bottom: 16px;
         flex-shrink: 0;
+    }
+
+    .header-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
     }
 
     .header-left h1 {
@@ -742,19 +757,16 @@
         aspect-ratio: 1;
         border-radius: var(--radius-card);
         overflow: hidden;
-        background: var(--line-soft);
+        background: transparent;
         position: relative;
         outline: 2px solid transparent;
         transition:
-            outline-color 0.15s,
-            background 0.15s;
-        padding: 6px;
+            outline-color 0.15s;
         box-sizing: border-box;
     }
 
     .app-tile:hover .tile-icon-wrap {
         outline-color: var(--line);
-        background: var(--accent-soft);
     }
 
     .tile-icon {
@@ -762,7 +774,7 @@
         inset: 0;
         width: 100%;
         height: 100%;
-        object-fit: contain;
+        object-fit: cover;
     }
 
     .tile-icon-fallback {
@@ -780,7 +792,7 @@
 
     .tile-name {
         font-size: 12px;
-        font-weight: 500;
+        font-weight: 700;
         color: var(--ink);
         line-height: 1.3;
         word-break: break-word;
@@ -860,7 +872,7 @@
         inset: 0;
         width: 100%;
         height: 100%;
-        object-fit: contain;
+        object-fit: cover;
     }
 
     .popup-icon-fallback {
@@ -1001,11 +1013,19 @@
         display: flex;
         align-items: center;
         justify-content: space-between;
+        flex-wrap: wrap;
         gap: 12px;
         padding-bottom: 16px;
         border-bottom: 1px solid var(--line);
         margin-bottom: 16px;
         flex-shrink: 0;
+    }
+
+    .topbar-left {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 12px;
     }
 
     .back-btn {

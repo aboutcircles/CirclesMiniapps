@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/stores';
 	import { goto } from '$app/navigation';
+	import AppNavigation from '$lib/AppNavigation.svelte';
 
 	const baseUrl = import.meta.env.VITE_BASE_URL;
 	import { wallet } from '$lib/wallet.svelte.ts';
@@ -215,14 +216,20 @@
 <div class="page">
 	{#if notFound}
 		<div class="iframe-topbar">
-			<button class="back-btn" onclick={goBack}>&#8592; back</button>
+			<div class="topbar-left">
+				<button class="back-btn" onclick={goBack}>&#8592; back</button>
+				<AppNavigation />
+			</div>
 		</div>
 		<div class="not-found">
 			<p>App not found.</p>
 		</div>
 	{:else}
 		<div class="iframe-topbar">
-			<button class="back-btn" onclick={goBack}>&#8592; back</button>
+			<div class="topbar-left">
+				<button class="back-btn" onclick={goBack}>&#8592; back</button>
+				<AppNavigation />
+			</div>
 			<div class="header-right">
 				{#if wallet.connected}
 					<div class="user-chip" bind:this={chipEl} class:open={showLogout} onclick={() => (showLogout = !showLogout)} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && (showLogout = !showLogout)}>
@@ -296,11 +303,19 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+		flex-wrap: wrap;
 		gap: 12px;
 		padding-bottom: 12px;
 		border-bottom: 1px solid var(--line);
 		margin-bottom: 16px;
 		flex-shrink: 0;
+	}
+
+	.topbar-left {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 12px;
 	}
 
 	.back-btn {
