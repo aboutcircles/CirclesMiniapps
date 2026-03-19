@@ -145,6 +145,7 @@
 	// ----- Appreciations state -----
 	let txs = $state<TxEntry[]>([]);
 	let transferDataMap = $state<Map<string, string>>(new Map()); // hash -> data hex
+	let humanAvatars = $state<Set<string>>(new Set()); // lowercase addresses of Human-type avatars
 	let txLoading = $state(false);
 	let txError = $state('');
 	let showDialog = $state(false);
@@ -189,6 +190,11 @@
 			const decoded = decodeTransferData(rawData);
 			// Only show kudos-app transfers (type 0x1001 with metadata "kudos-app")
 			if (!decoded || decoded.metadata !== 'kudos-app') continue;
+			// Drop zero address and non-human avatars
+			if (/^0x0+$/.test(t.from)) continue;
+			if (humanAvatars.size > 0 && !humanAvatars.has(t.from.toLowerCase())) continue;
+			// Exclude self-sent kudos (recipient sending to themselves)
+			if (t.from.toLowerCase() === recipientLower) continue;
 			pairs.push({
 				transactionHash: t.transactionHash,
 				timestamp: t.timestamp,
@@ -407,6 +413,31 @@
 				...txs.map((t) => t.from.toLowerCase())
 			]));
 			await fetchProfiles(addrs);
+
+			// 4. Identify which senders are Human avatars
+			const senderAddrs = new Set(txs.map((t) => t.from.toLowerCase()));
+			if (senderAddrs.size > 0) {
+				try {
+					// Query each sender individually — 'In' filter not reliably supported
+					const checks = await Promise.all(
+						Array.from(senderAddrs).map(async (addr) => {
+							const r = (await jsonRpc(CIRCLES_QUERY_URL, 'circles_query', [{
+								Namespace: 'V_CrcV2',
+								Table: 'Avatars',
+								Columns: ['avatar'],
+								Filter: [
+									{ Type: 'FilterPredicate', FilterType: 'Equals', Column: 'type', Value: 'CrcV2_RegisterHuman' },
+									{ Type: 'FilterPredicate', FilterType: 'Equals', Column: 'avatar', Value: addr }
+								],
+								Limit: 1,
+								Offset: 0
+							}])) as { columns: string[]; rows: string[][] };
+							return (r?.rows?.length ?? 0) > 0 ? addr : null;
+						})
+					);
+					humanAvatars = new Set(checks.filter((a): a is string => a !== null));
+				} catch { /* non-critical, show all if query fails */ }
+			}
 		} catch (e: unknown) {
 			txError = e instanceof Error ? e.message : String(e);
 		} finally {
