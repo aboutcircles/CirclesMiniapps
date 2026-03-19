@@ -22,14 +22,12 @@
 
     let apps: MiniApp[] = $state([]);
     let view: "list" | "iframe" = $state("list");
-    let showAdvanced = $state(false);
     let selectedApp: MiniApp | null = $state(null);
     function visibleApps(): MiniApp[] {
         return apps.filter((app) => !app.isHidden && app.category === "admin");
     }
 
     let iframeSrc = $state("");
-    let urlInput = $state("");
     let pendingSource: MessageEventSource | null = null;
     let pendingRequest: {
         kind: "tx" | "sign";
@@ -181,11 +179,6 @@
         }
     });
 
-    function handleLoad() {
-        iframeSrc = urlInput;
-        view = "iframe";
-    }
-
     function handleIframeLoad() {
         if (wallet.connected) {
             postToIframe({ type: "wallet_connected", address: wallet.address });
@@ -206,7 +199,6 @@
             return;
         }
         iframeSrc = app.url;
-        urlInput = app.url;
         view = "iframe";
     }
 
@@ -452,29 +444,6 @@
                 </div>
             {/if}
 
-            <div class="advanced-section">
-                <button
-                    class="advanced-toggle"
-                    onclick={() => (showAdvanced = !showAdvanced)}
-                >
-                    {showAdvanced ? "Hide Advanced" : "Advanced"}
-                </button>
-                {#if showAdvanced}
-                    <div class="url-bar advanced-bar">
-                        <input
-                            type="text"
-                            bind:value={urlInput}
-                            onkeydown={(e: KeyboardEvent) => {
-                                if (e.key === "Enter") handleLoad();
-                            }}
-                            placeholder="Enter app URL..."
-                        />
-                        <button class="load-btn" onclick={handleLoad}
-                            >Load</button
-                        >
-                    </div>
-                {/if}
-            </div>
         </div>
     {:else}
         <div class="iframe-view">
@@ -541,20 +510,6 @@
                     {/if}
                 </div>
             </div>
-
-            {#if showAdvanced}
-                <div class="url-bar advanced-bar card">
-                    <input
-                        type="text"
-                        bind:value={urlInput}
-                        onkeydown={(e: KeyboardEvent) => {
-                            if (e.key === "Enter") handleLoad();
-                        }}
-                        placeholder="Enter app URL..."
-                    />
-                    <button class="load-btn" onclick={handleLoad}>Load</button>
-                </div>
-            {/if}
 
             <div class="card iframe-card">
                 <iframe
@@ -925,73 +880,6 @@
     }
 
     .popup-launch-btn:hover {
-        opacity: 0.85;
-    }
-
-    .advanced-section {
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        margin-top: 20px;
-    }
-
-    .advanced-toggle {
-        background: none;
-        border: none;
-        color: var(--muted);
-        font-size: 13px;
-        cursor: pointer;
-        padding: 0;
-        text-align: left;
-        transition: color 0.15s;
-    }
-
-    .advanced-toggle:hover {
-        color: var(--ink);
-    }
-
-    .url-bar {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 10px 12px;
-        background: rgba(255, 255, 255, 0.92);
-        backdrop-filter: blur(6px);
-        border: 1px solid var(--line);
-        border-radius: var(--radius-sm);
-    }
-
-    .url-bar input {
-        flex: 1;
-        padding: 6px 10px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        font-family: "SF Mono", ui-monospace, monospace;
-        font-size: 12px;
-        color: var(--ink);
-        background: var(--bg-a);
-        outline: none;
-        transition: border-color 0.15s;
-    }
-
-    .url-bar input:focus {
-        border-color: var(--accent-mid);
-    }
-
-    .load-btn {
-        background: linear-gradient(130deg, var(--accent), var(--accent-mid));
-        color: #fff;
-        border: none;
-        border-radius: var(--radius-pill);
-        padding: 7px 16px;
-        font-size: 13px;
-        font-weight: 600;
-        cursor: pointer;
-        white-space: nowrap;
-        transition: opacity 0.15s;
-    }
-
-    .load-btn:hover {
         opacity: 0.85;
     }
 
