@@ -4,10 +4,9 @@
     "name": "Sign Message Demo",
     "logo": "/app-logos/sign.png",
     "url": "https://aboutcircles.github.io/miniappDemo/demo-sign/",
-    "description": "Sign an arbitrary message using the connected Safe wallet.",
+    "description": "Sign an arbitrary message using your Circles Account.",
     "tags": [
-      "demo",
-      "signing"
+      "demo"
     ],
     "category": "miniapp"
   },
@@ -51,15 +50,12 @@
   },
   {
     "slug": "xmtp-circles-demo",
-    "name": "XMTP Circles Demo",
+    "name": "XMTP Demo",
     "logo": "/app-logos/xmtp.png",
     "url": "https://zengzengzenghuy.github.io/xmtp-circles-miniapp/",
-    "description": "Enables XMTP messaging for Safe wallets with native Circles support, allowing users to coordinate and message directly within a secure chat.",
+    "description": "Secure private and group messaging with circles users using XMTP.",
     "tags": [
-      "xmtp",
-      "circles",
-      "messaging",
-      "safe"
+      "demo"
     ],
     "category": "miniapp"
   },
@@ -71,7 +67,7 @@
     "description": "A simple coin flip mini app game.",
     "tags": [
       "game",
-      "coinflip"
+      "demo"
     ],
     "category": "miniapp"
   },
@@ -93,15 +89,10 @@
   {
     "slug": "miniapps-org-manager",
     "name": "MiniApps Builders Org Manager",
-    "logo": "/app-logos/orgmanager.png",
+    "logo": "/app-logos/org.png",
     "url": "https://circles-org-miniapp.vercel.app/",
-    "description": "Builder-focused setup tool for miniapp organizations, including org creation, accepted CRC configuration, signer management, and withdrawals.",
-    "tags": [
-      "circles",
-      "organization",
-      "builder",
-      "tools"
-    ],
+    "description": "Builder-focused tool to manage miniapp organizations",
+    "tags": [],
     "category": "admin"
   },
   {
@@ -123,11 +114,7 @@
     "logo": "/app-logos/invitations.png",
     "url": "https://aboutcircles.github.io/circles-invitation-links-manager/",
     "description": "Manage invitations",
-    "tags": [
-      "circles",
-      "invitations",
-      "tools"
-    ],
+    "tags": [],
     "category": "admin"
   },
   {
@@ -136,11 +123,7 @@
     "logo": "/app-logos/groups.png",
     "url": "https://circles-groups-miniapp.vercel.app/",
     "description": "Manage Circles groups",
-    "tags": [
-      "circles",
-      "groups",
-      "tools"
-    ],
+    "tags": [],
     "category": "admin"
   }
 ]
