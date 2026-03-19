@@ -145,7 +145,6 @@
 	// ----- Appreciations state -----
 	let txs = $state<TxEntry[]>([]);
 	let transferDataMap = $state<Map<string, string>>(new Map()); // hash -> data hex
-	let humanAvatars = $state<Set<string>>(new Set()); // lowercase addresses of Human-type avatars
 	let txLoading = $state(false);
 	let txError = $state('');
 	let showDialog = $state(false);
@@ -190,9 +189,8 @@
 			const decoded = decodeTransferData(rawData);
 			// Only show kudos-app transfers (type 0x1001 with metadata "kudos-app")
 			if (!decoded || decoded.metadata !== 'kudos-app') continue;
-			// Drop zero address and non-human avatars
+			// Drop zero address
 			if (/^0x0+$/.test(t.from)) continue;
-			if (humanAvatars.size > 0 && !humanAvatars.has(t.from.toLowerCase())) continue;
 			// Exclude self-sent kudos (recipient sending to themselves)
 			if (t.from.toLowerCase() === recipientLower) continue;
 			pairs.push({
@@ -399,8 +397,8 @@
 			const histResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransactionHistory', [recipientAddr, 150])) as { results: TxEntry[]; hasMore: boolean };
 			txs = histResult.results ?? [];
 
-			// 2. Transfer data (data field on incoming transfers) — query by recipient
-			const transferResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransferData', [recipientAddr, null, null, null, null, 500])) as { results: TransferData[]; hasMore: boolean };
+			// 2. Transfer data for received transfers
+			const transferResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransferData', [recipientAddr, 'received', null, null, null, 500])) as { results: TransferData[]; hasMore: boolean };
 			const map = new Map<string, string>();
 			for (const t of (transferResult.results ?? [])) {
 				if (t.data && t.data.length > 2) map.set(t.transactionHash, t.data);
@@ -414,30 +412,6 @@
 			]));
 			await fetchProfiles(addrs);
 
-			// 4. Identify which senders are Human avatars
-			const senderAddrs = new Set(txs.map((t) => t.from.toLowerCase()));
-			if (senderAddrs.size > 0) {
-				try {
-					// Query each sender individually — 'In' filter not reliably supported
-					const checks = await Promise.all(
-						Array.from(senderAddrs).map(async (addr) => {
-							const r = (await jsonRpc(CIRCLES_QUERY_URL, 'circles_query', [{
-								Namespace: 'V_CrcV2',
-								Table: 'Avatars',
-								Columns: ['avatar'],
-								Filter: [
-									{ Type: 'FilterPredicate', FilterType: 'Equals', Column: 'type', Value: 'CrcV2_RegisterHuman' },
-									{ Type: 'FilterPredicate', FilterType: 'Equals', Column: 'avatar', Value: addr }
-								],
-								Limit: 1,
-								Offset: 0
-							}])) as { columns: string[]; rows: string[][] };
-							return (r?.rows?.length ?? 0) > 0 ? addr : null;
-						})
-					);
-					humanAvatars = new Set(checks.filter((a): a is string => a !== null));
-				} catch { /* non-critical, show all if query fails */ }
-			}
 		} catch (e: unknown) {
 			txError = e instanceof Error ? e.message : String(e);
 		} finally {
