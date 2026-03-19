@@ -349,14 +349,14 @@
 			lbError = '';
 			(async () => {
 				try {
-					statusMsg = 'Loading snapshot\u2026';
+					statusMsg = 'Loading snapshot';
 					const res = await fetch('/snapshot.json');
 					if (!res.ok) throw new Error(`snapshot.json not found (HTTP ${res.status})`);
 					const snap = (await res.json()) as SnapshotFile;
 					snapshot = snap;
-					statusMsg = 'Fetching profiles\u2026';
+					statusMsg = 'Fetching profiles';
 					await fetchProfiles(snap.accounts.filter(a => a.toLowerCase() !== snap.group.toLowerCase()));
-					statusMsg = 'Fetching live balances\u2026';
+					statusMsg = 'Fetching live balances';
 					mountLoading = false;
 					await refreshLive();
 					startAutoRefresh();
@@ -590,7 +590,7 @@
 			{#if mountLoading}
 				<div class="loading-state">
 					<span class="spinner"></span>
-					{statusMsg || 'Loading\u2026'}
+					{statusMsg || 'Loading'}
 				</div>
 			{/if}
 			{#if snapshotError}
@@ -659,7 +659,7 @@
 					<span></span>
 				{/if}
 				<button class="btn-refresh" onclick={refreshLive} disabled={liveLoading || !snapshot}>
-					{liveLoading ? '\u2026' : '\u21BB Refresh'}
+					{liveLoading ? '' : '\u21BB Refresh'}
 				</button>
 			</div>
 		{/if}
@@ -785,7 +785,7 @@
 							<img src="/person.svg" alt="avatar" />
 						{/if}
 					</div>
-					<strong class="trust-name">{recipientProfile.name ?? recipientAddress.slice(0, 8) + '\u2026' + recipientAddress.slice(-6)}</strong>
+					<strong class="trust-name">{recipientProfile.name ?? recipientAddress.slice(0, 8) + '' + recipientAddress.slice(-6)}</strong>
 					<span class="trust-label"> on Circles</span>
 				</a>
 			{/if}
@@ -793,7 +793,7 @@
 			{#if txLoading}
 				<div class="loading-state">
 					<span class="spinner"></span>
-					Loading appreciations\u2026
+					Loading appreciations
 				</div>
 			{/if}
 			{#if txError}
@@ -847,7 +847,7 @@
 			<div class="card-footer">
 				<span></span>
 				<button class="btn-refresh" onclick={() => loadHistory(recipientAddress ?? GROUP_ADDRESS, GROUP_ADDRESS)} disabled={txLoading}>
-					{txLoading ? '\u2026' : '\u21BB Refresh'}
+					{txLoading ? '' : '\u21BB Refresh'}
 				</button>
 			</div>
 		{/if}
