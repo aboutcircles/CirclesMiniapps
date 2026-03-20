@@ -1,14 +1,10 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
-	import { createPublicClient, http, type Address, encodeFunctionData } from 'viem';
+	import { createPublicClient, http, type Address } from 'viem';
 	import { gnosis } from 'viem/chains';
-	import { SvelteMap } from 'svelte/reactivity';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import { CirclesConverter } from '@aboutcircles/sdk-utils/circlesConverter';
-	import { circlesConfig } from '@aboutcircles/sdk-utils';
-	import { encodeCrcV2TransferData, decodeCrcV2TransferData } from '@aboutcircles/sdk-utils';
-	import { TransferBuilder } from '@aboutcircles/sdk-transfers';
-	import { wallet } from '$lib/wallet.svelte';
 
 
 	// ----- Constants -----
@@ -16,29 +12,41 @@
 	const CIRCLES_RPC_URL = 'https://rpc.aboutcircles.com/';
 	const CIRCLES_QUERY_URL = 'https://staging.circlesubi.network/';
 	const TX_RPC_URL = 'https://staging.circlesubi.network/';
-	const PATHFINDER_RPC_URL = 'https://staging.circlesubi.network';
-	// ^^ No trailing slash - TransferBuilder uses this as the pathfinder URL
-	const HUB_ADDRESS: Address = circlesConfig[100].v2HubAddress as Address;
-
-	const HUB_ABI = [
-		{ type: 'function', name: 'toTokenId', inputs: [{ name: 'avatar', type: 'address' }], outputs: [{ name: '', type: 'uint256' }], stateMutability: 'pure' },
-		{ type: 'function', name: 'balanceOfBatch', inputs: [{ name: 'accounts', type: 'address[]' }, { name: 'ids', type: 'uint256[]' }], outputs: [{ name: '', type: 'uint256[]' }], stateMutability: 'view' },
-		{ type: 'function', name: 'safeTransferFrom', inputs: [{ name: 'from', type: 'address' }, { name: 'to', type: 'address' }, { name: 'id', type: 'uint256' }, { name: 'value', type: 'uint256' }, { name: 'data', type: 'bytes' }], outputs: [], stateMutability: 'nonpayable' }
-	] as const;
-
-	const LIFT_ERC20_ADDRESS: Address = '0x5F99a795dD2743C36D63511f0D4bc667e6d3cDB5';
-	const LIFT_ERC20_ABI = [
-		{ type: 'function', name: 'erc20Circles', inputs: [{ name: '_type', type: 'uint8' }, { name: '_avatar', type: 'address' }], outputs: [{ name: '', type: 'address' }], stateMutability: 'view' }
-	] as const;
 	const ERC20_ABI = [
-		{ type: 'function', name: 'balanceOf', inputs: [{ name: 'account', type: 'address' }], outputs: [{ name: '', type: 'uint256' }], stateMutability: 'view' }
+		{
+			type: 'function',
+			name: 'balanceOf',
+			inputs: [{ name: 'account', type: 'address' }],
+			outputs: [{ name: '', type: 'uint256' }],
+			stateMutability: 'view'
+		}
 	] as const;
-
-	const BASE_GROUP_ABI = [
-		{ type: 'function', name: 'BASE_MINT_HANDLER', inputs: [], outputs: [{ name: '', type: 'address' }], stateMutability: 'view' }
-	] as const;
-
 	const REFRESH_INTERVAL_MS = 15_000;
+
+	// ----- Group config dictionary -----
+	// Add entries here for each group this page supports.
+	// The key is the value of the ?group= URL param.
+	// Both groupAddress and orgAddress must be specified together.
+	interface GroupConfig {
+		groupAddress: string;
+		orgAddress: string;
+	}
+
+	const GROUP_CONFIGS: Record<string, GroupConfig> = {
+		'parallel-society': {
+			groupAddress: '0x6F99506cD91560305bD4859DcDdcb422EAA81F02',
+			orgAddress:   '0x62532eeB3779fDA75554e1EeEce552D0a9FF1C56'
+		},
+		'dandelion': {
+		    groupAddress: '0x1d3663CebF6c7f54bE62B210d68eeA0E38838582',
+			orgAddress: '0x33aa31e1392FFB37b1b3572A1E2cc0651D0BCb7F'
+		}
+		// Add more entries like this:
+		// myevent: {
+		//   groupAddress: '0xAAAA...',
+		//   orgAddress:   '0xBBBB...'
+		// }
+	};
 
 	// ----- View toggle -----
 	type View = 'leaderboard' | 'appreciations';
@@ -46,28 +54,23 @@
 	// ----- Query params -----
 	// Standard params
 	const hasBoard = $derived(page.url.searchParams.has('hasBoard'));
-	const recipientAddress = $derived(page.url.searchParams.get('recipient') ?? null);
-	const blockFromParam = $derived.by(() => {
-		const v = page.url.searchParams.get('blockFrom');
-		const n = v ? parseInt(v, 10) : NaN;
-		return isNaN(n) ? null : n;
-	});
+	const recipientAddress = $derived(page.url.searchParams.get('address') ?? null);
 
-	// ----- Group config dictionary -----
-	const GROUP_CONFIGS: Record<string, Address> = {
-		'parallel-society': '0x6F99506cD91560305bD4859DcDdcb422EAA81F02',
-		'dandelion': '0x1d3663CebF6c7f54bE62B210d68eeA0E38838582',
-		'gnosis': '0xC19BC204eb1c1D5B3FE500E5E5dfaBaB625F286c'
-	};
-	const DEFAULT_GROUP: Address = GROUP_CONFIGS['gnosis'];
-
-	// ?group= accepts a named key OR a raw 0x address; falls back to gnosis group
+	// ----- Dynamic group / org resolution -----
+	// ?group=<key> is required. The key must match an entry in GROUP_CONFIGS above.
+	const activeConfig = $derived(
+		GROUP_CONFIGS[page.url.searchParams.get('group') ?? ''] ?? null
+	);
+	const GROUP_ADDRESS = $derived(activeConfig?.groupAddress ?? '');
+	const ORG_ADDRESS = $derived(activeConfig?.orgAddress ?? '');
 	const groupParam = $derived(page.url.searchParams.get('group'));
-	const GROUP_ADDRESS = $derived.by((): Address => {
-		if (!groupParam) return DEFAULT_GROUP;
-		if (/^0x[0-9a-fA-F]{40}$/.test(groupParam)) return groupParam as Address;
-		return GROUP_CONFIGS[groupParam] ?? DEFAULT_GROUP;
-	});
+	const configError = $derived(
+		!groupParam
+			? 'Missing required URL parameter: ?group=<key>'
+			: !activeConfig
+				? `Unknown group "${groupParam}". Add it to GROUP_CONFIGS in the source.`
+				: null
+	);
 
 	let activeView = $state<View>('appreciations');
 	$effect(() => {
@@ -75,16 +78,23 @@
 		else if (hasBoard) activeView = 'leaderboard';
 	});
 
-	// ----- Wallet auto-connect -----
-	$effect(() => {
-		untrack(() => wallet.autoConnect());
-	});
+	// ----- Snapshot JSON shape -----
+	interface SnapshotFile {
+		block: string;
+		timestamp: string;
+		group: string;
+		wrapperAddr: string;
+		accounts: string[];
+		balances: Record<string, string>;
+	}
 
 	interface AvatarRow {
 		avatar: string;
 		name: string | null;
 		imageUrl: string | null;
+		snapErc20: bigint;
 		liveErc20: bigint;
+		diff: bigint;
 	}
 
 	interface TxEntry {
@@ -120,14 +130,18 @@
 		sender: string;
 		recipient: string;
 		circles: string;
-		message: string | null;
+		message: string;
 	}
 
 	// ----- Leaderboard state -----
+	let snapshot = $state<SnapshotFile | null>(null);
+	let snapshotError = $state('');
+	let liveMap = $state<Map<string, bigint> | null>(null);
 	let rows = $state<AvatarRow[]>([]);
 	let liveLoading = $state(false);
 	let mountLoading = $state(false);
 	let lbError = $state('');
+	let statusMsg = $state('');
 	let autoRefreshActive = $state(false);
 	let showUnidentified = $state(false);
 
@@ -136,24 +150,16 @@
 	let transferDataMap = $state<Map<string, string>>(new Map()); // hash -> data hex
 	let txLoading = $state(false);
 	let txError = $state('');
-	let showDialog = $state(false);
+	let hasMore = $state(false);
 	let kudosMessage = $state('');
-
-	// ----- Send state -----
-	let maxFlow = $state<bigint | null>(null);
-	let maxFlowLoading = $state(false);
-	let maxFlowError = $state('');
-	let sendAmount = $state('1');
-	let sending = $state(false);
-	let sendError = $state('');
-	let sendSuccess = $state(false);
-	let mintHandler = $state<Address | null>(null);
+	let groupImageUrl = $state<string | null>(null);
 
 	// ----- Shared profile cache -----
 	const profileCache = new SvelteMap<string, { name: string | null; imageUrl: string | null }>();
 
 	// ----- Leaderboard derived -----
-	const tableReady = $derived(rows.length > 0);
+	const orgLower = $derived(ORG_ADDRESS.toLowerCase());
+	const tableReady = $derived(snapshot !== null && liveMap !== null && rows.length > 0);
 	const activeRows = $derived(rows.filter(r => r.liveErc20 > 0n));
 	const zeroRows = $derived(rows.filter(r => r.liveErc20 === 0n));
 	const sortedRows = $derived.by(() => {
@@ -165,30 +171,28 @@
 	const unidentifiedRows = $derived(sortedRows.filter(r => !r.name && !r.imageUrl));
 
 	// ----- Appreciations derived -----
+	const FILTER_FROM = '0x8586b48d6f773e8536823182a7abfa82d5a51f47';
 	const pairedTxs = $derived.by((): TxPair[] => {
-		if (!recipientAddress) return [];
-		const recipientLower = recipientAddress.toLowerCase();
-		const seen = new Set<string>();
+		const relevant = txs.filter((t) => t.from.toLowerCase() !== FILTER_FROM);
+		const byHash = new Map<string, TxEntry[]>();
+		for (const t of relevant) {
+			const bucket = byHash.get(t.transactionHash) ?? [];
+			bucket.push(t);
+			byHash.set(t.transactionHash, bucket);
+		}
 		const pairs: TxPair[] = [];
-		for (const t of txs) {
-			if (t.to.toLowerCase() !== recipientLower) continue;
-			if (seen.has(t.transactionHash)) continue;
-			seen.add(t.transactionHash);
-			const rawData = transferDataMap.get(t.transactionHash) ?? '';
-			const decoded = decodeTransferData(rawData);
-			// Only show kudos-app transfers (type 0x1001 with metadata "kudos-app")
-			if (!decoded || decoded.metadata !== 'kudos-app') continue;
-			// Drop zero address
-			if (/^0x0+$/.test(t.from)) continue;
-			// Exclude self-sent kudos (recipient sending to themselves)
-			if (t.from.toLowerCase() === recipientLower) continue;
+		for (const [hash, legs] of byHash) {
+			const incoming = legs.find((l) => l.to.toLowerCase() === orgLower);
+			const outgoing = legs.find((l) => l.from.toLowerCase() === orgLower);
+			if (!incoming || !outgoing) continue;
+			const rawData = transferDataMap.get(hash) ?? '';
 			pairs.push({
-				transactionHash: t.transactionHash,
-				timestamp: t.timestamp,
-				sender: t.from,
-				recipient: t.to,
-				circles: t.circles,
-				message: decoded.message || null
+				transactionHash: hash,
+				timestamp: incoming.timestamp,
+				sender: incoming.from,
+				recipient: outgoing.to,
+				circles: incoming.circles,
+				message: decodeMessage(rawData)
 			});
 		}
 		pairs.sort((a, b) => b.timestamp - a.timestamp || a.transactionHash.localeCompare(b.transactionHash));
@@ -264,57 +268,52 @@
 	}
 
 	// ----- Leaderboard logic -----
-	async function refreshLive(group: string = GROUP_ADDRESS) {
+	async function getCurrentMembers(group: string): Promise<string[]> {
+		const result = (await jsonRpc(CIRCLES_QUERY_URL, 'circles_query', [
+			{
+				Namespace: 'V_CrcV2',
+				Table: 'GroupMemberships',
+				Columns: ['member'],
+				Filter: [{ Type: 'FilterPredicate', FilterType: 'Equals', Column: 'group', Value: group }],
+				Limit: 1000,
+				Offset: 0
+			}
+		])) as { columns: string[]; rows: string[][] };
+		return (result?.rows ?? []).map((r) => r[0].toLowerCase());
+	}
+
+	async function fetchLiveBalances(snap: SnapshotFile): Promise<{ map: SvelteMap<string, bigint>; allAccounts: string[] }> {
+		const currentMembers = await getCurrentMembers(snap.group);
+		const accountSet = new SvelteSet([...snap.accounts, ...currentMembers]);
+		accountSet.delete(snap.group.toLowerCase());
+		const accs = Array.from(accountSet);
+		const wrapperAddr = snap.wrapperAddr as Address;
+		const balances = await Promise.all(
+			accs.map((acc) => client.readContract({ address: wrapperAddr, abi: ERC20_ABI, functionName: 'balanceOf', args: [acc as Address] }))
+		) as bigint[];
+		const map = new SvelteMap<string, bigint>();
+		for (let i = 0; i < accs.length; i++) map.set(accs[i], balances[i] ?? 0n);
+		return { map, allAccounts: accs };
+	}
+
+	function rebuildRows(snap: SnapshotFile, live: Map<string, bigint>, allAccounts: string[]) {
+		rows = allAccounts.map((acc) => {
+			const snapErc20 = BigInt(snap.balances[acc] ?? '0');
+			const liveErc20 = live.get(acc) ?? 0n;
+			const profile = profileCache.get(acc) ?? { name: null, imageUrl: null };
+			return { avatar: acc, name: profile.name, imageUrl: profile.imageUrl, snapErc20, liveErc20, diff: liveErc20 - snapErc20 };
+		});
+	}
+
+	async function refreshLive() {
+		if (!snapshot) return;
 		liveLoading = true;
 		lbError = '';
 		try {
-			// 1. Get group members (paginated); compute tokenId = uint256(uint160(groupAddress))
-			const members: string[] = [];
-			let cursor: string | null = null;
-			do {
-				const params: unknown[] = cursor ? [group, 100, cursor] : [group, 100];
-				const page = await jsonRpc(CIRCLES_QUERY_URL, 'circles_getGroupMembers', params) as { results: { member: string }[]; hasMore: boolean; nextCursor?: string };
-				for (const r of (page?.results ?? [])) members.push(r.member.toLowerCase());
-				cursor = page?.hasMore ? (page.nextCursor ?? null) : null;
-			} while (cursor);
-			if (!members.length) { rows = []; return; }
-
-			// 2. Get balances — prefer ERC20 inflationary wrapper (exists when tokens have been wrapped)
-			let balances: bigint[];
-			const erc20Address = await client.readContract({
-				address: LIFT_ERC20_ADDRESS,
-				abi: LIFT_ERC20_ABI,
-				functionName: 'erc20Circles',
-				args: [1, group as Address]
-			}) as Address;
-			if (erc20Address && !/^0x0+$/.test(erc20Address)) {
-				const results = await client.multicall({
-					contracts: members.map((acc) => ({
-						address: erc20Address,
-						abi: ERC20_ABI,
-						functionName: 'balanceOf' as const,
-						args: [acc as Address]
-					}))
-				});
-				balances = results.map((r) => (r.status === 'success' ? (r.result as bigint) : 0n));
-			} else {
-				// fallback: ERC1155 balanceOfBatch
-				const tokenId = BigInt(group);
-				const ids = members.map(() => tokenId);
-				balances = await client.readContract({
-					address: HUB_ADDRESS,
-					abi: HUB_ABI,
-					functionName: 'balanceOfBatch',
-					args: [members as Address[], ids]
-				}) as bigint[];
-			}
-
-			// 3. Fetch profiles and build rows
-			await fetchProfiles(members);
-			rows = members.map((acc, i) => {
-				const profile = profileCache.get(acc) ?? { name: null, imageUrl: null };
-				return { avatar: acc, name: profile.name, imageUrl: profile.imageUrl, liveErc20: balances[i] ?? 0n };
-			});
+			const { map, allAccounts } = await fetchLiveBalances(snapshot);
+			liveMap = map;
+			await fetchProfiles(allAccounts);
+			rebuildRows(snapshot, map, allAccounts);
 		} catch (e: unknown) {
 			lbError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -329,68 +328,87 @@
 		autoRefreshActive = false;
 	}
 
-	function startAutoRefresh(group: string) {
+	function startAutoRefresh() {
 		if (refreshTimerId !== null) return;
 		autoRefreshActive = true;
 		refreshTimerId = setInterval(async () => {
-			if (!liveLoading) await refreshLive(group).catch(() => {});
+			if (!liveLoading) await refreshLive().catch(() => {});
 		}, REFRESH_INTERVAL_MS);
 	}
 
 	$effect(() => () => stopAutoRefresh());
 
 	$effect(() => {
-		const group = GROUP_ADDRESS;
-		if (!group || !hasBoard) return;
+		if (!activeConfig) return;
 		untrack(() => {
 			mountLoading = true;
+			snapshotError = '';
 			lbError = '';
-			rows = [];
-			refreshLive(group).finally(() => {
-				mountLoading = false;
-				startAutoRefresh(group);
-			});
+			(async () => {
+				try {
+					statusMsg = 'Loading snapshot…';
+					const res = await fetch('/snapshot.json');
+					if (!res.ok) throw new Error(`snapshot.json not found (HTTP ${res.status})`);
+					const snap = (await res.json()) as SnapshotFile;
+					snapshot = snap;
+					statusMsg = 'Fetching profiles…';
+					await fetchProfiles(snap.accounts.filter(a => a.toLowerCase() !== snap.group.toLowerCase()));
+					statusMsg = 'Fetching live balances…';
+					mountLoading = false;
+					await refreshLive();
+					startAutoRefresh();
+				} catch (e: unknown) {
+					snapshotError = e instanceof Error ? e.message : String(e);
+					mountLoading = false;
+				} finally {
+					statusMsg = '';
+				}
+			})();
 		});
 	});
 
 	// ----- Appreciations logic -----
-	function decodeTransferData(data: string): { message: string; metadata: string } | null {
-		if (!data || data.length <= 2) return null;
-		try {
-			const decoded = decodeCrcV2TransferData(data);
-			if (decoded.type === 0x1001) {
-				const p = decoded.payload as { message: string; metadata: string };
-				return { message: p.message, metadata: p.metadata };
-			}
-			if (decoded.type === 0x0001) return { message: decoded.payload as string, metadata: '' };
-			return null;
-		} catch { return null; }
+	function decodeAddress(data: string): string {
+		const hex = data.startsWith('0x') ? data.slice(2) : data;
+		if (hex.length < 40) return '';
+		return '0x' + hex.slice(0, 40).toLowerCase();
 	}
 
-	async function loadHistory(recipientAddr: string, groupAddr: string, blockFrom: number | null = null) {
-		if (!recipientAddr) return;
+	function decodeMessage(data: string): string {
+		const hex = data.startsWith('0x') ? data.slice(2) : data;
+		if (hex.length <= 40) return '';
+		try {
+			const msgHex = hex.slice(40);
+			const bytes = new Uint8Array(msgHex.match(/.{1,2}/g)!.map(b => parseInt(b, 16)));
+			return new TextDecoder().decode(bytes).trim();
+		} catch { return ''; }
+	}
+
+	async function loadHistory(orgAddr: string, groupAddr: string) {
 		txLoading = true;
 		txError = '';
 		try {
-			// 1. Transaction history for the recipient
-			const histResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransactionHistory', [recipientAddr, 150])) as { results: TxEntry[]; hasMore: boolean };
+			// 1. Transaction history
+			const histResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransactionHistory', [orgAddr, 150])) as { results: TxEntry[]; hasMore: boolean };
 			txs = histResult.results ?? [];
+			hasMore = histResult.hasMore ?? false;
 
-			// 2. Transfer data for received transfers (optionally filtered from a block)
-			const transferResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransferData', [recipientAddr, 'received', null, blockFrom ?? null])) as { results: TransferData[]; hasMore: boolean };
+			// 2. Transfer data for messages
+			const transferResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransferData', [orgAddr, null, null, null, null, 500])) as { results: TransferData[]; hasMore: boolean };
 			const map = new Map<string, string>();
 			for (const t of (transferResult.results ?? [])) {
 				if (t.data && t.data.length > 2) map.set(t.transactionHash, t.data);
 			}
 			transferDataMap = map;
 
-			// 3. Batch-fetch profiles for all senders
+			// 3. Batch all profiles (tx participants + group avatar) in one request
+			const relevant = txs.filter((t) => t.from.toLowerCase() !== FILTER_FROM);
 			const addrs = Array.from(new Set([
 				groupAddr.toLowerCase(),
-				...txs.map((t) => t.from.toLowerCase())
+				...relevant.flatMap((t) => [t.from.toLowerCase(), t.to.toLowerCase()])
 			]));
 			await fetchProfiles(addrs);
-
+			groupImageUrl = getProfile(groupAddr).imageUrl;
 		} catch (e: unknown) {
 			txError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -398,141 +416,22 @@
 		}
 	}
 
-	function encodeTransferMessage(message: string): Uint8Array {
-		const hex = encodeCrcV2TransferData([message, 'kudos-app'], 0x1001);
-		return new Uint8Array(hex.slice(2).match(/.{1,2}/g)!.map((b: string) => parseInt(b, 16)));
-	}
-
-	// ----- TransferBuilder (handles wrapped tokens, self-approval, flow matrix) -----
-	const transferBuilder = new TransferBuilder({
-		...circlesConfig[100],
-		circlesRpcUrl: PATHFINDER_RPC_URL,
-		pathfinderUrl: PATHFINDER_RPC_URL
-	});
-
-	// ----- Max flow refresh -----
-	async function refreshMaxFlow() {
-		const addr = wallet.connected ? wallet.address : null;
-		const group = GROUP_ADDRESS;
-		if (!addr || !group) return;
-		maxFlow = null;
-		mintHandler = null;
-		maxFlowError = '';
-		maxFlowLoading = true;
-		try {
-			const resolvedMintHandler = await client.readContract({
-				address: group as Address,
-				abi: BASE_GROUP_ABI,
-				functionName: 'BASE_MINT_HANDLER'
-			}) as Address;
-			mintHandler = resolvedMintHandler;
-			const MAX_UINT256 = BigInt('115792089237316195423570985008687907853269984665640564039457584007913129639935');
-			const attoMax = CirclesConverter.truncateToSixDecimals(MAX_UINT256);
-			const rpcResult = await jsonRpc(PATHFINDER_RPC_URL, 'circlesV2_findPath', [{
-				source: addr,
-				sink: resolvedMintHandler,
-				targetFlow: attoMax.toString(),
-				withWrap: true,
-				toTokens: [group],
-				quantizedMode: false
-			}]) as { maxFlow: string };
-			maxFlow = BigInt(rpcResult.maxFlow ?? '0');
-		} catch (e: unknown) {
-			maxFlowError = e instanceof Error ? e.message : String(e);
-		} finally {
-			maxFlowLoading = false;
-		}
-	}
-
-	// ----- Auto-check max flow when wallet connects -----
-	$effect(() => {
-		const addr = wallet.connected ? wallet.address : null;
-		const recipient = recipientAddress;
-		const group = GROUP_ADDRESS;
-		if (!addr || !recipient || !group) return;
-		untrack(() => {
-			sendAmount = '1';
-			sendError = '';
-			sendSuccess = false;
-			refreshMaxFlow();
-		});
-	});
-
-	async function executeSend() {
-		if (!recipientAddress || !sendAmount || !wallet.connected) return;
-		sending = true;
-		sendError = '';
-		sendSuccess = false;
-
-		try {
-			const amountCrc = parseFloat(sendAmount);
-			if (isNaN(amountCrc) || amountCrc <= 0) throw new Error('Invalid amount');
-			const targetAtto = CirclesConverter.circlesToAttoCircles(amountCrc);
-
-			// 1. Resolve the mint handler address from the group contract
-			const resolvedMintHandler = mintHandler ?? (await client.readContract({
-				address: GROUP_ADDRESS as Address,
-				abi: BASE_GROUP_ABI,
-				functionName: 'BASE_MINT_HANDLER'
-			}) as Address);
-
-			// 2. Path through the trust network to the mint handler (mints group tokens to sender)
-			const pathTxs = await transferBuilder.constructAdvancedTransfer(
-				wallet.address as Address,
-				resolvedMintHandler,
-				targetAtto,
-				{ useWrappedBalances: true, toTokens: [GROUP_ADDRESS as Address] }
-			);
-
-			// 3. Build safeTransferFrom: sender → recipient, group token, with encoded message
-			const groupTokenId = await client.readContract({
-				address: HUB_ADDRESS,
-				abi: HUB_ABI,
-				functionName: 'toTokenId',
-				args: [GROUP_ADDRESS as Address]
-			}) as bigint;
-
-			const msgBytes = kudosMessage ? encodeTransferMessage(kudosMessage) : new Uint8Array(0);
-			const msgHex = `0x${Array.from(msgBytes).map(b => b.toString(16).padStart(2, '0')).join('')}` as `0x${string}`;
-
-			const transferTx = {
-				to: HUB_ADDRESS,
-				data: encodeFunctionData({
-					abi: HUB_ABI,
-					functionName: 'safeTransferFrom',
-					args: [wallet.address as Address, recipientAddress as Address, groupTokenId, targetAtto, msgHex]
-				}),
-				value: '0'
-			};
-
-			await wallet.sendTransactions([
-				...pathTxs.map(tx => ({ to: tx.to, data: tx.data, value: tx.value?.toString() })),
-				transferTx
-			]);
-			sendSuccess = true;
-			setTimeout(async () => {
-				showDialog = false;
-				sendSuccess = false;
-				kudosMessage = '';
-				sendAmount = '1';
-				await Promise.all([
-					loadHistory(recipientAddress!, GROUP_ADDRESS, blockFromParam),
-					refreshMaxFlow()
-				]);
-			}, 2500);
-		} catch (e: unknown) {
-			sendError = e instanceof Error ? e.message : String(e);
-		} finally {
-			sending = false;
-		}
+	// ----- Kudos data encoding -----
+	function encodeKudosData(address: string, message: string): string {
+		// Encode: raw address hex (40 chars) + optional UTF-8 message as hex
+		const addrHex = address.replace(/^0x/i, '').toLowerCase();
+		if (!message) return '0x' + addrHex;
+		const msgBytes = new TextEncoder().encode(message);
+		const msgHex = Array.from(msgBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+		return '0x' + addrHex + msgHex;
 	}
 
 	// Re-run whenever ORG_ADDRESS or GROUP_ADDRESS changes (e.g. URL param update).
 	$effect(() => {
-		const recipAddr = recipientAddress;
+		if (!activeConfig) return;
+		const orgAddr = ORG_ADDRESS;
 		const groupAddr = GROUP_ADDRESS;
-		if (!groupAddr) return;
-		untrack(() => loadHistory(recipAddr ?? groupAddr, groupAddr, blockFromParam));
+		untrack(() => loadHistory(orgAddr, groupAddr));
 	});
 
 	$effect(() => {
@@ -546,6 +445,11 @@
 
 <div class="page">
 	<div class="card">
+
+		<!-- Config error -->
+		{#if configError}
+			<div class="error-banner">{configError}</div>
+		{/if}
 
 		<!-- Toggle -->
 		{#if !recipientAddress || hasBoard}
@@ -574,8 +478,11 @@
 			{#if mountLoading}
 				<div class="loading-state">
 					<span class="spinner"></span>
-					Loading
+					{statusMsg || 'Loading…'}
 				</div>
+			{/if}
+			{#if snapshotError}
+				<div class="error-banner">{snapshotError}</div>
 			{/if}
 			{#if lbError}
 				<div class="error-banner">{lbError}</div>
@@ -639,8 +546,8 @@
 				{:else}
 					<span></span>
 				{/if}
-				<button class="btn-refresh" onclick={() => refreshLive(GROUP_ADDRESS)} disabled={liveLoading}>
-					{liveLoading ? '' : '\u21BB Refresh'}
+				<button class="btn-refresh" onclick={refreshLive} disabled={liveLoading || !snapshot}>
+					{liveLoading ? '…' : '↻ Refresh'}
 				</button>
 			</div>
 		{/if}
@@ -649,99 +556,46 @@
 		{#if activeView === 'appreciations'}
 			{#if recipientAddress}
 				{@const recipientProfile = getProfile(recipientAddress)}
-				{#if !wallet.connected}
-					<button class="kudos-btn" onclick={() => wallet.connectWithPasskey()}>
-						<span class="kudos-label">{wallet.connecting ? 'Connecting…' : 'Connect wallet to send kudos'}</span>
-					</button>
-				{:else if maxFlowLoading}
-					<button class="kudos-btn" disabled>
-						<span class="kudos-label">Checking…</span>
-					</button>
-				{:else if maxFlow === 0n}
-					<p class="no-path-note">No transfer path available. You may need to establish trust connections first.</p>
-				{:else if maxFlowError}
-					<div class="error-banner">{maxFlowError}</div>
-				{:else if maxFlow !== null}
-					<button class="kudos-btn" onclick={() => { showDialog = true; }}>
-						<span class="kudos-arrow">
-							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-								<path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
-							</svg>
-						</span>
-						<span class="kudos-label">Send kudos to</span>
-						<div class="kudos-avatar">
-							{#if recipientProfile.imageUrl}
-								<img src={recipientProfile.imageUrl} alt={recipientProfile.name ?? recipientAddress} onerror={(e) => { const el = e.currentTarget as HTMLElement; el.style.display = 'none'; const next = el.nextElementSibling as HTMLElement | null; if (next) next.style.display = 'block'; }} />
-								<img src="/person.svg" alt="avatar" style="display:none" />
-							{:else}
-								<img src="/person.svg" alt="avatar" />
-							{/if}
-						</div>
-						<strong class="kudos-name">{recipientProfile.name ?? recipientAddress.slice(0, 8) + '…' + recipientAddress.slice(-6)}</strong>
-					</button>
-				{/if}
-
-				<!-- Send dialog -->
-				{#if showDialog && maxFlow !== null && maxFlow > 0n}
-					<div class="dialog-backdrop" role="presentation" onclick={() => { if (!sendSuccess) showDialog = false; }}>
-						<div class="dialog-card" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape' && !sendSuccess) showDialog = false; }}>
-							{#if sendSuccess}
-								<button class="dialog-close" onclick={() => { showDialog = false; sendSuccess = false; kudosMessage = ''; sendAmount = '1'; refreshMaxFlow(); }} aria-label="Close">
-									<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-										<path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd" />
-									</svg>
-								</button>
-								<div class="dialog-success">
-									<span class="dialog-success-icon">✓</span>
-									<p class="dialog-success-msg">Kudos sent!</p>
-								</div>
-							{:else}
-								<button class="dialog-close" onclick={() => { showDialog = false; }} aria-label="Close">
-									<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-										<path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 11-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd" />
-									</svg>
-								</button>
-								<div class="dialog-amount-wrap">
-									<input
-										id="kudos-amount"
-										class="dialog-amount-input"
-										type="number"
-										min="1"
-										max={toCircles(maxFlow!)}
-										placeholder="1"
-										size={Math.max(1, String(sendAmount).length)}
-										bind:value={sendAmount}
-										oninput={(e) => {
-											const max = Number(toCircles(maxFlow!));
-											const v = Number((e.currentTarget as HTMLInputElement).value);
-											if (v > max) sendAmount = String(max);
-										}}
-									/>
-									<span class="dialog-amount-unit">kudos</span>
-								</div>
-								<input
-									id="kudos-msg"
-									class="dialog-input"
-									type="text"
-									maxlength="120"
-									placeholder="Add a short message…"
-									bind:value={kudosMessage}
-								/>
-								{#if sendError}
-									<div class="error-banner">{sendError}</div>
-								{/if}
-								<p class="dialog-max-note">Max kudos to send: {toCircles(maxFlow)} CRC</p>
-								<button
-									class="dialog-send-btn"
-									onclick={executeSend}
-									disabled={sending || !sendAmount || Number(sendAmount) <= 0}
-								>
-									{sending ? 'Sending…' : 'Send'}
-								</button>
-							{/if}
-						</div>
+				<div class="kudos-msg-wrap">
+					<input
+						class="kudos-msg-input"
+						type="text"
+						maxlength="120"
+						placeholder="Add a short message… (optional)"
+						bind:value={kudosMessage}
+					/>
+				</div>
+				<a
+					class="kudos-btn"
+					href="https://app.gnosis.io/transfer/{ORG_ADDRESS}/crc/1?data={encodeKudosData(recipientAddress, kudosMessage)}"
+					target="_blank"
+					rel="noopener noreferrer"
+				>
+					<span class="kudos-arrow">
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+							<path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+						</svg>
+					</span>
+					<span class="kudos-label">Send kudos to</span>
+					<div class="kudos-avatar">
+						{#if recipientProfile.imageUrl}
+							<img
+								src={recipientProfile.imageUrl}
+								alt={recipientProfile.name ?? recipientAddress}
+								onerror={(e) => {
+									const el = e.currentTarget as HTMLElement;
+									el.style.display = 'none';
+									const next = el.nextElementSibling as HTMLElement | null;
+									if (next) next.style.display = 'block';
+								}}
+							/>
+							<img src="/person.svg" alt="avatar" style="display:none" />
+						{:else}
+							<img src="/person.svg" alt="avatar" />
+						{/if}
 					</div>
-				{/if}
+					<strong class="kudos-name">{recipientProfile.name ?? recipientAddress.slice(0, 8) + '…' + recipientAddress.slice(-6)}</strong>
+				</a>
 				<a
 					class="trust-btn"
 					href="https://app.gnosis.io/{recipientAddress}"
@@ -766,7 +620,7 @@
 							<img src="/person.svg" alt="avatar" />
 						{/if}
 					</div>
-					<strong class="trust-name">{recipientProfile.name ?? recipientAddress.slice(0, 8) + '' + recipientAddress.slice(-6)}</strong>
+					<strong class="trust-name">{recipientProfile.name ?? recipientAddress.slice(0, 8) + '…' + recipientAddress.slice(-6)}</strong>
 					<span class="trust-label"> on Circles</span>
 				</a>
 			{/if}
@@ -774,7 +628,7 @@
 			{#if txLoading}
 				<div class="loading-state">
 					<span class="spinner"></span>
-					Loading appreciations
+					Loading appreciations…
 				</div>
 			{/if}
 			{#if txError}
@@ -788,6 +642,7 @@
 				<div class="tx-list">
 					{#each pairedTxs as tx, i (tx.transactionHash)}
 						{@const senderProfile = getProfile(tx.sender)}
+						{@const recipientProfile = getProfile(tx.recipient)}
 						<div class="tx-row {i % 2 === 0 ? 'row-even' : 'row-odd'}">
 							<div class="tx-avatars">
 								<div class="avatar-wrap">
@@ -808,12 +663,36 @@
 										<img class="avatar-placeholder-sm" src="/person.svg" alt="avatar" />
 									{/if}
 								</div>
+								<span class="arrow">→</span>
+								<div class="avatar-wrap">
+									{#if recipientProfile.imageUrl}
+										<img
+											class="avatar-img-sm"
+											src={recipientProfile.imageUrl}
+											alt={recipientProfile.name ?? tx.recipient}
+											onerror={(e) => {
+												const el = e.currentTarget as HTMLElement;
+												el.style.display = 'none';
+												const next = el.nextElementSibling as HTMLElement | null;
+												if (next) next.style.display = 'block';
+											}}
+										/>
+										<img class="avatar-placeholder-sm" src="/person.svg" alt="avatar" style="display:none" />
+									{:else}
+										<img class="avatar-placeholder-sm" src="/person.svg" alt="avatar" />
+									{/if}
+								</div>
 							</div>
 							<div class="tx-body">
 								<p class="tx-sentence">
 									<span class="tx-name" title={tx.sender}>{displayName(tx.sender)}</span>
 									<span class="tx-verb"> sent </span>
-									<span class="tx-amount">{formatAmount(tx.circles)} kudos</span>
+									<span class="tx-amount">{formatAmount(tx.circles)}</span>
+									{#if groupImageUrl}
+										<img class="group-avatar-inline" src={groupImageUrl} alt="CRC" />
+									{/if}
+									<span class="tx-verb"> CRC to </span>
+									<span class="tx-name" title={tx.recipient}>{displayName(tx.recipient)}</span>
 								</p>
 								{#if tx.message}
 									<p class="tx-msg">"{tx.message}"</p>
@@ -823,12 +702,15 @@
 					{/each}
 				</div>
 
+				{#if hasMore}
+					<p class="has-more">More appreciations available — showing most recent batch.</p>
+				{/if}
 			{/if}
 
 			<div class="card-footer">
 				<span></span>
-				<button class="btn-refresh" onclick={() => loadHistory(recipientAddress ?? GROUP_ADDRESS, GROUP_ADDRESS, blockFromParam)} disabled={txLoading}>
-					{txLoading ? '' : '\u21BB Refresh'}
+				<button class="btn-refresh" onclick={() => loadHistory(ORG_ADDRESS, GROUP_ADDRESS)} disabled={txLoading}>
+					{txLoading ? '…' : '↻ Refresh'}
 				</button>
 			</div>
 		{/if}
@@ -1059,10 +941,6 @@
 		margin-bottom: 20px;
 		transition: opacity 0.15s;
 		cursor: pointer;
-		border: none;
-		width: 100%;
-		box-sizing: border-box;
-		font-size: 1rem;
 	}
 
 	.kudos-btn:hover { opacity: 0.85; }
@@ -1138,142 +1016,30 @@
 		flex-shrink: 0;
 	}
 
-	/* ----- Kudos send dialog ----- */
-	.dialog-backdrop {
-		position: fixed;
-		inset: 0;
-		background: rgba(6, 10, 64, 0.45);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		z-index: 100;
+	/* ----- Kudos message input ----- */
+	.kudos-msg-wrap {
+		margin-bottom: 10px;
 	}
 
-	.dialog-card {
-		position: relative;
-		background: #ffffff;
-		border-radius: 20px;
-		padding: 32px 24px 20px;
-		width: min(400px, 92vw);
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 16px;
-		box-shadow: 0 8px 40px rgba(6, 10, 64, 0.18);
-	}
-
-	.dialog-close {
-		position: absolute;
-		top: 14px;
-		right: 14px;
-		background: none;
-		border: none;
-		color: #6a6c8c;
-		cursor: pointer;
-		padding: 4px;
-		display: flex;
-		align-items: center;
-		border-radius: 6px;
-	}
-
-	.dialog-close:hover { color: #060a40; background: #f0f0f8; }
-
-	.dialog-amount-wrap {
-		display: flex;
-		align-items: baseline;
-		justify-content: center;
-		gap: 10px;
-		width: 100%;
-	}
-
-	.dialog-amount-input {
-		width: auto;
-		min-width: 1ch;
-		border: none;
-		outline: none;
-		font-size: 3rem;
-		font-weight: 700;
-		color: #060a40;
-		text-align: right;
-		background: transparent;
-		padding: 0;
-		-moz-appearance: textfield;
-		appearance: textfield;
-	}
-
-	.dialog-amount-unit {
-		font-size: 1.1rem;
-		font-weight: 600;
-		color: #6a6c8c;
-		white-space: nowrap;
-	}
-
-	.dialog-amount-input::-webkit-outer-spin-button,
-	.dialog-amount-input::-webkit-inner-spin-button { -webkit-appearance: none; appearance: none; margin: 0; }
-
-	.dialog-input {
+	.kudos-msg-input {
 		width: 100%;
 		box-sizing: border-box;
 		padding: 10px 14px;
 		border: 1.5px solid #c8caeb;
 		border-radius: 10px;
-		font-size: 0.95rem;
+		font-size: 0.92rem;
 		color: #060a40;
 		background: #ffffff;
 		outline: none;
 		transition: border-color 0.15s;
 	}
 
-	.dialog-input:focus { border-color: #3a3f7a; }
-	.dialog-input::placeholder { color: #b0b2cc; }
-
-	.dialog-max-note {
-		font-size: 0.8rem;
-		color: #6a6c8c;
-		text-align: center;
-		margin: 0;
-		width: 100%;
+	.kudos-msg-input:focus {
+		border-color: #3a3f7a;
 	}
 
-	.dialog-send-btn {
-		width: 100%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 16px;
-		background: #5b5ea6;
-		color: #ffffff;
-		border: none;
-		border-radius: 14px;
-		font-size: 1.05rem;
-		font-weight: 600;
-		cursor: pointer;
-		transition: opacity 0.15s;
-	}
-
-	.dialog-send-btn:hover:not(:disabled) { opacity: 0.85; }
-	.dialog-send-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-
-	.dialog-success {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 12px;
-		padding: 32px 24px;
-	}
-
-	.dialog-success-icon {
-		font-size: 3rem;
-		color: #166534;
-		line-height: 1;
-	}
-
-	.dialog-success-msg {
-		font-size: 1.2rem;
-		font-weight: 700;
-		color: #060a40;
-		margin: 0;
+	.kudos-msg-input::placeholder {
+		color: #b0b2cc;
 	}
 
 	/* ----- Appreciations ----- */
@@ -1316,7 +1082,14 @@
 		display: block;
 	}
 
-.tx-body { flex: 1; min-width: 0; }
+	.arrow {
+		font-size: 0.85rem;
+		color: #9b9db3;
+		font-weight: 700;
+		padding: 0 2px;
+	}
+
+	.tx-body { flex: 1; min-width: 0; }
 
 	.tx-sentence {
 		margin: 0;
@@ -1325,6 +1098,15 @@
 		line-height: 1.4;
 	}
 
+	.group-avatar-inline {
+		width: 16px;
+		height: 16px;
+		border-radius: 50%;
+		object-fit: cover;
+		vertical-align: text-bottom;
+		display: inline-block;
+		margin: 0 1px;
+	}
 
 	.tx-msg {
 		margin: 4px 0 0;
@@ -1347,6 +1129,14 @@
 	.tx-amount {
 		font-weight: 400;
 		color: #6a6c8c;
+	}
+
+	.has-more {
+		text-align: center;
+		font-size: 0.78rem;
+		color: #9b9db3;
+		font-style: italic;
+		margin: 8px 0 4px;
 	}
 
 	/* ----- Footer ----- */
@@ -1401,19 +1191,4 @@
 	.btn-refresh:not(:disabled):hover {
 		opacity: 0.82;
 	}
-
-
-
-	.no-path-note {
-		font-size: 0.85rem;
-		color: #a0505a;
-		text-align: center;
-		padding: 10px 0;
-		margin: 0;
-	}
-
-
-
-
-
 </style>
