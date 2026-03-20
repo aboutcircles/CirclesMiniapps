@@ -16,7 +16,7 @@
 	const CIRCLES_RPC_URL = 'https://rpc.aboutcircles.com/';
 	const CIRCLES_QUERY_URL = 'https://staging.circlesubi.network/';
 	const TX_RPC_URL = 'https://staging.circlesubi.network/';
-	const PATHFINDER_RPC_URL = 'https://staging.circlesubi.network';
+	const PATHFINDER_RPC_URL = 'https://rpc.aboutcircles.com/';
 	// ^^ No trailing slash - TransferBuilder uses this as the pathfinder URL
 	const HUB_ADDRESS: Address = circlesConfig[100].v2HubAddress as Address;
 
@@ -433,7 +433,6 @@
 				sink: resolvedMintHandler,
 				targetFlow: attoMax.toString(),
 				withWrap: true,
-				toTokens: [group],
 				quantizedMode: false
 			}]) as { maxFlow: string };
 			maxFlow = BigInt(rpcResult.maxFlow ?? '0');
@@ -481,7 +480,7 @@
 				wallet.address as Address,
 				resolvedMintHandler,
 				targetAtto,
-				{ useWrappedBalances: true, toTokens: [GROUP_ADDRESS as Address] }
+				{ useWrappedBalances: true }
 			);
 
 			// 3. Build safeTransferFrom: sender → recipient, group token, with encoded message
@@ -521,7 +520,8 @@
 				]);
 			}, 2500);
 		} catch (e: unknown) {
-			sendError = e instanceof Error ? e.message : String(e);
+			console.error('Kudos send failed:', e);
+			sendError = 'Sorry, kudos might not have been sent. Please try again.';
 		} finally {
 			sending = false;
 		}
@@ -651,14 +651,14 @@
 				{@const recipientProfile = getProfile(recipientAddress)}
 				{#if !wallet.connected}
 					<button class="kudos-btn" onclick={() => wallet.connectWithPasskey()}>
-						<span class="kudos-label">{wallet.connecting ? 'Connecting…' : 'Connect wallet to send kudos'}</span>
+						<span class="kudos-label">{wallet.connecting ? 'Connecting…' : 'Connect account to send kudos'}</span>
 					</button>
 				{:else if maxFlowLoading}
 					<button class="kudos-btn" disabled>
 						<span class="kudos-label">Checking…</span>
 					</button>
 				{:else if maxFlow === 0n}
-					<p class="no-path-note">No transfer path available. You may need to establish trust connections first.</p>
+					<p class="no-path-note">You can't send kudos to this person — no transfer path available.</p>
 				{:else if maxFlowError}
 					<div class="error-banner">{maxFlowError}</div>
 				{:else if maxFlow !== null}
