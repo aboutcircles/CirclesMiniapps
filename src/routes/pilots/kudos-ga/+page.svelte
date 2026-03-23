@@ -278,7 +278,7 @@
 					href="https://app.gnosis.io/transfer/{ORG_ADDRESS}/crc/1?data={encodeKudosData(recipientAddress, kudosMessage)}"
 					target="_blank"
 					rel="noopener noreferrer"
-					onclick={() => { kudosMessage = ''; }}
+					onclick={() => { setTimeout(() => { kudosMessage = ''; }, 1000); }}
 				>
 					<span class="kudos-arrow">
 						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
