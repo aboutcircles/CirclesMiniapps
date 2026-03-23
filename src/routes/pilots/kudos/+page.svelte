@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { createPublicClient, http, type Address, encodeFunctionData } from 'viem';
 	import { gnosis } from 'viem/chains';
-	import { SvelteMap } from 'svelte/reactivity';
+	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import { CirclesConverter } from '@aboutcircles/sdk-utils/circlesConverter';
 	import { circlesConfig } from '@aboutcircles/sdk-utils';
 	import { encodeCrcV2TransferData, decodeCrcV2TransferData } from '@aboutcircles/sdk-utils';
@@ -14,7 +14,6 @@
 	// ----- Constants -----
 	const ONCHAIN_RPC_URL = 'https://rpc.aboutcircles.com/';
 	const CIRCLES_RPC_URL = 'https://rpc.aboutcircles.com/';
-	const CIRCLES_QUERY_URL = 'https://staging.circlesubi.network/';
 	const TX_RPC_URL = 'https://staging.circlesubi.network/';
 	const PATHFINDER_RPC_URL = 'https://rpc.aboutcircles.com/';
 	// ^^ No trailing slash - TransferBuilder uses this as the pathfinder URL
@@ -26,10 +25,6 @@
 		{ type: 'function', name: 'safeTransferFrom', inputs: [{ name: 'from', type: 'address' }, { name: 'to', type: 'address' }, { name: 'id', type: 'uint256' }, { name: 'value', type: 'uint256' }, { name: 'data', type: 'bytes' }], outputs: [], stateMutability: 'nonpayable' }
 	] as const;
 
-	const LIFT_ERC20_ADDRESS: Address = '0x5F99a795dD2743C36D63511f0D4bc667e6d3cDB5';
-	const LIFT_ERC20_ABI = [
-		{ type: 'function', name: 'erc20Circles', inputs: [{ name: '_type', type: 'uint8' }, { name: '_avatar', type: 'address' }], outputs: [{ name: '', type: 'address' }], stateMutability: 'view' }
-	] as const;
 	const ERC20_ABI = [
 		{ type: 'function', name: 'balanceOf', inputs: [{ name: 'account', type: 'address' }], outputs: [{ name: '', type: 'uint256' }], stateMutability: 'view' }
 	] as const;
@@ -38,14 +33,7 @@
 		{ type: 'function', name: 'BASE_MINT_HANDLER', inputs: [], outputs: [{ name: '', type: 'address' }], stateMutability: 'view' }
 	] as const;
 
-	const REFRESH_INTERVAL_MS = 15_000;
-
-	// ----- View toggle -----
-	type View = 'leaderboard' | 'appreciations';
-
 	// ----- Query params -----
-	// Standard params
-	const hasBoard = $derived(page.url.searchParams.has('hasBoard'));
 	const recipientAddress = $derived(page.url.searchParams.get('recipient') ?? null);
 	const blockFromParam = $derived.by(() => {
 		const v = page.url.searchParams.get('blockFrom');
@@ -69,23 +57,10 @@
 		return GROUP_CONFIGS[groupParam] ?? DEFAULT_GROUP;
 	});
 
-	let activeView = $state<View>('appreciations');
-	$effect(() => {
-		if (recipientAddress) activeView = 'appreciations';
-		else if (hasBoard) activeView = 'leaderboard';
-	});
-
 	// ----- Wallet auto-connect -----
 	$effect(() => {
 		untrack(() => wallet.autoConnect());
 	});
-
-	interface AvatarRow {
-		avatar: string;
-		name: string | null;
-		imageUrl: string | null;
-		liveErc20: bigint;
-	}
 
 	interface TxEntry {
 		blockNumber: number;
@@ -123,17 +98,9 @@
 		message: string | null;
 	}
 
-	// ----- Leaderboard state -----
-	let rows = $state<AvatarRow[]>([]);
-	let liveLoading = $state(false);
-	let mountLoading = $state(false);
-	let lbError = $state('');
-	let autoRefreshActive = $state(false);
-	let showUnidentified = $state(false);
-
 	// ----- Appreciations state -----
 	let txs = $state<TxEntry[]>([]);
-	let transferDataMap = $state<Map<string, string>>(new Map()); // hash -> data hex
+	let transferDataMap = new SvelteMap<string, string>(); // hash -> data hex
 	let txLoading = $state(false);
 	let txError = $state('');
 	let showDialog = $state(false);
@@ -152,23 +119,11 @@
 	// ----- Shared profile cache -----
 	const profileCache = new SvelteMap<string, { name: string | null; imageUrl: string | null }>();
 
-	// ----- Leaderboard derived -----
-	const tableReady = $derived(rows.length > 0);
-	const activeRows = $derived(rows.filter(r => r.liveErc20 > 0n));
-	const zeroRows = $derived(rows.filter(r => r.liveErc20 === 0n));
-	const sortedRows = $derived.by(() => {
-		const active = [...activeRows].sort((a, b) => (a.liveErc20 < b.liveErc20 ? 1 : a.liveErc20 > b.liveErc20 ? -1 : 0));
-		const zero = [...zeroRows].sort((a, b) => (a.name ?? a.avatar).localeCompare(b.name ?? b.avatar));
-		return [...active, ...zero];
-	});
-	const identifiedRows = $derived(sortedRows.filter(r => r.name || r.imageUrl));
-	const unidentifiedRows = $derived(sortedRows.filter(r => !r.name && !r.imageUrl));
-
 	// ----- Appreciations derived -----
 	const pairedTxs = $derived.by((): TxPair[] => {
 		if (!recipientAddress) return [];
 		const recipientLower = recipientAddress.toLowerCase();
-		const seen = new Set<string>();
+		const seen = new SvelteSet<string>();
 		const pairs: TxPair[] = [];
 		for (const t of txs) {
 			if (t.to.toLowerCase() !== recipientLower) continue;
@@ -263,96 +218,6 @@
 		return p.name ?? truncate(addr);
 	}
 
-	// ----- Leaderboard logic -----
-	async function refreshLive(group: string = GROUP_ADDRESS) {
-		liveLoading = true;
-		lbError = '';
-		try {
-			// 1. Get group members (paginated); compute tokenId = uint256(uint160(groupAddress))
-			const members: string[] = [];
-			let cursor: string | null = null;
-			do {
-				const params: unknown[] = cursor ? [group, 100, cursor] : [group, 100];
-				const page = await jsonRpc(CIRCLES_QUERY_URL, 'circles_getGroupMembers', params) as { results: { member: string }[]; hasMore: boolean; nextCursor?: string };
-				for (const r of (page?.results ?? [])) members.push(r.member.toLowerCase());
-				cursor = page?.hasMore ? (page.nextCursor ?? null) : null;
-			} while (cursor);
-			if (!members.length) { rows = []; return; }
-
-			// 2. Get balances — prefer ERC20 inflationary wrapper (exists when tokens have been wrapped)
-			let balances: bigint[];
-			const erc20Address = await client.readContract({
-				address: LIFT_ERC20_ADDRESS,
-				abi: LIFT_ERC20_ABI,
-				functionName: 'erc20Circles',
-				args: [1, group as Address]
-			}) as Address;
-			if (erc20Address && !/^0x0+$/.test(erc20Address)) {
-				const results = await client.multicall({
-					contracts: members.map((acc) => ({
-						address: erc20Address,
-						abi: ERC20_ABI,
-						functionName: 'balanceOf' as const,
-						args: [acc as Address]
-					}))
-				});
-				balances = results.map((r) => (r.status === 'success' ? (r.result as bigint) : 0n));
-			} else {
-				// fallback: ERC1155 balanceOfBatch
-				const tokenId = BigInt(group);
-				const ids = members.map(() => tokenId);
-				balances = await client.readContract({
-					address: HUB_ADDRESS,
-					abi: HUB_ABI,
-					functionName: 'balanceOfBatch',
-					args: [members as Address[], ids]
-				}) as bigint[];
-			}
-
-			// 3. Fetch profiles and build rows
-			await fetchProfiles(members);
-			rows = members.map((acc, i) => {
-				const profile = profileCache.get(acc) ?? { name: null, imageUrl: null };
-				return { avatar: acc, name: profile.name, imageUrl: profile.imageUrl, liveErc20: balances[i] ?? 0n };
-			});
-		} catch (e: unknown) {
-			lbError = e instanceof Error ? e.message : String(e);
-		} finally {
-			liveLoading = false;
-		}
-	}
-
-	let refreshTimerId: ReturnType<typeof setInterval> | null = null;
-
-	function stopAutoRefresh() {
-		if (refreshTimerId !== null) { clearInterval(refreshTimerId); refreshTimerId = null; }
-		autoRefreshActive = false;
-	}
-
-	function startAutoRefresh(group: string) {
-		if (refreshTimerId !== null) return;
-		autoRefreshActive = true;
-		refreshTimerId = setInterval(async () => {
-			if (!liveLoading) await refreshLive(group).catch(() => {});
-		}, REFRESH_INTERVAL_MS);
-	}
-
-	$effect(() => () => stopAutoRefresh());
-
-	$effect(() => {
-		const group = GROUP_ADDRESS;
-		if (!group || !hasBoard) return;
-		untrack(() => {
-			mountLoading = true;
-			lbError = '';
-			rows = [];
-			refreshLive(group).finally(() => {
-				mountLoading = false;
-				startAutoRefresh(group);
-			});
-		});
-	});
-
 	// ----- Appreciations logic -----
 	function decodeTransferData(data: string): { message: string; metadata: string } | null {
 		if (!data || data.length <= 2) return null;
@@ -378,11 +243,10 @@
 
 			// 2. Transfer data for received transfers (optionally filtered from a block)
 			const transferResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransferData', [recipientAddr, 'received', null, blockFrom ?? null])) as { results: TransferData[]; hasMore: boolean };
-			const map = new Map<string, string>();
+			transferDataMap.clear();
 			for (const t of (transferResult.results ?? [])) {
-				if (t.data && t.data.length > 2) map.set(t.transactionHash, t.data);
+				if (t.data && t.data.length > 2) transferDataMap.set(t.transactionHash, t.data);
 			}
-			transferDataMap = map;
 
 			// 3. Batch-fetch profiles for all senders
 			const addrs = Array.from(new Set([
@@ -547,106 +411,7 @@
 <div class="page">
 	<div class="card">
 
-		<!-- Toggle -->
-		{#if !recipientAddress || hasBoard}
-		<div class="toggle-bar">
-			{#if hasBoard}
-				<button
-					class="toggle-btn {activeView === 'leaderboard' ? 'active' : ''}"
-					onclick={() => (activeView = 'leaderboard')}
-				>
-					BOARD
-				</button>
-			{/if}
-			<button
-				class="toggle-btn {activeView === 'appreciations' ? 'active' : ''}"
-				onclick={() => (activeView = 'appreciations')}
-			>
-				FEED
-			</button>
-		</div>
-		{/if}
-
-		<!-- ===== LEADERBOARD ===== -->
-		{#if activeView === 'leaderboard'}
-			<p class="subtitle">Get more kudos</p>
-
-			{#if mountLoading}
-				<div class="loading-state">
-					<span class="spinner"></span>
-					Loading
-				</div>
-			{/if}
-			{#if lbError}
-				<div class="error-banner">{lbError}</div>
-			{/if}
-
-			{#if tableReady}
-				<div class="lb-list">
-					{#each identifiedRows as row, i (row.avatar)}
-						{@const hasBalance = row.liveErc20 > 0n}
-						<a class="lb-row {i % 2 === 0 ? 'row-even' : 'row-odd'} {!hasBalance ? 'row-zero' : ''}" href="/ps/{row.avatar}">
-							<div class="lb-avatar">
-								{#if row.imageUrl}
-									<img
-										class="avatar-img"
-										src={row.imageUrl}
-										alt={row.name ?? row.avatar}
-										onerror={(e) => {
-											const el = e.currentTarget as HTMLElement;
-											el.style.display = 'none';
-											const next = el.nextElementSibling as HTMLElement | null;
-											if (next) next.style.display = 'flex';
-										}}
-									/>
-									<img class="avatar-placeholder" src="/person.svg" alt="avatar" style="display:none" />
-								{:else}
-									<img class="avatar-placeholder" src="/person.svg" alt="avatar" />
-								{/if}
-							</div>
-							<span class="lb-name" title={row.avatar}>{row.name ?? truncate(row.avatar)}</span>
-							<span class="lb-score {!hasBalance ? 'lb-score-zero' : ''}">{toCircles(row.liveErc20)}</span>
-						</a>
-					{/each}
-
-					{#if unidentifiedRows.length > 0}
-						{#if showUnidentified}
-							{#each unidentifiedRows as row, i (row.avatar)}
-								{@const hasBalance = row.liveErc20 > 0n}
-								{@const rowIndex = identifiedRows.length + i}
-								<a class="lb-row {rowIndex % 2 === 0 ? 'row-even' : 'row-odd'} row-zero" href="/ps/{row.avatar}">
-									<div class="lb-avatar">
-										<img class="avatar-placeholder" src="/person.svg" alt="avatar" />
-									</div>
-									<span class="lb-name lb-name-addr" title={row.avatar}>{truncate(row.avatar)}</span>
-									<span class="lb-score {!hasBalance ? 'lb-score-zero' : ''}">{toCircles(row.liveErc20)}</span>
-								</a>
-							{/each}
-						{/if}
-						<button class="show-more-btn" onclick={() => (showUnidentified = !showUnidentified)}>
-							{showUnidentified ? 'Show less' : `Show ${unidentifiedRows.length} more`}
-						</button>
-					{/if}
-				</div>
-			{/if}
-
-			<div class="card-footer">
-				{#if autoRefreshActive}
-					<span class="auto-label">
-						<span class="spinner-sm"></span>
-						AUTO-REFRESHING
-					</span>
-				{:else}
-					<span></span>
-				{/if}
-				<button class="btn-refresh" onclick={() => refreshLive(GROUP_ADDRESS)} disabled={liveLoading}>
-					{liveLoading ? '' : '\u21BB Refresh'}
-				</button>
-			</div>
-		{/if}
-
 		<!-- ===== KUDOS ===== -->
-		{#if activeView === 'appreciations'}
 			{#if recipientAddress}
 				{@const recipientProfile = getProfile(recipientAddress)}
 				{#if !wallet.connected}
@@ -831,7 +596,6 @@
 					{txLoading ? '' : '\u21BB Refresh'}
 				</button>
 			</div>
-		{/if}
 
 	</div>
 </div>
@@ -863,45 +627,6 @@
 		width: 100%;
 		padding: 28px 28px 28px;
 		box-sizing: border-box;
-	}
-
-	/* ----- Toggle ----- */
-	.toggle-bar {
-		display: flex;
-		background: #ede1d8;
-		border-radius: 12px;
-		padding: 4px;
-		gap: 4px;
-		margin-bottom: 20px;
-	}
-
-	.toggle-btn {
-		flex: 1;
-		padding: 8px 0;
-		border: none;
-		border-radius: 9px;
-		font-size: 0.78rem;
-		font-weight: 700;
-		letter-spacing: 0.06em;
-		cursor: pointer;
-		transition: background 0.15s, color 0.15s, box-shadow 0.15s;
-		background: transparent;
-		color: #9b9db3;
-	}
-
-	.toggle-btn.active {
-		background: #faf5f1;
-		color: #060a40;
-		box-shadow: 0 1px 4px rgba(6, 10, 64, 0.10);
-	}
-
-	/* ----- Shared ----- */
-	.subtitle {
-		text-align: center;
-		font-size: 0.85rem;
-		color: #9b9db3;
-		margin: 0 0 20px;
-		font-style: italic;
 	}
 
 	.loading-state {
@@ -945,104 +670,6 @@
 
 	.row-even { background: #ffffff; }
 	.row-odd  { background: #faf5f1; }
-
-	/* ----- Leaderboard ----- */
-	.lb-list {
-		border: 1.5px solid #ede1d8;
-		border-radius: 14px;
-		overflow: hidden;
-		margin-bottom: 4px;
-	}
-
-	.lb-row {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		padding: 12px 16px;
-		border-bottom: 1px solid #ede1d8;
-		text-decoration: none;
-		cursor: pointer;
-		transition: filter 0.12s;
-	}
-
-	.lb-row:last-child { border-bottom: none; }
-	.lb-row:hover { filter: brightness(0.96); }
-
-	.row-zero { opacity: 0.55; }
-	.row-zero .lb-name { color: #8a8ca8; }
-
-	.lb-avatar {
-		width: 40px;
-		height: 40px;
-		flex-shrink: 0;
-		position: relative;
-	}
-
-	.avatar-img {
-		width: 40px;
-		height: 40px;
-		border-radius: 50%;
-		object-fit: cover;
-		display: block;
-	}
-
-	.avatar-placeholder {
-		width: 40px;
-		height: 40px;
-		border-radius: 50%;
-		object-fit: cover;
-		display: block;
-	}
-
-	.lb-name {
-		flex: 1;
-		font-weight: 600;
-		color: #060a40;
-		font-size: 0.92rem;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.lb-name-addr {
-		font-family: 'SF Mono', ui-monospace, monospace;
-		font-size: 0.78rem;
-		color: #8a8ca8;
-	}
-
-	.lb-score {
-		font-size: 1.3rem;
-		font-weight: 800;
-		color: #060a40;
-		min-width: 60px;
-		text-align: right;
-		flex-shrink: 0;
-	}
-
-	.lb-score-zero {
-		color: #b0b0c0;
-		font-weight: 600;
-	}
-
-	.show-more-btn {
-		width: 100%;
-		background: none;
-		border: none;
-		border-top: 1px solid #ede1d8;
-		padding: 10px 16px;
-		font-size: 0.8rem;
-		font-weight: 600;
-		color: #8a8ca8;
-		cursor: pointer;
-		text-align: center;
-		letter-spacing: 0.04em;
-		transition: color 0.15s, background 0.15s;
-	}
-
-	.show-more-btn:hover {
-		color: #6a6c8c;
-		background: #faf5f1;
-	}
 
 	/* ----- Kudos button ----- */
 	.kudos-btn {
@@ -1357,28 +984,6 @@
 		margin-top: 16px;
 		padding-top: 12px;
 		border-top: 1px solid #ede1d8;
-	}
-
-	.auto-label {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-		font-size: 0.72rem;
-		font-weight: 700;
-		color: #8a8ca8;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-	}
-
-	.spinner-sm {
-		display: inline-block;
-		width: 10px;
-		height: 10px;
-		border: 2px solid #ede1d8;
-		border-top-color: #15803d;
-		border-radius: 50%;
-		animation: spin 0.75s linear infinite;
-		flex-shrink: 0;
 	}
 
 	.btn-refresh {
