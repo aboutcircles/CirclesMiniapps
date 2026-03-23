@@ -2,8 +2,6 @@
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { SvelteMap } from 'svelte/reactivity';
-	import { CirclesConverter } from '@aboutcircles/sdk-utils/circlesConverter';
-
 
 	// ----- Constants -----
 	const CIRCLES_RPC_URL = 'https://rpc.aboutcircles.com/';
@@ -52,34 +50,27 @@
 				: null
 	);
 
-	interface TxEntry {
+	// circles_getTransferData entry — has sender, recipient encoded in data, and message
+	interface TransferEntry {
 		blockNumber: number;
 		timestamp: number;
 		transactionIndex: number;
 		logIndex: number;
 		transactionHash: string;
-		version: number;
-		from: string;
-		to: string;
-		value: string;
-		circles: string;
-		attoCircles: string;
-		crc: string;
-		attoCrc: string;
-		staticCircles: string;
-		staticAttoCircles: string;
-	}
-
-	interface TransferData {
-		transactionHash: string;
-		blockNumber: number;
-		timestamp: number;
 		from: string;
 		to: string;
 		data: string;
 	}
 
-	interface TxPair {
+	// circles_getTransactionHistory entry — used to look up transfer amounts by tx hash
+	interface TxEntry {
+		transactionHash: string;
+		from: string;
+		to: string;
+		circles: string;
+	}
+
+	interface KudosPair {
 		transactionHash: string;
 		timestamp: number;
 		sender: string;
@@ -89,8 +80,8 @@
 	}
 
 	// ----- Appreciations state -----
-	let txs = $state<TxEntry[]>([]);
-	let transferDataMap = new SvelteMap<string, string>(); // hash -> data hex
+	let transferEntries = $state<TransferEntry[]>([]);
+	let amountMap = new SvelteMap<string, string>(); // txHash -> circles amount (incoming leg to org)
 	let txLoading = $state(false);
 	let txError = $state('');
 	let hasMore = $state(false);
@@ -102,28 +93,23 @@
 
 	// ----- Appreciations derived -----
 	const orgLower = $derived(ORG_ADDRESS.toLowerCase());
-	const FILTER_FROM = '0x8586b48d6f773e8536823182a7abfa82d5a51f47';
-	const pairedTxs = $derived.by((): TxPair[] => {
-		const relevant = txs.filter((t) => t.from.toLowerCase() !== FILTER_FROM);
-		const byHash = new SvelteMap<string, TxEntry[]>();
-		for (const t of relevant) {
-			const bucket = byHash.get(t.transactionHash) ?? [];
-			bucket.push(t);
-			byHash.set(t.transactionHash, bucket);
-		}
-		const pairs: TxPair[] = [];
-		for (const [hash, legs] of byHash) {
-			const incoming = legs.find((l) => l.to.toLowerCase() === orgLower);
-			const outgoing = legs.find((l) => l.from.toLowerCase() === orgLower);
-			if (!incoming || !outgoing) continue;
-			const rawData = transferDataMap.get(hash) ?? '';
+	const recipientLower = $derived(recipientAddress?.toLowerCase() ?? null);
+	const kudosPairs = $derived.by((): KudosPair[] => {
+		const pairs: KudosPair[] = [];
+		for (const entry of transferEntries) {
+			// entry.from = actual sender, entry.to = org, entry.data = 0x<recipientAddr40><msgHex>
+			if (entry.to.toLowerCase() !== orgLower) continue;
+			const recipient = decodeRecipient(entry.data);
+			if (!recipient) continue;
+			// when ?address is set, only show kudos received by that address
+			if (recipientLower && recipient.toLowerCase() !== recipientLower) continue;
 			pairs.push({
-				transactionHash: hash,
-				timestamp: incoming.timestamp,
-				sender: incoming.from,
-				recipient: outgoing.to,
-				circles: incoming.circles,
-				message: decodeMessage(rawData)
+				transactionHash: entry.transactionHash,
+				timestamp: entry.timestamp,
+				sender: entry.from,
+				recipient,
+				circles: amountMap.get(entry.transactionHash) ?? '0',
+				message: decodeMessage(entry.data)
 			});
 		}
 		pairs.sort((a, b) => b.timestamp - a.timestamp || a.transactionHash.localeCompare(b.transactionHash));
@@ -133,16 +119,6 @@
 	// ----- Helpers -----
 	function truncate(addr: string): string {
 		return addr.length < 12 ? addr : addr.slice(0, 8) + '...' + addr.slice(-6);
-	}
-
-	function toCircles(inflationaryAtto: bigint): string {
-		if (inflationaryAtto === 0n) return '0';
-		const isNeg = inflationaryAtto < 0n;
-		const abs = isNeg ? -inflationaryAtto : inflationaryAtto;
-		const day = CirclesConverter.dayFromTimestamp(BigInt(Math.floor(Date.now() / 1000)));
-		const demurraged = CirclesConverter.inflationaryToDemurrage(abs, day);
-		const circles = CirclesConverter.attoCirclesToCircles(demurraged);
-		return `${isNeg ? '-' : ''}${Math.round(circles)}`;
 	}
 
 	function formatAmount(val: string): string {
@@ -195,7 +171,13 @@
 		return p.name ?? truncate(addr);
 	}
 
-	// ----- Appreciations logic -----
+	// ----- Data decoding -----
+	function decodeRecipient(data: string): string | null {
+		const hex = data.startsWith('0x') ? data.slice(2) : data;
+		if (hex.length < 40) return null;
+		return '0x' + hex.slice(0, 40);
+	}
+
 	function decodeMessage(data: string): string {
 		const hex = data.startsWith('0x') ? data.slice(2) : data;
 		if (hex.length <= 40) return '';
@@ -210,23 +192,30 @@
 		txLoading = true;
 		txError = '';
 		try {
-			// 1. Transaction history
-			const histResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransactionHistory', [orgAddr, 150])) as { results: TxEntry[]; hasMore: boolean };
-			txs = histResult.results ?? [];
-			hasMore = histResult.hasMore ?? false;
+			// 1. Transfer data — source of truth for sender, recipient (in data), message
+			const transferResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransferData', [orgAddr])) as { results: TransferEntry[]; hasMore: boolean };
+			transferEntries = transferResult.results ?? [];
+			hasMore = transferResult.hasMore ?? false;
 
-			// 2. Transfer data for messages
-			const transferResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransferData', [orgAddr, null, null, null, null, 500])) as { results: TransferData[]; hasMore: boolean };
-			transferDataMap.clear();
-			for (const t of (transferResult.results ?? [])) {
-				if (t.data && t.data.length > 2) transferDataMap.set(t.transactionHash, t.data);
+			// 2. Transaction history — used only to look up amounts by tx hash (high limit to avoid missing entries)
+			const histResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransactionHistory', [orgAddr, 500])) as { results: TxEntry[]; hasMore: boolean };
+			amountMap.clear();
+			for (const t of (histResult.results ?? [])) {
+				// incoming leg to org = the actual kudos amount
+				if (t.to?.toLowerCase() === orgAddr.toLowerCase() && !amountMap.has(t.transactionHash)) {
+					amountMap.set(t.transactionHash, t.circles);
+				}
 			}
 
-			// 3. Batch all profiles (tx participants + group avatar) in one request
-			const relevant = txs.filter((t) => t.from.toLowerCase() !== FILTER_FROM);
+			// 3. Batch fetch profiles for all participants + group avatar
 			const addrs = Array.from(new Set([
 				groupAddr.toLowerCase(),
-				...relevant.flatMap((t) => [t.from.toLowerCase(), t.to.toLowerCase()])
+				...transferEntries
+					.filter((e) => e.to.toLowerCase() === orgAddr.toLowerCase())
+					.flatMap((e) => {
+						const r = decodeRecipient(e.data);
+						return r ? [e.from.toLowerCase(), r.toLowerCase()] : [e.from.toLowerCase()];
+					})
 			]));
 			await fetchProfiles(addrs);
 			groupImageUrl = getProfile(groupAddr).imageUrl;
@@ -289,6 +278,7 @@
 					href="https://app.gnosis.io/transfer/{ORG_ADDRESS}/crc/1?data={encodeKudosData(recipientAddress, kudosMessage)}"
 					target="_blank"
 					rel="noopener noreferrer"
+					onclick={() => { kudosMessage = ''; }}
 				>
 					<span class="kudos-arrow">
 						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
@@ -353,13 +343,13 @@
 			{#if txError}
 				<div class="error-banner">{txError}</div>
 			{/if}
-			{#if !txLoading && pairedTxs.length === 0 && !txError}
+			{#if !txLoading && kudosPairs.length === 0 && !txError}
 				<div class="empty">No appreciations found.</div>
 			{/if}
 
-			{#if pairedTxs.length > 0}
+			{#if kudosPairs.length > 0}
 				<div class="tx-list">
-					{#each pairedTxs as tx, i (tx.transactionHash)}
+					{#each kudosPairs as tx, i (tx.transactionHash)}
 						{@const senderProfile = getProfile(tx.sender)}
 						{@const recipientProfile = getProfile(tx.recipient)}
 						<div class="tx-row {i % 2 === 0 ? 'row-even' : 'row-odd'}">
