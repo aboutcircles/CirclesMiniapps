@@ -256,7 +256,7 @@
 		if (!activeConfig) return;
 		const orgAddr = ORG_ADDRESS;
 		const groupAddr = GROUP_ADDRESS;
-		untrack(() => loadHistory(orgAddr, groupAddr));
+		loadHistory(orgAddr, groupAddr);
 	});
 
 	$effect(() => {
