@@ -23,6 +23,10 @@
 		'dandelion': {
 		    groupAddress: '0x1d3663CebF6c7f54bE62B210d68eeA0E38838582',
 			orgAddress: '0x33aa31e1392FFB37b1b3572A1E2cc0651D0BCb7F'
+		},
+		'bfn': {
+			groupAddress: '0xeb614ef61367687704cd4628a68a02f3b10ce68c',
+			orgAddress:   '0xd4591B6F845C0C496D03A4eAb3a8ca4304EFA60D'
 		}
 		// Add more entries like this:
 		// myevent: {
