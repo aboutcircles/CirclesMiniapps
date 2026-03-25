@@ -269,15 +269,6 @@
 		<!-- ===== KUDOS ===== -->
 			{#if recipientAddress}
 				{@const recipientProfile = getProfile(recipientAddress)}
-				<div class="kudos-msg-wrap">
-					<input
-						class="kudos-msg-input"
-						type="text"
-						maxlength="120"
-						placeholder="Add a short message… (optional)"
-						bind:value={kudosMessage}
-					/>
-				</div>
 				<a
 					class="kudos-btn"
 					href="https://app.gnosis.io/transfer/{ORG_ADDRESS}/crc/1?data={encodeKudosData(recipientAddress, kudosMessage)}"
@@ -285,30 +276,42 @@
 					rel="noopener noreferrer"
 					onclick={() => { setTimeout(() => { kudosMessage = ''; }, 1000); }}
 				>
-					<span class="kudos-arrow">
-						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-							<path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
-						</svg>
-					</span>
-					<span class="kudos-label">Send kudos to</span>
-					<div class="kudos-avatar">
-						{#if recipientProfile.imageUrl}
-							<img
-								src={recipientProfile.imageUrl}
-								alt={recipientProfile.name ?? recipientAddress}
-								onerror={(e) => {
-									const el = e.currentTarget as HTMLElement;
-									el.style.display = 'none';
-									const next = el.nextElementSibling as HTMLElement | null;
-									if (next) next.style.display = 'block';
-								}}
-							/>
-							<img src="/person.svg" alt="avatar" style="display:none" />
-						{:else}
-							<img src="/person.svg" alt="avatar" />
-						{/if}
+					<div class="kudos-top-row">
+						<span class="kudos-arrow">
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+								<path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+							</svg>
+						</span>
+						<span class="kudos-label">Send kudos to</span>
+						<div class="kudos-avatar">
+							{#if recipientProfile.imageUrl}
+								<img
+									src={recipientProfile.imageUrl}
+									alt={recipientProfile.name ?? recipientAddress}
+									onerror={(e) => {
+										const el = e.currentTarget as HTMLElement;
+										el.style.display = 'none';
+										const next = el.nextElementSibling as HTMLElement | null;
+										if (next) next.style.display = 'block';
+									}}
+								/>
+								<img src="/person.svg" alt="avatar" style="display:none" />
+							{:else}
+								<img src="/person.svg" alt="avatar" />
+							{/if}
+						</div>
+						<strong class="kudos-name">{recipientProfile.name ?? recipientAddress.slice(0, 8) + '…' + recipientAddress.slice(-6)}</strong>
 					</div>
-					<strong class="kudos-name">{recipientProfile.name ?? recipientAddress.slice(0, 8) + '…' + recipientAddress.slice(-6)}</strong>
+					<div class="kudos-input-row">
+						<input
+							class="kudos-msg-input"
+							type="text"
+							maxlength="120"
+							placeholder="Add a message… (optional)"
+							bind:value={kudosMessage}
+							onclick={(e) => e.preventDefault()}
+						/>
+					</div>
 				</a>
 				{#if showTrust}
 				<a
@@ -508,21 +511,35 @@
 	/* ----- Kudos button ----- */
 	.kudos-btn {
 		display: flex;
-		flex-direction: row;
-		align-items: center;
-		justify-content: center;
-		gap: 10px;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0;
 		background: #3a3f7a;
 		color: #ffffff;
 		border-radius: 16px;
-		padding: 14px 18px;
+		padding: 0;
 		text-decoration: none;
 		margin-bottom: 20px;
 		transition: opacity 0.15s;
 		cursor: pointer;
+		overflow: hidden;
 	}
 
 	.kudos-btn:hover { opacity: 0.85; }
+
+	.kudos-top-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		gap: 10px;
+		padding: 14px 18px;
+	}
+
+	.kudos-input-row {
+		border-top: 1px solid rgba(255, 255, 255, 0.15);
+		padding: 10px 14px;
+	}
 
 	.kudos-arrow {
 		color: #c0c4f0;
@@ -595,30 +612,27 @@
 		flex-shrink: 0;
 	}
 
-	/* ----- Kudos message input ----- */
-	.kudos-msg-wrap {
-		margin-bottom: 10px;
-	}
-
+	/* ----- Kudos message input (inside button) ----- */
 	.kudos-msg-input {
 		width: 100%;
 		box-sizing: border-box;
-		padding: 10px 14px;
-		border: 1.5px solid #c8caeb;
-		border-radius: 10px;
-		font-size: 0.92rem;
-		color: #060a40;
-		background: #ffffff;
+		padding: 8px 12px;
+		border: 1.5px solid rgba(255, 255, 255, 0.2);
+		border-radius: 8px;
+		font-size: 0.88rem;
+		color: #ffffff;
+		background: rgba(255, 255, 255, 0.1);
 		outline: none;
-		transition: border-color 0.15s;
+		transition: border-color 0.15s, background 0.15s;
 	}
 
 	.kudos-msg-input:focus {
-		border-color: #3a3f7a;
+		border-color: rgba(255, 255, 255, 0.5);
+		background: rgba(255, 255, 255, 0.15);
 	}
 
 	.kudos-msg-input::placeholder {
-		color: #b0b2cc;
+		color: rgba(255, 255, 255, 0.45);
 	}
 
 	/* ----- Appreciations ----- */
