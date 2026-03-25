@@ -260,7 +260,7 @@
 	});
 
 	$effect(() => {
-		if (recipientAddress) untrack(() => fetchProfiles([recipientAddress]));
+		if (recipientAddress) fetchProfiles([recipientAddress]);
 	});
 </script>
 
