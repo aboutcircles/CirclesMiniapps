@@ -159,22 +159,39 @@
 	async function fetchProfiles(addresses: string[]): Promise<void> {
 		const missing = addresses.filter((a) => !profileCache.has(a));
 		if (!missing.length) return;
-		try {
-			const result = (await jsonRpc(CIRCLES_RPC_URL, 'circles_getProfileByAddressBatch', [missing])) as Array<Record<string, unknown> | null>;
-			if (!Array.isArray(result)) return;
-			for (let i = 0; i < missing.length; i++) {
-				const p = result[i];
-				const rawImage = (p?.previewImageUrl ?? p?.imageUrl ?? p?.avatarUrl ?? p?.picture ?? null) as string | null;
-				let imageUrl: string | null = null;
-				if (rawImage) {
-					if (rawImage.startsWith('data:')) imageUrl = rawImage;
-					else if (rawImage.startsWith('ipfs://')) imageUrl = `https://ipfs.io/ipfs/${rawImage.slice(7)}`;
-					else if (rawImage.startsWith('http')) imageUrl = rawImage;
-					else if (/^Qm[1-9A-HJ-NP-Za-km-z]{44}/.test(rawImage) || /^bafy/.test(rawImage)) imageUrl = `https://ipfs.io/ipfs/${rawImage}`;
+
+		function resolveImageUrl(rawImage: string | null): string | null {
+			if (!rawImage) return null;
+			if (rawImage.startsWith('data:')) return rawImage;
+			if (rawImage.startsWith('ipfs://')) return `https://ipfs.io/ipfs/${rawImage.slice(7)}`;
+			if (rawImage.startsWith('http')) return rawImage;
+			if (/^Qm[1-9A-HJ-NP-Za-km-z]{44}/.test(rawImage) || /^bafy/.test(rawImage)) return `https://ipfs.io/ipfs/${rawImage}`;
+			return null;
+		}
+
+		async function fetchOne(address: string): Promise<void> {
+			try {
+				const info = (await jsonRpc(CIRCLES_RPC_URL, 'circles_getAvatarInfo', [address])) as Record<string, unknown> | null;
+				const cidV0 = (info?.cidV0 as string | null | undefined) ?? '';
+				if (!cidV0) {
+					profileCache.set(address.toLowerCase(), { name: null, imageUrl: null });
+					return;
 				}
-				profileCache.set(missing[i].toLowerCase(), { name: (p?.name as string) ?? null, imageUrl });
-			}
-		} catch { /* profiles optional */ }
+				const ipfsRes = await fetch(`https://ipfs.io/ipfs/${cidV0}`);
+				if (!ipfsRes.ok) {
+					profileCache.set(address.toLowerCase(), { name: null, imageUrl: null });
+					return;
+				}
+				const ipfsData = (await ipfsRes.json()) as Record<string, unknown>;
+				const rawImage = (ipfsData?.previewImageUrl ?? ipfsData?.imageUrl ?? null) as string | null;
+				profileCache.set(address.toLowerCase(), {
+					name: (ipfsData?.name as string) ?? null,
+					imageUrl: resolveImageUrl(rawImage)
+				});
+			} catch { /* profiles optional */ }
+		}
+
+		await Promise.allSettled(missing.map(fetchOne));
 	}
 
 	function getProfile(addr: string) {
@@ -334,8 +351,7 @@
 				<a
 					class="trust-btn"
 					href="https://app.gnosis.io/{recipientAddress}"
-					target="_blank"
-					rel="noopener noreferrer"
+					onclick={(e) => { e.preventDefault(); window.top?.open((e.currentTarget as HTMLAnchorElement).href, '_blank'); }}
 				>
 					<span class="trust-label">Trust</span>
 					<div class="kudos-avatar">
