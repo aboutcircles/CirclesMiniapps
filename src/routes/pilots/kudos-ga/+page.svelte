@@ -13,6 +13,8 @@
 	interface GroupConfig {
 		groupAddress: string;
 		orgAddress: string;
+		/** If set, wraps the transfer link as a redirect. Use {LINK} as placeholder. */
+		transferRoot?: string;
 	}
 
 	const GROUP_CONFIGS: Record<string, GroupConfig> = {
@@ -26,7 +28,8 @@
 		},
 		'bfn': {
 			groupAddress: '0xeb614ef61367687704cd4628a68a02f3b10ce68c',
-			orgAddress:   '0xd4591B6F845C0C496D03A4eAb3a8ca4304EFA60D'
+			orgAddress:   '0xd4591B6F845C0C496D03A4eAb3a8ca4304EFA60D',
+			transferRoot: 'https://circles.gnosis.io/invitation/3Spg5oBI?redirect_to={LINK}'
 		}
 		// Add more entries like this:
 		// myevent: {
@@ -46,6 +49,13 @@
 	);
 	const GROUP_ADDRESS = $derived(activeConfig?.groupAddress ?? '');
 	const ORG_ADDRESS = $derived(activeConfig?.orgAddress ?? '');
+	const kudosHref = $derived.by(() => {
+		if (!recipientAddress || !ORG_ADDRESS) return '#';
+		const relative = `/transfer/${ORG_ADDRESS}/crc/1?data=${encodeKudosData(recipientAddress, kudosMessage)}`;
+		const root = activeConfig?.transferRoot;
+		if (root) return root.replace('{LINK}', encodeURIComponent(relative));
+		return `https://app.gnosis.io${relative}`;
+	});
 	const groupParam = $derived(page.url.searchParams.get('group'));
 	const configError = $derived(
 		!groupParam
@@ -271,7 +281,7 @@
 				{@const recipientProfile = getProfile(recipientAddress)}
 				<a
 					class="kudos-btn"
-					href="https://app.gnosis.io/transfer/{ORG_ADDRESS}/crc/1?data={encodeKudosData(recipientAddress, kudosMessage)}"
+					href={kudosHref}
 					target="_blank"
 					rel="noopener noreferrer"
 				>
