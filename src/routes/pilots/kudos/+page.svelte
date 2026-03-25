@@ -59,7 +59,7 @@
 
 	// ----- Wallet auto-connect -----
 	$effect(() => {
-		untrack(() => wallet.autoConnect());
+		wallet.autoConnect();
 	});
 
 	interface TxEntry {
