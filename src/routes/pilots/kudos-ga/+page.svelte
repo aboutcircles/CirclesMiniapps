@@ -312,7 +312,7 @@
 							onclick={(e) => e.preventDefault()}
 						/>
 						<div class="kudos-suggestions">
-							{#each ['🙏', '🌟', '💪', '❤️', '🎉'] as emoji}
+							{#each ['🙏', '🌟', '💪', '❤️'] as emoji}
 								<button
 									class="kudos-suggestion"
 									onclick={(e) => { e.preventDefault(); kudosMessage = (kudosMessage + emoji).slice(0, 120); }}
@@ -559,14 +559,16 @@
 	}
 
 	.kudos-suggestion {
+		flex: 1;
 		background: rgba(255, 255, 255, 0.12);
 		border: 1px solid rgba(255, 255, 255, 0.2);
 		border-radius: 8px;
-		padding: 4px 10px;
+		padding: 6px 0;
 		font-size: 1.1rem;
 		cursor: pointer;
 		transition: background 0.12s;
 		line-height: 1;
+		text-align: center;
 	}
 
 	.kudos-suggestion:hover {
