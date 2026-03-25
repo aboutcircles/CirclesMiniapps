@@ -37,6 +37,7 @@
 
 	// ----- Query params -----
 	const recipientAddress = $derived(page.url.searchParams.get('address') ?? null);
+	const showTrust = $derived(page.url.searchParams.has('trust'));
 
 	// ----- Dynamic group / org resolution -----
 	// ?group=<key> is required. The key must match an entry in GROUP_CONFIGS above.
@@ -309,6 +310,7 @@
 					</div>
 					<strong class="kudos-name">{recipientProfile.name ?? recipientAddress.slice(0, 8) + '…' + recipientAddress.slice(-6)}</strong>
 				</a>
+				{#if showTrust}
 				<a
 					class="trust-btn"
 					href="https://app.gnosis.io/{recipientAddress}"
@@ -336,7 +338,14 @@
 					<strong class="trust-name">{recipientProfile.name ?? recipientAddress.slice(0, 8) + '…' + recipientAddress.slice(-6)}</strong>
 					<span class="trust-label"> on Circles</span>
 				</a>
+				{/if}
 			{/if}
+
+			<div class="refresh-bar">
+				<button class="btn-refresh" onclick={() => loadHistory(ORG_ADDRESS, GROUP_ADDRESS)} disabled={txLoading}>
+					{txLoading ? '…' : '↻ Refresh'}
+				</button>
+			</div>
 
 			{#if txLoading}
 				<div class="loading-state">
@@ -420,12 +429,7 @@
 				{/if}
 			{/if}
 
-			<div class="card-footer">
-				<span></span>
-				<button class="btn-refresh" onclick={() => loadHistory(ORG_ADDRESS, GROUP_ADDRESS)} disabled={txLoading}>
-					{txLoading ? '…' : '↻ Refresh'}
-				</button>
-			</div>
+
 
 	</div>
 </div>
@@ -712,6 +716,13 @@
 		color: #9b9db3;
 		font-style: italic;
 		margin: 8px 0 4px;
+	}
+
+	/* ----- Refresh bar ----- */
+	.refresh-bar {
+		display: flex;
+		justify-content: flex-end;
+		margin-bottom: 12px;
 	}
 
 	/* ----- Footer ----- */
