@@ -311,6 +311,14 @@
 							bind:value={kudosMessage}
 							onclick={(e) => e.preventDefault()}
 						/>
+						<div class="kudos-suggestions">
+							{#each ['🙏', '🌟', '💪', '❤️', '🎉'] as emoji}
+								<button
+									class="kudos-suggestion"
+									onclick={(e) => { e.preventDefault(); kudosMessage = (kudosMessage + emoji).slice(0, 120); }}
+								>{emoji}</button>
+							{/each}
+						</div>
 					</div>
 				</a>
 				{#if showTrust}
@@ -539,6 +547,30 @@
 	.kudos-input-row {
 		border-top: 1px solid rgba(255, 255, 255, 0.15);
 		padding: 10px 14px;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.kudos-suggestions {
+		display: flex;
+		flex-direction: row;
+		gap: 6px;
+	}
+
+	.kudos-suggestion {
+		background: rgba(255, 255, 255, 0.12);
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		border-radius: 8px;
+		padding: 4px 10px;
+		font-size: 1.1rem;
+		cursor: pointer;
+		transition: background 0.12s;
+		line-height: 1;
+	}
+
+	.kudos-suggestion:hover {
+		background: rgba(255, 255, 255, 0.22);
 	}
 
 	.kudos-arrow {
