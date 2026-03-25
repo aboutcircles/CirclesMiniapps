@@ -13,6 +13,8 @@
 	interface GroupConfig {
 		groupAddress: string;
 		orgAddress: string;
+		/** If set, wraps the transfer link as a redirect. Use {LINK} as placeholder. */
+		transferRoot?: string;
 	}
 
 	const GROUP_CONFIGS: Record<string, GroupConfig> = {
@@ -23,6 +25,11 @@
 		'dandelion': {
 		    groupAddress: '0x1d3663CebF6c7f54bE62B210d68eeA0E38838582',
 			orgAddress: '0x33aa31e1392FFB37b1b3572A1E2cc0651D0BCb7F'
+		},
+		'bfn': {
+			groupAddress: '0xeb614ef61367687704cd4628a68a02f3b10ce68c',
+			orgAddress:   '0xd4591B6F845C0C496D03A4eAb3a8ca4304EFA60D',
+			transferRoot: 'https://circles.gnosis.io/invitation/3Spg5oBI?redirect_to={LINK}'
 		}
 		// Add more entries like this:
 		// myevent: {
@@ -33,6 +40,7 @@
 
 	// ----- Query params -----
 	const recipientAddress = $derived(page.url.searchParams.get('address') ?? null);
+	const showTrust = $derived(page.url.searchParams.has('trust'));
 
 	// ----- Dynamic group / org resolution -----
 	// ?group=<key> is required. The key must match an entry in GROUP_CONFIGS above.
@@ -41,6 +49,13 @@
 	);
 	const GROUP_ADDRESS = $derived(activeConfig?.groupAddress ?? '');
 	const ORG_ADDRESS = $derived(activeConfig?.orgAddress ?? '');
+	const kudosHref = $derived.by(() => {
+		if (!recipientAddress || !ORG_ADDRESS) return '#';
+		const relative = `/transfer/${ORG_ADDRESS}/crc/1?data=${encodeKudosData(recipientAddress, kudosMessage)}`;
+		const root = activeConfig?.transferRoot;
+		if (root) return root.replace('{LINK}', encodeURIComponent(relative));
+		return `https://app.gnosis.io${relative}`;
+	});
 	const groupParam = $derived(page.url.searchParams.get('group'));
 	const configError = $derived(
 		!groupParam
@@ -241,11 +256,11 @@
 		if (!activeConfig) return;
 		const orgAddr = ORG_ADDRESS;
 		const groupAddr = GROUP_ADDRESS;
-		untrack(() => loadHistory(orgAddr, groupAddr));
+		loadHistory(orgAddr, groupAddr);
 	});
 
 	$effect(() => {
-		if (recipientAddress) untrack(() => fetchProfiles([recipientAddress]));
+		if (recipientAddress) fetchProfiles([recipientAddress]);
 	});
 </script>
 
@@ -264,47 +279,58 @@
 		<!-- ===== KUDOS ===== -->
 			{#if recipientAddress}
 				{@const recipientProfile = getProfile(recipientAddress)}
-				<div class="kudos-msg-wrap">
-					<input
-						class="kudos-msg-input"
-						type="text"
-						maxlength="120"
-						placeholder="Add a short message… (optional)"
-						bind:value={kudosMessage}
-					/>
-				</div>
 				<a
 					class="kudos-btn"
-					href="https://app.gnosis.io/transfer/{ORG_ADDRESS}/crc/1?data={encodeKudosData(recipientAddress, kudosMessage)}"
+					href={kudosHref}
 					target="_blank"
 					rel="noopener noreferrer"
-					onclick={() => { setTimeout(() => { kudosMessage = ''; }, 1000); }}
 				>
-					<span class="kudos-arrow">
-						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
-							<path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
-						</svg>
-					</span>
-					<span class="kudos-label">Send kudos to</span>
-					<div class="kudos-avatar">
-						{#if recipientProfile.imageUrl}
-							<img
-								src={recipientProfile.imageUrl}
-								alt={recipientProfile.name ?? recipientAddress}
-								onerror={(e) => {
-									const el = e.currentTarget as HTMLElement;
-									el.style.display = 'none';
-									const next = el.nextElementSibling as HTMLElement | null;
-									if (next) next.style.display = 'block';
-								}}
-							/>
-							<img src="/person.svg" alt="avatar" style="display:none" />
-						{:else}
-							<img src="/person.svg" alt="avatar" />
-						{/if}
+					<div class="kudos-top-row" onclick={() => { setTimeout(() => { kudosMessage = ''; }, 1000); }}>
+						<span class="kudos-arrow">
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+								<path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+							</svg>
+						</span>
+						<span class="kudos-label">Send kudos to</span>
+						<div class="kudos-avatar">
+							{#if recipientProfile.imageUrl}
+								<img
+									src={recipientProfile.imageUrl}
+									alt={recipientProfile.name ?? recipientAddress}
+									onerror={(e) => {
+										const el = e.currentTarget as HTMLElement;
+										el.style.display = 'none';
+										const next = el.nextElementSibling as HTMLElement | null;
+										if (next) next.style.display = 'block';
+									}}
+								/>
+								<img src="/person.svg" alt="avatar" style="display:none" />
+							{:else}
+								<img src="/person.svg" alt="avatar" />
+							{/if}
+						</div>
+						<strong class="kudos-name">{recipientProfile.name ?? recipientAddress.slice(0, 8) + '…' + recipientAddress.slice(-6)}</strong>
 					</div>
-					<strong class="kudos-name">{recipientProfile.name ?? recipientAddress.slice(0, 8) + '…' + recipientAddress.slice(-6)}</strong>
+					<div class="kudos-input-row">
+						<input
+							class="kudos-msg-input"
+							type="text"
+							maxlength="120"
+							placeholder="Add a message… (optional)"
+							bind:value={kudosMessage}
+							onclick={(e) => e.preventDefault()}
+						/>
+						<div class="kudos-suggestions">
+							{#each ['🙏', '🌟', '💪', '❤️'] as emoji}
+								<button
+									class="kudos-suggestion"
+									onclick={(e) => { e.preventDefault(); kudosMessage = (kudosMessage + emoji).slice(0, 120); }}
+								>{emoji}</button>
+							{/each}
+						</div>
+					</div>
 				</a>
+				{#if showTrust}
 				<a
 					class="trust-btn"
 					href="https://app.gnosis.io/{recipientAddress}"
@@ -332,7 +358,14 @@
 					<strong class="trust-name">{recipientProfile.name ?? recipientAddress.slice(0, 8) + '…' + recipientAddress.slice(-6)}</strong>
 					<span class="trust-label"> on Circles</span>
 				</a>
+				{/if}
 			{/if}
+
+			<div class="refresh-bar">
+				<button class="btn-refresh" onclick={() => loadHistory(ORG_ADDRESS, GROUP_ADDRESS)} disabled={txLoading}>
+					{txLoading ? '…' : '↻ Refresh'}
+				</button>
+			</div>
 
 			{#if txLoading}
 				<div class="loading-state">
@@ -416,12 +449,7 @@
 				{/if}
 			{/if}
 
-			<div class="card-footer">
-				<span></span>
-				<button class="btn-refresh" onclick={() => loadHistory(ORG_ADDRESS, GROUP_ADDRESS)} disabled={txLoading}>
-					{txLoading ? '…' : '↻ Refresh'}
-				</button>
-			</div>
+
 
 	</div>
 </div>
@@ -500,21 +528,61 @@
 	/* ----- Kudos button ----- */
 	.kudos-btn {
 		display: flex;
-		flex-direction: row;
-		align-items: center;
-		justify-content: center;
-		gap: 10px;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 0;
 		background: #3a3f7a;
 		color: #ffffff;
 		border-radius: 16px;
-		padding: 14px 18px;
+		padding: 0;
 		text-decoration: none;
 		margin-bottom: 20px;
 		transition: opacity 0.15s;
 		cursor: pointer;
+		overflow: hidden;
 	}
 
 	.kudos-btn:hover { opacity: 0.85; }
+
+	.kudos-top-row {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		justify-content: center;
+		gap: 10px;
+		padding: 14px 18px;
+	}
+
+	.kudos-input-row {
+		border-top: 1px solid rgba(255, 255, 255, 0.15);
+		padding: 10px 14px;
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+
+	.kudos-suggestions {
+		display: flex;
+		flex-direction: row;
+		gap: 6px;
+	}
+
+	.kudos-suggestion {
+		flex: 1;
+		background: rgba(255, 255, 255, 0.12);
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		border-radius: 8px;
+		padding: 6px 0;
+		font-size: 1.1rem;
+		cursor: pointer;
+		transition: background 0.12s;
+		line-height: 1;
+		text-align: center;
+	}
+
+	.kudos-suggestion:hover {
+		background: rgba(255, 255, 255, 0.22);
+	}
 
 	.kudos-arrow {
 		color: #c0c4f0;
@@ -587,30 +655,27 @@
 		flex-shrink: 0;
 	}
 
-	/* ----- Kudos message input ----- */
-	.kudos-msg-wrap {
-		margin-bottom: 10px;
-	}
-
+	/* ----- Kudos message input (inside button) ----- */
 	.kudos-msg-input {
 		width: 100%;
 		box-sizing: border-box;
-		padding: 10px 14px;
-		border: 1.5px solid #c8caeb;
-		border-radius: 10px;
-		font-size: 0.92rem;
-		color: #060a40;
-		background: #ffffff;
+		padding: 8px 12px;
+		border: 1.5px solid rgba(255, 255, 255, 0.2);
+		border-radius: 8px;
+		font-size: 0.88rem;
+		color: #ffffff;
+		background: rgba(255, 255, 255, 0.1);
 		outline: none;
-		transition: border-color 0.15s;
+		transition: border-color 0.15s, background 0.15s;
 	}
 
 	.kudos-msg-input:focus {
-		border-color: #3a3f7a;
+		border-color: rgba(255, 255, 255, 0.5);
+		background: rgba(255, 255, 255, 0.15);
 	}
 
 	.kudos-msg-input::placeholder {
-		color: #b0b2cc;
+		color: rgba(255, 255, 255, 0.45);
 	}
 
 	/* ----- Appreciations ----- */
@@ -708,6 +773,13 @@
 		color: #9b9db3;
 		font-style: italic;
 		margin: 8px 0 4px;
+	}
+
+	/* ----- Refresh bar ----- */
+	.refresh-bar {
+		display: flex;
+		justify-content: flex-end;
+		margin-bottom: 12px;
 	}
 
 	/* ----- Footer ----- */
