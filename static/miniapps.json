@@ -57,7 +57,8 @@
     "tags": [
       "demo"
     ],
-    "category": "miniapp"
+    "category": "miniapp",
+    "isHidden": true
   },
   {
     "slug": "coinflip-game",
