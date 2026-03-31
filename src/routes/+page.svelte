@@ -1,12 +1,9 @@
 <script lang="ts">
-	import Disclaimer from '$lib/Disclaimer.svelte';
 </script>
 
 <svelte:head>
 	<title>Circles</title>
 </svelte:head>
-
-<Disclaimer />
 
 <div class="page-wrap">
 	<div class="card">
@@ -16,6 +13,7 @@
 		<div class="buttons">
 			<a class="btn" href="/miniapps">Mini Apps</a>
 			<a class="btn btn-outline" href="/admin">Admin</a>
+			<a class="btn btn-outline" href="/playground">Playground</a>
 		</div>
 	</div>
 </div>
