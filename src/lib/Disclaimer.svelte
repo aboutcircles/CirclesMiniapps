@@ -1,48 +1,81 @@
 <script lang="ts">
-	let disclaimerDismissed = $state(
-		typeof localStorage !== 'undefined' &&
-			localStorage.getItem('disclaimer-dismissed') === 'true'
-	);
+	import { page } from '$app/stores';
+
+	const PLAYGROUND_KEY = 'disclaimer-dismissed-playground';
+	const CURATED_KEY = 'disclaimer-dismissed-curated';
+
+	const isPlayground = $derived($page.url.pathname === '/playground');
+	const disclaimerDismissedKey = $derived(isPlayground ? PLAYGROUND_KEY : CURATED_KEY);
+
+	let disclaimerDismissed = $state(false);
+
+	$effect(() => {
+		if (typeof localStorage === 'undefined') return;
+		disclaimerDismissed =
+			localStorage.getItem(disclaimerDismissedKey) === 'true';
+	});
 
 	function dismissDisclaimer() {
-		localStorage.setItem('disclaimer-dismissed', 'true');
+		localStorage.setItem(disclaimerDismissedKey, 'true');
 		disclaimerDismissed = true;
 	}
 </script>
 
 {#if !disclaimerDismissed}
 	<div class="disclaimer-banner">
-		<div class="disclaimer-shell">
+		<div class="disclaimer-shell" class:compact={!isPlayground}>
 			<div class="disclaimer-header">
 				<div class="disclaimer-badge">Legal notice</div>
-				<h2 class="disclaimer-title">DEVELOPMENT PREVIEW - USE AT YOUR OWN RISK</h2>
+				{#if isPlayground}
+					<h2 class="disclaimer-title">DEVELOPMENT PREVIEW - USE AT YOUR OWN RISK</h2>
+				{:else}
+					<h2 class="disclaimer-title">Curated mini-app notice</h2>
+				{/if}
 			</div>
+
 			<div class="disclaimer-content">
-				<p class="disclaimer-text">
-					This experimental mini-apps feature is made available in connection with the Gnosis App
-					offered by Gnosis Ecosystem (Cayman) Ltd (“Gnosis”). This website, the mini-apps listing
-					and the mini-apps accessible through it are provided solely for limited testing and product
-					evaluation. Mini-apps are contributed by independent builders, and their code is not
-					reviewed, audited, whitelisted or simulated by Gnosis at this stage.
-				</p>
-				<p class="disclaimer-text">
-					When you use a mini-app, you may be asked to sign transactions directly from your Gnosis
-					App Safe using your passkey. Once signed, transactions are irreversible. Gnosis does not
-					control how mini-apps use your signatures and does not assume any responsibility for, or
-					obligation to compensate you for, any resulting loss. Any funds, tokens or assets you use
-					to interact with a mini-app are entirely at your sole risk. Do not sign transactions
-					relating to assets you cannot afford to lose.
-				</p>
-				<p class="disclaimer-text">
-					To the maximum extent permitted by law, the mini-apps feature is provided as is, without
-					any warranty of any kind relating to functionality, availability, reliability, security,
-					legality or fitness for any purpose. By continuing, you confirm that you understand and
-					accept all associated risks.
-				</p>
+				{#if isPlayground}
+					<p class="disclaimer-text">
+						This experimental mini-apps feature is made available in connection with the Gnosis App
+						offered by Gnosis Ecosystem (Cayman) Ltd (“Gnosis”). This website, the mini-apps listing
+						and the mini-apps accessible through it are provided solely for limited testing and product
+						evaluation. Mini-apps are contributed by independent builders, and their code is not
+						reviewed, audited, whitelisted or simulated by Gnosis at this stage.
+					</p>
+					<p class="disclaimer-text">
+						When you use a mini-app, you may be asked to sign transactions directly from your Gnosis
+						App Safe using your passkey. Once signed, transactions are irreversible. Gnosis does not
+						control how mini-apps use your signatures and does not assume any responsibility for, or
+						obligation to compensate you for, any resulting loss. Any funds, tokens or assets you use
+						to interact with a mini-app are entirely at your sole risk. Do not sign transactions
+						relating to assets you cannot afford to lose.
+					</p>
+					<p class="disclaimer-text">
+						To the maximum extent permitted by law, the mini-apps feature is provided as is, without
+						any warranty of any kind relating to functionality, availability, reliability, security,
+						legality or fitness for any purpose. By continuing, you confirm that you understand and
+						accept all associated risks.
+					</p>
+				{:else}
+					<p class="disclaimer-text">
+						Mini-apps on this page trigger on-chain transactions from your Safe wallet. Gnosis does
+						not provide investment advice or guarantees and cannot reverse transactions or compensate
+						you for any loss. Always check what you sign. For further details, please refer to the
+						Gnosis App Terms of Use available via
+						<a
+							href="https://app.gnosis.io"
+							target="_blank"
+							rel="noopener noreferrer"
+						>
+							app.gnosis.io
+						</a>.
+					</p>
+				{/if}
 			</div>
+
 			<div class="disclaimer-actions">
 				<button class="disclaimer-close" onclick={dismissDisclaimer}>
-					I understand the risks
+					{isPlayground ? 'I understand the risks' : 'Continue'}
 				</button>
 			</div>
 		</div>
@@ -73,6 +106,11 @@
 		overflow: hidden;
 	}
 
+	.disclaimer-shell.compact {
+		max-width: 960px;
+		padding: 18px 22px;
+	}
+
 	.disclaimer-shell::before {
 		content: '';
 		position: absolute;
@@ -86,6 +124,11 @@
 		flex-direction: column;
 		gap: 10px;
 		margin-bottom: 14px;
+	}
+
+	.compact .disclaimer-header {
+		gap: 8px;
+		margin-bottom: 10px;
 	}
 
 	.disclaimer-badge {
@@ -114,6 +157,10 @@
 		max-width: 920px;
 	}
 
+	.compact .disclaimer-content {
+		max-width: none;
+	}
+
 	.disclaimer-text {
 		font-size: 0.95rem;
 		color: var(--muted);
@@ -121,10 +168,24 @@
 		margin: 0 0 12px;
 	}
 
+	.compact .disclaimer-text {
+		margin-bottom: 0;
+	}
+
+	.disclaimer-text a {
+		color: var(--accent);
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+
 	.disclaimer-actions {
 		display: flex;
 		justify-content: flex-end;
 		padding-top: 8px;
+	}
+
+	.compact .disclaimer-actions {
+		padding-top: 14px;
 	}
 
 	.disclaimer-close {
