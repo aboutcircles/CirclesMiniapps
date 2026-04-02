@@ -162,31 +162,10 @@
 </div>
 
 <style>
-	:root {
-		--bg: #ffffff;
-		--bg-subtle: #faf5f1;
-		--bg-muted: #f7ece4;
-		--border: #ede1d8;
-		--fg: #060a40;
-		--fg-muted: #6a6c8c;
-		--fg-subtle: #9b9db3;
-		--fg-on-dark: #ffffff;
-		--brand: #060a40;
-		--green: #22c54b;
-		--green-bg: #f0fdf3;
-		--green-border: #bbf7ca;
-		--green-fg: #158030;
-		--red-bg: #fef2f2;
-		--red-border: #fecaca;
-		--red-fg: #b91c1c;
-		--radius: 16px;
-		--radius-full: 999px;
-	}
-
 	.backdrop {
 		position: fixed;
 		inset: 0;
-		background: rgba(0, 0, 0, 0.4);
+		background: rgba(5, 6, 26, 0.4);
 		z-index: 9999;
 		display: flex;
 		align-items: flex-end;
@@ -194,22 +173,17 @@
 	}
 
 	.popup {
-		background: var(--bg);
-		border-radius: var(--radius) var(--radius) 0 0;
-		border-top: 1px solid var(--border);
+		background: rgba(255, 255, 255, 0.92);
+		backdrop-filter: blur(6px);
+		border-radius: var(--radius-card) var(--radius-card) 0 0;
+		border-top: 1px solid var(--line);
 		width: 100%;
 		max-width: 480px;
 		max-height: 60vh;
 		overflow-y: auto;
-		padding: 24px;
+		padding: 22px;
 		animation: slideUp 0.25s cubic-bezier(0.35, 0.15, 0, 1);
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-		-webkit-font-smoothing: antialiased;
-	}
-
-	@keyframes slideUp {
-		from { transform: translateY(100%); }
-		to { transform: translateY(0); }
+		box-shadow: var(--shadow-card);
 	}
 
 	h3 {
@@ -217,7 +191,7 @@
 		font-size: 17px;
 		font-weight: 600;
 		letter-spacing: -0.02em;
-		color: var(--fg);
+		color: var(--ink);
 	}
 
 	.details-section {
@@ -225,9 +199,9 @@
 	}
 
 	.tx-card {
-		background: var(--bg-subtle);
-		border: 1px solid var(--border);
-		border-radius: 12px;
+		background: var(--bg-a);
+		border: 1px solid var(--line);
+		border-radius: var(--radius-sm);
 		padding: 12px 14px;
 		margin-bottom: 8px;
 	}
@@ -239,7 +213,7 @@
 	.tx-label {
 		font-size: 11px;
 		font-weight: 600;
-		color: var(--fg-subtle);
+		color: var(--muted);
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 		margin-bottom: 8px;
@@ -258,7 +232,7 @@
 
 	.field-label {
 		font-size: 12px;
-		color: var(--fg-muted);
+		color: var(--muted);
 		font-weight: 500;
 	}
 
@@ -266,7 +240,7 @@
 		font-family: 'SF Mono', ui-monospace, monospace;
 		font-size: 12px;
 		word-break: break-all;
-		color: var(--fg);
+		color: var(--ink);
 	}
 
 	.message-content {
@@ -284,9 +258,9 @@
 		flex: 1;
 		padding: 13px 16px;
 		border: none;
-		border-radius: var(--radius-full);
+		border-radius: var(--radius-pill);
 		font-size: 15px;
-		font-weight: 500;
+		font-weight: 600;
 		cursor: pointer;
 		transition: opacity 0.15s;
 		display: flex;
@@ -305,20 +279,20 @@
 	}
 
 	.btn-approve {
-		background: var(--brand);
-		color: var(--fg-on-dark);
+		background: linear-gradient(130deg, var(--accent), var(--accent-mid));
+		color: #fff;
 	}
 
 	.btn-reject {
-		background: var(--bg-subtle);
-		color: var(--fg);
-		border: 1px solid var(--border);
+		background: var(--card);
+		color: var(--ink);
+		border: 1px solid var(--line);
 	}
 
 	.btn-close {
-		background: var(--bg-subtle);
-		color: var(--fg);
-		border: 1px solid var(--border);
+		background: var(--card);
+		color: var(--ink);
+		border: 1px solid var(--line);
 	}
 
 	.loading-container {
@@ -326,15 +300,15 @@
 		flex-direction: column;
 		align-items: center;
 		padding: 20px 0;
-		color: var(--fg-muted);
+		color: var(--muted);
 		font-size: 14px;
 	}
 
 	.spinner {
 		width: 32px;
 		height: 32px;
-		border: 3px solid var(--border);
-		border-top-color: var(--fg-muted);
+		border: 3px solid var(--line);
+		border-top-color: var(--accent-mid);
 		border-radius: 50%;
 		animation: spin 0.7s linear infinite;
 		margin-bottom: 12px;
@@ -350,25 +324,21 @@
 		display: inline-block;
 	}
 
-	@keyframes spin {
-		to { transform: rotate(360deg); }
-	}
-
 	.result-section {
-		border-radius: 12px;
+		border-radius: var(--radius-sm);
 		padding: 14px;
 		margin-bottom: 4px;
-		border: 1px solid var(--border);
+		border: 1px solid var(--line);
 	}
 
 	.result-section.success {
-		background: var(--green-bg);
-		border-color: var(--green-border);
+		background: var(--success-bg);
+		border-color: var(--success-bg);
 	}
 
 	.result-section.error-result {
-		background: var(--red-bg);
-		border-color: var(--red-border);
+		background: var(--error-bg);
+		border-color: var(--error-bg);
 	}
 
 	.result-section p {
@@ -378,11 +348,11 @@
 	}
 
 	.success p {
-		color: var(--green-fg);
+		color: var(--success-ink);
 	}
 
 	.error-result p {
-		color: var(--red-fg);
+		color: var(--error-ink);
 	}
 
 	.result-value {
@@ -394,7 +364,7 @@
 
 	.scan-link {
 		display: inline-block;
-		color: var(--fg-muted);
+		color: var(--accent-mid);
 		font-weight: 500;
 		font-size: 13px;
 		text-decoration: underline;
@@ -402,15 +372,15 @@
 	}
 
 	.scan-link:hover {
-		color: var(--fg);
+		color: var(--accent);
 	}
 
 	.sig-type-badge {
 		font-size: 11px;
-		color: var(--fg-subtle);
+		color: var(--muted);
 		margin-top: 6px;
 		padding: 4px 8px;
-		background: var(--bg-muted);
+		background: var(--accent-soft);
 		border-radius: 6px;
 		display: inline-block;
 	}

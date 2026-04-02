@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { getAddress } from 'viem';
+	import Disclaimer from '$lib/Disclaimer.svelte';
+	import '../style.css';
 
 	interface Props {
 		children: Snippet;
@@ -23,4 +25,5 @@
 
 </script>
 
+<Disclaimer />
 {@render children()}

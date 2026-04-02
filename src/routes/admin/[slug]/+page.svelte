@@ -8,7 +8,7 @@
 	import { wallet } from '$lib/wallet.svelte.ts';
 	import ApprovalPopup from '$lib/ApprovalPopup.svelte';
 
-	type MiniApp = { slug?: string; name: string; logo: string; url: string; description?: string; tags: string[]; isHidden?: boolean };
+	type MiniApp = { slug?: string; name: string; logo: string; url: string; description?: string; tags: string[]; isHidden?: boolean; category?: string };
 
 	let app: MiniApp | null = $state(null);
 	let notFound = $state(false);
@@ -170,7 +170,7 @@
 	}
 
 	function goBack() {
-		goto('/miniapps');
+		goto('/admin');
 	}
 
 
@@ -210,7 +210,7 @@
 <svelte:window onclick={handleWindowClick} />
 
 <svelte:head>
-	<title>{app ? app.name : 'Mini App'} - {baseUrl}</title>
+	<title>{app ? app.name : 'Admin App'} - {baseUrl}</title>
 </svelte:head>
 
 <div class="page">
@@ -268,7 +268,7 @@
 					bind:this={iframeEl}
 					src={iframeSrc}
 					sandbox="allow-scripts allow-forms allow-same-origin"
-					title={app ? app.name : 'Mini App'}
+					title={app ? app.name : 'Admin App'}
 					onload={handleIframeLoad}
 				></iframe>
 			{/if}

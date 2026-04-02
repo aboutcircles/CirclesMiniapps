@@ -4,7 +4,7 @@
 	import { gnosis } from 'viem/chains';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import { CirclesConverter } from '@aboutcircles/sdk-utils/circlesConverter';
-	import { ORG_ADDRESS } from '../ps/config';
+	import { ORG_ADDRESS as PS_ORG_ADDRESS } from '../ps/config';
 
 	// ----- Constants -----
 	const ONCHAIN_RPC_URL = 'https://rpc.aboutcircles.com/';
@@ -20,14 +20,45 @@
 		}
 	] as const;
 	const REFRESH_INTERVAL_MS = 15_000;
-	const GROUP_ADDRESS = '0x6F99506cD91560305bD4859DcDdcb422EAA81F02';
+
+	// ----- Group config dictionary -----
+	// Add new groups here. The key is the value of the ?group= URL param.
+	// Both groupAddress and orgAddress must be specified together.
+	interface GroupConfig {
+		groupAddress: string;
+		orgAddress: string;
+	}
+
+	const GROUP_CONFIGS: Record<string, GroupConfig> = {
+		ps: {
+			groupAddress: '0x6F99506cD91560305bD4859DcDdcb422EAA81F02',
+			orgAddress: PS_ORG_ADDRESS
+		}
+		// Example — add more entries like this:
+		// myevent: {
+		//   groupAddress: '0xAAAA...',
+		//   orgAddress:   '0xBBBB...'
+		// }
+	};
+
+	const DEFAULT_CONFIG: GroupConfig = GROUP_CONFIGS.ps;
 
 	// ----- View toggle -----
 	type View = 'leaderboard' | 'appreciations';
 
 	// ----- Query params -----
+	// Standard params
 	const hasBoard = $derived(page.url.searchParams.has('hasBoard'));
 	const recipientAddress = $derived(page.url.searchParams.get('address') ?? null);
+
+	// ----- Dynamic group / org resolution -----
+	// Pass ?group=<key> to load a different group config from the dictionary above.
+	// If the key is missing or unrecognised, the default PS config is used.
+	const activeConfig = $derived(
+		GROUP_CONFIGS[page.url.searchParams.get('group') ?? ''] ?? DEFAULT_CONFIG
+	);
+	const GROUP_ADDRESS = $derived(activeConfig.groupAddress);
+	const ORG_ADDRESS = $derived(activeConfig.orgAddress);
 
 	let activeView = $state<View>('appreciations');
 	$effect(() => {
@@ -115,7 +146,7 @@
 	const profileCache = new SvelteMap<string, { name: string | null; imageUrl: string | null }>();
 
 	// ----- Leaderboard derived -----
-	const orgLower = ORG_ADDRESS.toLowerCase();
+	const orgLower = $derived(ORG_ADDRESS.toLowerCase());
 	const tableReady = $derived(snapshot !== null && liveMap !== null && rows.length > 0);
 	const activeRows = $derived(rows.filter(r => r.liveErc20 > 0n));
 	const zeroRows = $derived(rows.filter(r => r.liveErc20 === 0n));
@@ -338,17 +369,17 @@
 		} catch { return ''; }
 	}
 
-	async function loadHistory() {
+	async function loadHistory(orgAddr: string, groupAddr: string) {
 		txLoading = true;
 		txError = '';
 		try {
 			// 1. Transaction history
-			const histResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransactionHistory', [ORG_ADDRESS, 150])) as { results: TxEntry[]; hasMore: boolean };
+			const histResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransactionHistory', [orgAddr, 150])) as { results: TxEntry[]; hasMore: boolean };
 			txs = histResult.results ?? [];
 			hasMore = histResult.hasMore ?? false;
 
 			// 2. Transfer data for messages
-			const transferResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransferData', [ORG_ADDRESS, null, null, null, null, 500])) as { results: TransferData[]; hasMore: boolean };
+			const transferResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransferData', [orgAddr, null, null, null, null, 500])) as { results: TransferData[]; hasMore: boolean };
 			const map = new Map<string, string>();
 			for (const t of (transferResult.results ?? [])) {
 				if (t.data && t.data.length > 2) map.set(t.transactionHash, t.data);
@@ -358,11 +389,11 @@
 			// 3. Batch all profiles (tx participants + group avatar) in one request
 			const relevant = txs.filter((t) => t.from.toLowerCase() !== FILTER_FROM);
 			const addrs = Array.from(new Set([
-				GROUP_ADDRESS.toLowerCase(),
+				groupAddr.toLowerCase(),
 				...relevant.flatMap((t) => [t.from.toLowerCase(), t.to.toLowerCase()])
 			]));
 			await fetchProfiles(addrs);
-			groupImageUrl = getProfile(GROUP_ADDRESS).imageUrl;
+			groupImageUrl = getProfile(groupAddr).imageUrl;
 		} catch (e: unknown) {
 			txError = e instanceof Error ? e.message : String(e);
 		} finally {
@@ -380,8 +411,11 @@
 		return '0x' + addrHex + msgHex;
 	}
 
+	// Re-run whenever ORG_ADDRESS or GROUP_ADDRESS changes (e.g. URL param update).
 	$effect(() => {
-		loadHistory();
+		const orgAddr = ORG_ADDRESS;
+		const groupAddr = GROUP_ADDRESS;
+		loadHistory(orgAddr, groupAddr);
 	});
 
 	$effect(() => {
@@ -654,7 +688,7 @@
 
 			<div class="card-footer">
 				<span></span>
-				<button class="btn-refresh" onclick={loadHistory} disabled={txLoading}>
+				<button class="btn-refresh" onclick={() => loadHistory(ORG_ADDRESS, GROUP_ADDRESS)} disabled={txLoading}>
 					{txLoading ? '…' : '↻ Refresh'}
 				</button>
 			</div>
@@ -664,14 +698,6 @@
 </div>
 
 <style>
-	:global(body) {
-		margin: 0;
-		background: #f0e8dc;
-		color: #060a40;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-		-webkit-font-smoothing: antialiased;
-	}
-
 	.page {
 		min-height: 100vh;
 		display: flex;
@@ -679,24 +705,25 @@
 		justify-content: center;
 		padding: 48px 16px 80px;
 		box-sizing: border-box;
-		background: #f0e8dc;
 	}
 
 	.card {
-		background: #faf5f1;
-		border-radius: 24px;
-		box-shadow: 0 8px 40px rgba(6, 10, 64, 0.12);
+		background: rgba(255, 255, 255, 0.92);
+		backdrop-filter: blur(6px);
+		border: 1px solid var(--line);
+		border-radius: var(--radius-card);
+		box-shadow: var(--shadow-card);
 		max-width: 480px;
 		width: 100%;
-		padding: 28px 28px 28px;
+		padding: 22px;
 		box-sizing: border-box;
 	}
 
 	/* ----- Toggle ----- */
 	.toggle-bar {
 		display: flex;
-		background: #ede1d8;
-		border-radius: 12px;
+		background: var(--line-soft);
+		border-radius: var(--radius-sm);
 		padding: 4px;
 		gap: 4px;
 		margin-bottom: 20px;
@@ -713,20 +740,20 @@
 		cursor: pointer;
 		transition: background 0.15s, color 0.15s, box-shadow 0.15s;
 		background: transparent;
-		color: #9b9db3;
+		color: var(--muted);
 	}
 
 	.toggle-btn.active {
-		background: #faf5f1;
-		color: #060a40;
-		box-shadow: 0 1px 4px rgba(6, 10, 64, 0.10);
+		background: var(--card);
+		color: var(--ink);
+		box-shadow: 0 1px 4px rgba(5, 6, 26, 0.10);
 	}
 
 	/* ----- Shared ----- */
 	.subtitle {
 		text-align: center;
 		font-size: 0.85rem;
-		color: #9b9db3;
+		color: var(--muted);
 		margin: 0 0 20px;
 		font-style: italic;
 	}
@@ -736,7 +763,7 @@
 		align-items: center;
 		gap: 10px;
 		padding: 16px 0;
-		color: #6a6c8c;
+		color: var(--muted);
 		font-size: 0.9rem;
 	}
 
@@ -744,38 +771,36 @@
 		display: inline-block;
 		width: 18px;
 		height: 18px;
-		border: 2.5px solid #ede1d8;
-		border-top-color: #060a40;
+		border: 2.5px solid var(--line);
+		border-top-color: var(--accent-mid);
 		border-radius: 50%;
 		animation: spin 0.75s linear infinite;
 		flex-shrink: 0;
 	}
 
-	@keyframes spin { to { transform: rotate(360deg); } }
-
 	.error-banner {
 		padding: 12px 16px;
-		background: #fff0f0;
-		border: 1.5px solid #fca5a5;
+		background: var(--error-bg);
+		border: 1.5px solid var(--error-bg);
 		border-radius: 10px;
-		color: #991b1b;
+		color: var(--error-ink);
 		font-size: 0.88rem;
 		margin-bottom: 16px;
 	}
 
 	.empty {
 		text-align: center;
-		color: #9b9db3;
+		color: var(--muted);
 		font-size: 0.9rem;
 		padding: 24px 0;
 	}
 
-	.row-even { background: #ffffff; }
-	.row-odd  { background: #faf5f1; }
+	.row-even { background: var(--card); }
+	.row-odd  { background: var(--bg-a); }
 
 	/* ----- Leaderboard ----- */
 	.lb-list {
-		border: 1.5px solid #ede1d8;
+		border: 1.5px solid var(--line);
 		border-radius: 14px;
 		overflow: hidden;
 		margin-bottom: 4px;
@@ -786,7 +811,7 @@
 		align-items: center;
 		gap: 12px;
 		padding: 12px 16px;
-		border-bottom: 1px solid #ede1d8;
+		border-bottom: 1px solid var(--line);
 		text-decoration: none;
 		cursor: pointer;
 		transition: filter 0.12s;
@@ -796,7 +821,7 @@
 	.lb-row:hover { filter: brightness(0.96); }
 
 	.row-zero { opacity: 0.55; }
-	.row-zero .lb-name { color: #8a8ca8; }
+	.row-zero .lb-name { color: var(--muted); }
 
 	.lb-avatar {
 		width: 40px;
@@ -824,7 +849,7 @@
 	.lb-name {
 		flex: 1;
 		font-weight: 600;
-		color: #060a40;
+		color: var(--ink);
 		font-size: 0.92rem;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -834,20 +859,20 @@
 	.lb-name-addr {
 		font-family: 'SF Mono', ui-monospace, monospace;
 		font-size: 0.78rem;
-		color: #8a8ca8;
+		color: var(--muted);
 	}
 
 	.lb-score {
 		font-size: 1.3rem;
 		font-weight: 800;
-		color: #060a40;
+		color: var(--ink);
 		min-width: 60px;
 		text-align: right;
 		flex-shrink: 0;
 	}
 
 	.lb-score-zero {
-		color: #b0b0c0;
+		color: var(--muted);
 		font-weight: 600;
 	}
 
@@ -855,11 +880,11 @@
 		width: 100%;
 		background: none;
 		border: none;
-		border-top: 1px solid #ede1d8;
+		border-top: 1px solid var(--line);
 		padding: 10px 16px;
 		font-size: 0.8rem;
 		font-weight: 600;
-		color: #8a8ca8;
+		color: var(--muted);
 		cursor: pointer;
 		text-align: center;
 		letter-spacing: 0.04em;
@@ -867,8 +892,8 @@
 	}
 
 	.show-more-btn:hover {
-		color: #6a6c8c;
-		background: #faf5f1;
+		color: var(--ink);
+		background: var(--bg-a);
 	}
 
 	/* ----- Kudos button ----- */
@@ -878,9 +903,9 @@
 		align-items: center;
 		justify-content: center;
 		gap: 10px;
-		background: #3a3f7a;
+		background: linear-gradient(130deg, var(--accent), var(--accent-mid));
 		color: #ffffff;
-		border-radius: 16px;
+		border-radius: var(--radius-pill);
 		padding: 14px 18px;
 		text-decoration: none;
 		margin-bottom: 20px;
@@ -891,7 +916,7 @@
 	.kudos-btn:hover { opacity: 0.85; }
 
 	.kudos-arrow {
-		color: #c0c4f0;
+		color: rgba(255, 255, 255, 0.6);
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
@@ -899,7 +924,7 @@
 
 	.kudos-label {
 		font-size: 1rem;
-		color: #d8daff;
+		color: rgba(255, 255, 255, 0.8);
 		flex-shrink: 0;
 	}
 
@@ -929,7 +954,7 @@
 	.trust-name {
 		font-size: 1rem;
 		font-weight: 700;
-		color: #060a40;
+		color: var(--ink);
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -942,10 +967,10 @@
 		align-items: center;
 		justify-content: center;
 		gap: 6px;
-		background: #f0e8dc;
-		color: #060a40;
-		border: 1.5px solid #c8caeb;
-		border-radius: 16px;
+		background: var(--card);
+		color: var(--ink);
+		border: 1.5px solid var(--line);
+		border-radius: var(--radius-pill);
 		padding: 12px 18px;
 		text-decoration: none;
 		margin-bottom: 16px;
@@ -957,7 +982,7 @@
 
 	.trust-label {
 		font-size: 1rem;
-		color: #060a40;
+		color: var(--ink);
 		flex-shrink: 0;
 	}
 
@@ -970,26 +995,26 @@
 		width: 100%;
 		box-sizing: border-box;
 		padding: 10px 14px;
-		border: 1.5px solid #c8caeb;
+		border: 1.5px solid var(--line);
 		border-radius: 10px;
 		font-size: 0.92rem;
-		color: #060a40;
-		background: #ffffff;
+		color: var(--ink);
+		background: var(--card);
 		outline: none;
 		transition: border-color 0.15s;
 	}
 
 	.kudos-msg-input:focus {
-		border-color: #3a3f7a;
+		border-color: var(--accent-mid);
 	}
 
 	.kudos-msg-input::placeholder {
-		color: #b0b2cc;
+		color: var(--muted);
 	}
 
 	/* ----- Appreciations ----- */
 	.tx-list {
-		border: 1.5px solid #ede1d8;
+		border: 1.5px solid var(--line);
 		border-radius: 14px;
 		overflow: hidden;
 		margin-bottom: 4px;
@@ -1000,7 +1025,7 @@
 		align-items: center;
 		gap: 14px;
 		padding: 14px 16px;
-		border-bottom: 1px solid #ede1d8;
+		border-bottom: 1px solid var(--line);
 	}
 
 	.tx-row:last-child { border-bottom: none; }
@@ -1029,7 +1054,7 @@
 
 	.arrow {
 		font-size: 0.85rem;
-		color: #9b9db3;
+		color: var(--muted);
 		font-weight: 700;
 		padding: 0 2px;
 	}
@@ -1039,7 +1064,7 @@
 	.tx-sentence {
 		margin: 0;
 		font-size: 0.88rem;
-		color: #060a40;
+		color: var(--ink);
 		line-height: 1.4;
 	}
 
@@ -1056,30 +1081,30 @@
 	.tx-msg {
 		margin: 4px 0 0;
 		font-size: 0.82rem;
-		color: #6a6c8c;
+		color: var(--muted);
 		font-style: italic;
 		line-height: 1.3;
 	}
 
 	.tx-name {
 		font-weight: 700;
-		color: #060a40;
+		color: var(--ink);
 	}
 
 	.tx-verb {
-		color: #6a6c8c;
+		color: var(--muted);
 		font-weight: 400;
 	}
 
 	.tx-amount {
 		font-weight: 400;
-		color: #6a6c8c;
+		color: var(--muted);
 	}
 
 	.has-more {
 		text-align: center;
 		font-size: 0.78rem;
-		color: #9b9db3;
+		color: var(--muted);
 		font-style: italic;
 		margin: 8px 0 4px;
 	}
@@ -1091,7 +1116,7 @@
 		align-items: center;
 		margin-top: 16px;
 		padding-top: 12px;
-		border-top: 1px solid #ede1d8;
+		border-top: 1px solid var(--line);
 	}
 
 	.auto-label {
@@ -1100,7 +1125,7 @@
 		gap: 6px;
 		font-size: 0.72rem;
 		font-weight: 700;
-		color: #8a8ca8;
+		color: var(--muted);
 		letter-spacing: 0.06em;
 		text-transform: uppercase;
 	}
@@ -1109,8 +1134,8 @@
 		display: inline-block;
 		width: 10px;
 		height: 10px;
-		border: 2px solid #ede1d8;
-		border-top-color: #15803d;
+		border: 2px solid var(--line);
+		border-top-color: var(--success-ink);
 		border-radius: 50%;
 		animation: spin 0.75s linear infinite;
 		flex-shrink: 0;
@@ -1118,10 +1143,10 @@
 
 	.btn-refresh {
 		padding: 6px 14px;
-		background: #060a40;
+		background: linear-gradient(130deg, var(--accent), var(--accent-mid));
 		color: #ffffff;
 		border: none;
-		border-radius: 8px;
+		border-radius: var(--radius-pill);
 		font-size: 0.8rem;
 		font-weight: 600;
 		cursor: pointer;
