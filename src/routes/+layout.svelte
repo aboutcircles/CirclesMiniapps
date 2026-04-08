@@ -2,6 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import { getAddress } from 'viem';
 	import Disclaimer from '$lib/Disclaimer.svelte';
+	import OfflineNotice from '$lib/OfflineNotice.svelte';
 	import '../style.css';
 
 	interface Props {
@@ -26,4 +27,5 @@
 </script>
 
 <Disclaimer />
+<OfflineNotice />
 {@render children()}
