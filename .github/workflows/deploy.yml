@@ -18,6 +18,7 @@ jobs:
           script: |
             set -e
             cd /var/www/circles-miniapps
-            git pull origin master
+            git fetch origin master
+            git reset --hard origin/master
             npm ci
             npm run build
