@@ -20,5 +20,5 @@ jobs:
             cd /var/www/circles-miniapps
             git fetch origin master
             git reset --hard origin/master
-            npm ci
+            npm install
             npm run build
