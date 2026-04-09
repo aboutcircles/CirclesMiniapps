@@ -267,7 +267,7 @@
 				<iframe
 					bind:this={iframeEl}
 					src={iframeSrc}
-					sandbox="allow-scripts allow-forms allow-same-origin"
+					sandbox="allow-scripts allow-forms allow-same-origin allow-top-navigation allow-popups"
 					title={app ? app.name : 'Admin App'}
 					onload={handleIframeLoad}
 				></iframe>
