@@ -5,6 +5,7 @@
 	const CURATED_KEY = 'disclaimer-dismissed-curated';
 
 	const isPlayground = $derived($page.url.pathname === '/playground');
+	const isHidden = $derived($page.url.pathname.startsWith('/pilots/kudos-ga'));
 	const disclaimerDismissedKey = $derived(isPlayground ? PLAYGROUND_KEY : CURATED_KEY);
 
 	let disclaimerDismissed = $state(false);
@@ -21,7 +22,7 @@
 	}
 </script>
 
-{#if !disclaimerDismissed}
+{#if !disclaimerDismissed && !isHidden}
 	<div class="disclaimer-banner">
 		<div class="disclaimer-shell" class:compact={!isPlayground}>
 			<div class="disclaimer-header">

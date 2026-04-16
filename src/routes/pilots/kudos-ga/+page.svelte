@@ -2,6 +2,7 @@
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { SvelteMap } from 'svelte/reactivity';
+	import QRCode from 'qrcode';
 
 	// ----- Constants -----
 	const CIRCLES_RPC_URL = 'https://rpc.aboutcircles.com/';
@@ -13,9 +14,12 @@
 	interface GroupConfig {
 		groupAddress: string;
 		orgAddress: string;
-		/** If set, wraps the transfer link as a redirect. Use {LINK} as placeholder. */
-		transferRoot?: string;
+		/** Invitation slug for this group. Falls back to DEFAULT_INVITE_SLUG if omitted. */
+		inviteSlug?: string;
 	}
+
+	// Fallback invitation slug used when a group has no inviteSlug set.
+	const DEFAULT_INVITE_SLUG = '6hIBYDpn';
 
 	const GROUP_CONFIGS: Record<string, GroupConfig> = {
 		'parallel-society': {
@@ -28,13 +32,14 @@
 		},
 		'bfn': {
 			groupAddress: '0xeb614ef61367687704cd4628a68a02f3b10ce68c',
-			orgAddress:   '0xd4591B6F845C0C496D03A4eAb3a8ca4304EFA60D',
-			transferRoot: 'https://circles.gnosis.io/invitation/3Spg5oBI?redirect_to={LINK}'
+			orgAddress:   '0xd4591B6F845C0C496D03A4eAb3a8ca4304EFA60D'
+			// inviteSlug: 'XXXXXXXX'  ← set a group-specific slug here when available
 		}
 		// Add more entries like this:
 		// myevent: {
 		//   groupAddress: '0xAAAA...',
-		//   orgAddress:   '0xBBBB...'
+		//   orgAddress:   '0xBBBB...',
+		//   inviteSlug:   'YYYYYYYY'
 		// }
 	};
 
@@ -51,10 +56,9 @@
 	const ORG_ADDRESS = $derived(activeConfig?.orgAddress ?? '');
 	const kudosHref = $derived.by(() => {
 		if (!recipientAddress || !ORG_ADDRESS) return '#';
-		const relative = `/transfer/${ORG_ADDRESS}/crc/1?data=${encodeKudosData(recipientAddress, kudosMessage)}`;
-		const root = activeConfig?.transferRoot;
-		if (root) return root.replace('{LINK}', encodeURIComponent(relative));
-		return `https://app.gnosis.io${relative}`;
+		const transferPath = `/transfer/${ORG_ADDRESS}/crc?data=${encodeKudosData(recipientAddress, kudosMessage)}&amount=1`;
+		const slug = activeConfig?.inviteSlug ?? DEFAULT_INVITE_SLUG;
+		return `https://circles.gnosis.io/invitation/${slug}?redirect_to=${encodeURIComponent(transferPath)}`;
 	});
 	const groupParam = $derived(page.url.searchParams.get('group'));
 	const configError = $derived(
@@ -92,6 +96,21 @@
 		recipient: string;
 		circles: string;
 		message: string;
+	}
+
+	// ----- Device detection -----
+	const isMobile = typeof window !== 'undefined' && navigator.maxTouchPoints > 0;
+
+	// ----- QR overlay state -----
+	let qrDataUrl = $state<string | null>(null);
+	let showQr = $state(false);
+
+	async function openKudos(e: MouseEvent) {
+		if (isMobile) return; // let the <a> navigate normally on mobile
+		e.preventDefault();
+		if (kudosHref === '#') return;
+		qrDataUrl = await QRCode.toDataURL(kudosHref, { width: 240, margin: 2 });
+		showQr = true;
 	}
 
 	// ----- Appreciations state -----
@@ -268,12 +287,14 @@
 		return '0x' + addrHex + msgHex;
 	}
 
-	// Re-run whenever ORG_ADDRESS or GROUP_ADDRESS changes (e.g. URL param update).
+	// Re-run whenever ORG_ADDRESS or GROUP_ADDRESS changes; also poll every 5 s.
 	$effect(() => {
 		if (!activeConfig) return;
 		const orgAddr = ORG_ADDRESS;
 		const groupAddr = GROUP_ADDRESS;
 		loadHistory(orgAddr, groupAddr);
+		const interval = setInterval(() => loadHistory(orgAddr, groupAddr), 5000);
+		return () => clearInterval(interval);
 	});
 
 	$effect(() => {
@@ -302,7 +323,7 @@
 					target="_blank"
 					rel="noopener noreferrer"
 				>
-					<div class="kudos-top-row" onclick={() => { setTimeout(() => { kudosMessage = ''; }, 1000); }}>
+					<div class="kudos-top-row" role="button" tabindex="0" onclick={openKudos} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') openKudos(e as unknown as MouseEvent); }}>
 						<span class="kudos-arrow">
 							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
 								<path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
@@ -335,18 +356,40 @@
 							maxlength="120"
 							placeholder="Add a message… (optional)"
 							bind:value={kudosMessage}
-							onclick={(e) => e.preventDefault()}
+							onclick={(e) => { e.preventDefault(); e.stopPropagation(); }}
 						/>
 						<div class="kudos-suggestions">
 							{#each ['🙏', '🌟', '💪', '❤️'] as emoji}
 								<button
 									class="kudos-suggestion"
-									onclick={(e) => { e.preventDefault(); kudosMessage = (kudosMessage + emoji).slice(0, 120); }}
+									onclick={(e) => { e.preventDefault(); e.stopPropagation(); kudosMessage = (kudosMessage + emoji).slice(0, 120); }}
 								>{emoji}</button>
 							{/each}
 						</div>
 					</div>
 				</a>
+
+				{#if showQr && qrDataUrl}
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div class="qr-overlay" onclick={() => { showQr = false; }}>
+						<div class="qr-card" onclick={(e) => e.stopPropagation()}>
+							<button class="qr-close" onclick={() => { showQr = false; }}>✕</button>
+							<div class="qr-header">
+								<span class="qr-icon">📱</span>
+								<p class="qr-title">Scan to send kudos</p>
+								<p class="qr-subtitle">Point your phone camera at the code</p>
+							</div>
+							<div class="qr-frame">
+								<img class="qr-img" src={qrDataUrl} alt="QR code for kudos link" />
+							</div>
+							<a class="qr-link-btn" href={kudosHref} target="_blank" rel="noopener noreferrer">
+								Open on this device instead
+							</a>
+						</div>
+					</div>
+				{/if}
+
 				{#if showTrust}
 				<a
 					class="trust-btn"
@@ -827,5 +870,119 @@
 
 	.btn-refresh:not(:disabled):hover {
 		opacity: 0.82;
+	}
+
+	/* ----- QR overlay ----- */
+	.qr-overlay {
+		position: fixed;
+		inset: 0;
+		background: rgba(6, 10, 64, 0.6);
+		backdrop-filter: blur(4px);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 100;
+	}
+
+	.qr-card {
+		background: #ffffff;
+		border-radius: 24px;
+		padding: 32px 32px 24px;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0;
+		position: relative;
+		box-shadow: 0 24px 64px rgba(6, 10, 64, 0.28);
+		width: 320px;
+	}
+
+	.qr-close {
+		position: absolute;
+		top: 14px;
+		right: 14px;
+		width: 28px;
+		height: 28px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		background: #f0f0f4;
+		border: none;
+		border-radius: 50%;
+		font-size: 0.75rem;
+		color: #6a6c8c;
+		cursor: pointer;
+		line-height: 1;
+		padding: 0;
+		transition: background 0.12s, color 0.12s;
+	}
+
+	.qr-close:hover {
+		background: #e2e2ea;
+		color: #060a40;
+	}
+
+	.qr-header {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 4px;
+		margin-bottom: 20px;
+		padding-right: 24px;
+		padding-left: 24px;
+	}
+
+	.qr-icon {
+		font-size: 1.6rem;
+		line-height: 1;
+		margin-bottom: 6px;
+	}
+
+	.qr-title {
+		margin: 0;
+		font-size: 1.05rem;
+		font-weight: 700;
+		color: #060a40;
+		text-align: center;
+	}
+
+	.qr-subtitle {
+		margin: 0;
+		font-size: 0.8rem;
+		color: #9b9db3;
+		text-align: center;
+	}
+
+	.qr-frame {
+		background: #f7f7fa;
+		border-radius: 16px;
+		padding: 12px;
+		margin-bottom: 20px;
+	}
+
+	.qr-img {
+		width: 220px;
+		height: 220px;
+		border-radius: 6px;
+		display: block;
+	}
+
+	.qr-link-btn {
+		display: block;
+		width: 100%;
+		box-sizing: border-box;
+		text-align: center;
+		padding: 10px 16px;
+		background: #f0f0f8;
+		border-radius: 10px;
+		font-size: 0.82rem;
+		font-weight: 600;
+		color: #3a3f7a;
+		text-decoration: none;
+		transition: background 0.12s;
+	}
+
+	.qr-link-btn:hover {
+		background: #e4e4f4;
 	}
 </style>

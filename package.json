@@ -14,6 +14,9 @@
     "@aboutcircles/sdk-transfers": "^0.1.27",
     "@aboutcircles/sdk-utils": "^0.1.26",
     "@cometh/connect-sdk-4337": "^1.0.24",
+    "@selfxyz/sdk-common": "^1.0.0",
+    "qrcode": "^1.5.4",
+    "socket.io-client": "^4.8.3",
     "viem": "^2.41.2"
   },
   "devDependencies": {
