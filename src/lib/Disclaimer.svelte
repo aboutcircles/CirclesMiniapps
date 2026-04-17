@@ -5,7 +5,10 @@
 	const CURATED_KEY = 'disclaimer-dismissed-curated';
 
 	const isPlayground = $derived($page.url.pathname === '/playground');
-	const isHidden = $derived($page.url.pathname.startsWith('/pilots/kudos-ga'));
+	const isHidden = $derived(
+		$page.url.pathname.startsWith('/pilots/kudos-ga') ||
+		$page.url.pathname.startsWith('/invitation')
+	);
 	const disclaimerDismissedKey = $derived(isPlayground ? PLAYGROUND_KEY : CURATED_KEY);
 
 	let disclaimerDismissed = $state(false);
