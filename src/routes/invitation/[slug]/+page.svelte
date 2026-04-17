@@ -82,7 +82,6 @@
 
 <div class="page">
 	<div class="card">
-		<div class="logo">⭕</div>
 		<h1 class="title">Circles</h1>
 
 		{#if status === 'loading'}

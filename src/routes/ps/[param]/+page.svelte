@@ -145,7 +145,6 @@
 
 <div class="page">
 	<div class="card">
-		<div class="logo">⭕</div>
 		<h1 class="title">Circles Event Status</h1>
 
 		{#if resolvedAddress}
