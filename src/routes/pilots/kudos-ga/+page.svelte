@@ -421,17 +421,14 @@
 			{/if}
 
 			<div class="refresh-bar">
+				<div class="loading-state" class:invisible={!txLoading}>
+					<span class="spinner"></span>
+					Loading…
+				</div>
 				<button class="btn-refresh" onclick={() => loadHistory(ORG_ADDRESS, GROUP_ADDRESS)} disabled={txLoading}>
-					{txLoading ? '…' : '↻ Refresh'}
+					↻ Refresh
 				</button>
 			</div>
-
-			{#if txLoading}
-				<div class="loading-state">
-					<span class="spinner"></span>
-					Loading appreciations…
-				</div>
-			{/if}
 			{#if txError}
 				<div class="error-banner">{txError}</div>
 			{/if}
@@ -545,10 +542,14 @@
 	.loading-state {
 		display: flex;
 		align-items: center;
-		gap: 10px;
-		padding: 16px 0;
+		gap: 8px;
 		color: #6a6c8c;
-		font-size: 0.9rem;
+		font-size: 0.85rem;
+		flex: 1;
+	}
+
+	.invisible {
+		visibility: hidden;
 	}
 
 	.spinner {
@@ -837,7 +838,8 @@
 	/* ----- Refresh bar ----- */
 	.refresh-bar {
 		display: flex;
-		justify-content: flex-end;
+		align-items: center;
+		justify-content: space-between;
 		margin-bottom: 12px;
 	}
 
