@@ -117,6 +117,7 @@
 	let transferEntries = $state<TransferEntry[]>([]);
 	let amountMap = new SvelteMap<string, string>(); // txHash -> circles amount (incoming leg to org)
 	let txLoading = $state(false);
+	let txManualRefresh = $state(false);
 	let txError = $state('');
 	let hasMore = $state(false);
 	let kudosMessage = $state('');
@@ -239,8 +240,9 @@
 		} catch { return ''; }
 	}
 
-	async function loadHistory(orgAddr: string, groupAddr: string) {
+	async function loadHistory(orgAddr: string, groupAddr: string, manual = false) {
 		txLoading = true;
+		txManualRefresh = manual;
 		txError = '';
 		try {
 			// 1. Transfer data — source of truth for sender, recipient (in data), message
@@ -421,11 +423,11 @@
 			{/if}
 
 			<div class="refresh-bar">
-				<div class="loading-state" class:invisible={!txLoading}>
+				<div class="loading-state" class:invisible={!txLoading || !txManualRefresh}>
 					<span class="spinner"></span>
 					Loading…
 				</div>
-				<button class="btn-refresh" onclick={() => loadHistory(ORG_ADDRESS, GROUP_ADDRESS)} disabled={txLoading}>
+				<button class="btn-refresh" onclick={() => loadHistory(ORG_ADDRESS, GROUP_ADDRESS, true)} disabled={txLoading && txManualRefresh}>
 					↻ Refresh
 				</button>
 			</div>
