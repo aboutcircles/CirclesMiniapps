@@ -6,7 +6,6 @@
 
 	// ----- Constants -----
 	const CIRCLES_RPC_URL = 'https://rpc.aboutcircles.com/';
-	const TX_RPC_URL = 'https://staging.circlesubi.network/';
 	// ----- Group config dictionary -----
 	// Add entries here for each group this page supports.
 	// The key is the value of the ?group= URL param.
@@ -180,33 +179,13 @@
 		const missing = addresses.filter((a) => !profileCache.has(a));
 		if (!missing.length) return;
 
-		function resolveImageUrl(rawImage: string | null): string | null {
-			if (!rawImage) return null;
-			if (rawImage.startsWith('data:')) return rawImage;
-			if (rawImage.startsWith('ipfs://')) return `https://ipfs.io/ipfs/${rawImage.slice(7)}`;
-			if (rawImage.startsWith('http')) return rawImage;
-			if (/^Qm[1-9A-HJ-NP-Za-km-z]{44}/.test(rawImage) || /^bafy/.test(rawImage)) return `https://ipfs.io/ipfs/${rawImage}`;
-			return null;
-		}
-
 		async function fetchOne(address: string): Promise<void> {
 			try {
-				const info = (await jsonRpc(CIRCLES_RPC_URL, 'circles_getAvatarInfo', [address])) as Record<string, unknown> | null;
-				const cidV0 = (info?.cidV0 as string | null | undefined) ?? '';
-				if (!cidV0) {
-					profileCache.set(address.toLowerCase(), { name: null, imageUrl: null });
-					return;
-				}
-				const ipfsRes = await fetch(`https://ipfs.io/ipfs/${cidV0}`);
-				if (!ipfsRes.ok) {
-					profileCache.set(address.toLowerCase(), { name: null, imageUrl: null });
-					return;
-				}
-				const ipfsData = (await ipfsRes.json()) as Record<string, unknown>;
-				const rawImage = (ipfsData?.previewImageUrl ?? ipfsData?.imageUrl ?? null) as string | null;
+				const profile = (await jsonRpc(CIRCLES_RPC_URL, 'circles_getProfileByAddress', [address])) as Record<string, unknown> | null;
+				const rawImage = (profile?.previewImageUrl ?? null) as string | null;
 				profileCache.set(address.toLowerCase(), {
-					name: (ipfsData?.name as string) ?? null,
-					imageUrl: resolveImageUrl(rawImage)
+					name: (profile?.name as string | null) || null,
+					imageUrl: rawImage || null
 				});
 			} catch { /* profiles optional */ }
 		}
@@ -246,12 +225,12 @@
 		txError = '';
 		try {
 			// 1. Transfer data — source of truth for sender, recipient (in data), message
-			const transferResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransferData', [orgAddr])) as { results: TransferEntry[]; hasMore: boolean };
+			const transferResult = (await jsonRpc(CIRCLES_RPC_URL, 'circles_getTransferData', [orgAddr])) as { results: TransferEntry[]; hasMore: boolean };
 			transferEntries = transferResult.results ?? [];
 			hasMore = transferResult.hasMore ?? false;
 
 			// 2. Transaction history — used only to look up amounts by tx hash (high limit to avoid missing entries)
-			const histResult = (await jsonRpc(TX_RPC_URL, 'circles_getTransactionHistory', [orgAddr, 500])) as { results: TxEntry[]; hasMore: boolean };
+			const histResult = (await jsonRpc(CIRCLES_RPC_URL, 'circles_getTransactionHistory', [orgAddr, 500])) as { results: TxEntry[]; hasMore: boolean };
 			amountMap.clear();
 			for (const t of (histResult.results ?? [])) {
 				// incoming leg to org = the actual kudos amount
@@ -273,7 +252,8 @@
 			await fetchProfiles(addrs);
 			groupImageUrl = getProfile(groupAddr).imageUrl;
 		} catch (e: unknown) {
-			txError = e instanceof Error ? e.message : String(e);
+			const msg = e instanceof Error ? e.message : String(e);
+			if (!msg.includes('429')) txError = msg;
 		} finally {
 			txLoading = false;
 		}
