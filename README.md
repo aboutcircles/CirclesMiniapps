@@ -6,22 +6,47 @@ A SvelteKit app that hosts mini apps in iframes at `https://<VITE_BASE_URL>/mini
 
 ## Submitting Your App to the Marketplace
 
-Apps are listed in [`static/miniapps.json`](static/miniapps.json). To add yours, open a Pull Request against `master` on [aboutcircles/CirclesMiniapps](https://github.com/aboutcircles/CirclesMiniapps) with two changes:
+Apps are listed in [`static/miniapps.json`](static/miniapps.json). To add yours, open a Pull Request against `master` on [aboutcircles/CirclesMiniapps](https://github.com/aboutcircles/CirclesMiniapps).
 
-1. **A new entry in `static/miniapps.json`**
-2. **A brief description of your app added to this README** (optional but appreciated)
+This submission flow is for [**Embedded Mini Apps**](https://docs.aboutcircles.com/miniapps/embedded-mini-apps) that should ship from this repository and appear in the `/miniapps` marketplace.
 
-### Entry format
+For the full contribution guide, see:  
+[https://docs.aboutcircles.com/miniapps/contribute-mini-apps](https://docs.aboutcircles.com/miniapps/contribute-mini-apps)
 
-```json
-{
-  "slug": "my-cool-app",
-  "name": "My Cool App",
-  "logo": "https://example.com/logo.svg",
-  "url": "https://example.com/app/",
-  "description": "One or two sentences describing what the app does.",
-  "tags": ["defi", "tokens"]
-}
+### What should PR contain
+
+Your PR must include the full application code that will run inside Circles Mini Apps.
+
+At minimum, the PR should include:
+
+- The mini app source code in this repository
+- Any local assets required by the app
+- A logo committed to this repository
+- A new entry in `static/miniapps.json`
+- Any setup notes or app-specific dependencies needed to build the repo
+
+If the implementation lives elsewhere and the PR only adds an external URL, it will not be considered.
+
+### How the host works
+
+The marketplace reads app metadata from `static/miniapps.json`.
+
+When a user opens `/miniapps/<slug>`, the host loads the matching app inside an iframe.
+
+For an embedded mini app, the `url` should point to a route served by this same repository, not to an external deployment.
+
+Recommended pattern:
+
+- Host wrapper route: `/miniapps/<slug>`
+- Embedded app route in this repo: `/apps/<slug>`
+- `static/miniapps.json` entry: `"url": "/apps/<slug>"`
+
+### Required file layout
+
+Create the app under:
+
+```text
+src/routes/apps/<slug>/
 ```
 
 | Field | Required | Notes |
@@ -45,6 +70,9 @@ Apps are listed in [`static/miniapps.json`](static/miniapps.json). To add yours,
 The Circles team reviews and merges PRs on a best-effort basis.
 
 ---
+
+## Notice
+If you only want to test your miniapps, you don't need to go through the below steps and run the environment locally. You can use [Circles Playground](https://circles.gnosis.io/playground).
 
 ## Prerequisites
 
