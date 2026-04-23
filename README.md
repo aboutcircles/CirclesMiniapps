@@ -8,7 +8,7 @@ A SvelteKit app that hosts mini apps in iframes at `https://<VITE_BASE_URL>/mini
 
 Apps are listed in [`static/miniapps.json`](static/miniapps.json). To add yours, open a Pull Request against `master` on [aboutcircles/CirclesMiniapps](https://github.com/aboutcircles/CirclesMiniapps).
 
-This submission flow is for [**Embedded Mini Apps**](https://docs.aboutcircles.com/miniapps/embedded-mini-apps) that should ship from this repository and appear in the `/miniapps` marketplace.
+This submission flow is for [**Embedded Mini Apps**](https://docs.aboutcircles.com/miniapps/embedded-mini-apps) that should ship from this repository and appear in the [Mini Apps marketplace](https://circles.gnosis.io/miniapps).
 
 For the full contribution guide, see:  
 [https://docs.aboutcircles.com/miniapps/contribute-mini-apps](https://docs.aboutcircles.com/miniapps/contribute-mini-apps)
@@ -71,7 +71,7 @@ The Circles team reviews and merges PRs on a best-effort basis.
 
 ---
 
-## Notice
+## Please Note:
 If you only want to test your miniapps, you don't need to go through the below steps and run the environment locally. You can use [Circles Playground](https://circles.gnosis.io/playground).
 
 ## Prerequisites
