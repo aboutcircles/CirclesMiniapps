@@ -102,13 +102,17 @@
 
 	// ----- QR overlay state -----
 	let qrDataUrl = $state<string | null>(null);
+	let qrHref = $state<string>('#');
 	let showQr = $state(false);
 
 	async function openKudos(e: MouseEvent) {
 		if (isMobile) return; // let the <a> navigate normally on mobile
 		e.preventDefault();
 		if (kudosHref === '#') return;
-		qrDataUrl = await QRCode.toDataURL(kudosHref, { width: 240, margin: 2 });
+		const href = kudosHref;
+		qrDataUrl = await QRCode.toDataURL(href, { width: 240, margin: 2 });
+		qrHref = href;
+		kudosMessage = '';
 		showQr = true;
 	}
 
@@ -365,7 +369,7 @@
 							<div class="qr-frame">
 								<img class="qr-img" src={qrDataUrl} alt="QR code for kudos link" />
 							</div>
-							<a class="qr-link-btn" href={kudosHref} target="_blank" rel="noopener noreferrer">
+							<a class="qr-link-btn" href={qrHref} target="_blank" rel="noopener noreferrer">
 								Open on this device instead
 							</a>
 						</div>
