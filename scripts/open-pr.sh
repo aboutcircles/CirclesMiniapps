@@ -6,7 +6,7 @@
 #
 # Required:
 #   gh CLI installed and authenticated (gh auth status)
-#   GH_REPO env var set, e.g. shorn-gnosis/circles-miniapps-for-agents  (or detected from git remote)
+#   GH_REPO env var set, e.g. aboutcircles/CirclesMiniapps  (or detected from git remote)
 
 set -euo pipefail
 
@@ -106,7 +106,7 @@ PR_URL=$(gh pr create \
 echo ""
 echo "✅  PR opened: $PR_URL"
 echo ""
-echo "PR opened on shorn-gnosis/circles-miniapps-for-agents for review."
+echo "PR opened on ${GH_REPO} for review."
 echo ""
 
 # Clean up temp file
