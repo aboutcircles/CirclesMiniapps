@@ -1,0 +1,14 @@
+{
+  "name": "sign-demo-miniapp",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5181",
+    "build": "vite build",
+    "preview": "vite preview --port 5181"
+  },
+  "devDependencies": {
+    "vite": "^6.4.1"
+  }
+}
