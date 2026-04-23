@@ -74,7 +74,7 @@ The user journey is as follows:
 A miniApp generally comprises:
 
 1. **Client UI** - state, status, and actions
-2. **Wallet transaction execution** - via `@aboutcircles/miniapp-sdk`
+2. **Wallet transaction execution** - via `miniapp-sdk.js` (local postMessage bridge, copied from `examples/miniapp-sdk.js`)
 3. **Backend API** - validation and state machine (can also be replaced by on-chain smart contracts)
 4. **Persistent storage** - Supabase, IPFS, etc.
 5. **Verification and on-chain payouts** - org-driven
