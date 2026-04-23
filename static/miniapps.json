@@ -109,6 +109,15 @@
     "isHidden": true
   },
   {
+    "slug": "trust-explorer",
+    "name": "Trust Explorer",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "https://circles-trust-explorer.vercel.app",
+    "description": "Explore the Circles social graph. View your trust connections, search for any Circles user, inspect their network, and trust or untrust them in one tap.",
+    "tags": ["social", "trust", "tools"],
+    "category": "miniapp"
+  },
+  {
     "slug": "invitations-manager",
     "name": "Invitations Manager",
     "logo": "/app-logos/invitations.png",

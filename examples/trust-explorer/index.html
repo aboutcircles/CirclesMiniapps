@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Circles Trust Explorer</title>
+  <!-- Gnosis design system fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="title-row">
+        <h1>Trust Explorer</h1>
+        <div id="wallet-status" class="badge">Not connected</div>
+      </div>
+      <p class="subtitle">Explore the Circles social graph</p>
+    </header>
+
+    <main id="main-content">
+      <!-- Disconnected state -->
+      <div id="disconnected-view" class="view">
+        <div class="card empty-state">
+          <div class="empty-icon">🔗</div>
+          <p>Connect your wallet via the Circles host to explore trust connections.</p>
+        </div>
+      </div>
+
+      <!-- Connected state -->
+      <div id="connected-view" class="view hidden">
+
+        <!-- My Profile Card -->
+        <div id="my-profile-card" class="card profile-card">
+          <div class="profile-header">
+            <div id="my-avatar" class="avatar-circle">?</div>
+            <div class="profile-info">
+              <div id="my-name" class="profile-name">Loading…</div>
+              <div id="my-address" class="profile-address"></div>
+            </div>
+          </div>
+          <div class="trust-stats">
+            <div class="stat">
+              <span id="my-trusting-count" class="stat-value">—</span>
+              <span class="stat-label">Trusting</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+              <span id="my-trusted-by-count" class="stat-value">—</span>
+              <span class="stat-label">Trusted by</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+              <span id="my-mutual-count" class="stat-value">—</span>
+              <span class="stat-label">Mutual</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search -->
+        <div class="card" id="search-card">
+          <div class="section-label">Search Users</div>
+          <div class="search-row">
+            <div class="field" style="flex:1; margin:0">
+              <input id="search-input" type="text" placeholder="Name or 0x address…" autocomplete="off" />
+            </div>
+            <button id="search-btn" class="btn btn-inline">Search</button>
+          </div>
+          <div id="search-results" class="search-results hidden"></div>
+        </div>
+
+        <!-- Profile Detail (shown when viewing someone) -->
+        <div id="profile-detail" class="card hidden">
+          <div class="section-label-row">
+            <div class="section-label">Profile</div>
+            <button id="back-btn" class="btn btn-secondary btn-inline">← Back</button>
+          </div>
+          <div class="profile-header">
+            <div id="detail-avatar" class="avatar-circle">?</div>
+            <div class="profile-info">
+              <div id="detail-name" class="profile-name">Loading…</div>
+              <div id="detail-address" class="profile-address"></div>
+            </div>
+          </div>
+          <div class="trust-stats">
+            <div class="stat">
+              <span id="detail-trusting-count" class="stat-value">—</span>
+              <span class="stat-label">Trusting</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+              <span id="detail-trusted-by-count" class="stat-value">—</span>
+              <span class="stat-label">Trusted by</span>
+            </div>
+            <div class="stat-divider"></div>
+            <div class="stat">
+              <span id="detail-mutual-count" class="stat-value">—</span>
+              <span class="stat-label">Mutual</span>
+            </div>
+          </div>
+
+          <!-- Trust / Untrust action -->
+          <div id="trust-action-row" class="trust-action-row">
+            <button id="trust-btn" class="btn btn-inline hidden">+ Trust</button>
+            <button id="untrust-btn" class="btn btn-danger btn-inline hidden">✕ Untrust</button>
+            <span id="trust-status-badge" class="badge hidden"></span>
+          </div>
+
+          <!-- Tabs -->
+          <div class="tabs" id="detail-tabs">
+            <button class="tab-btn active" data-tab="trusting">Trusting</button>
+            <button class="tab-btn" data-tab="trusted-by">Trusted by</button>
+          </div>
+
+          <div id="tab-trusting" class="tab-panel">
+            <div id="detail-trusting-list" class="trust-list"></div>
+          </div>
+          <div id="tab-trusted-by" class="tab-panel hidden">
+            <div id="detail-trusted-by-list" class="trust-list"></div>
+          </div>
+        </div>
+
+        <!-- My trust connections -->
+        <div id="my-trust-section" class="card">
+          <div class="tabs" id="my-tabs">
+            <button class="tab-btn active" data-tab="my-trusting">Trusting</button>
+            <button class="tab-btn" data-tab="my-trusted-by">Trusted by</button>
+            <button class="tab-btn" data-tab="my-mutual">Mutual</button>
+          </div>
+          <div id="tab-my-trusting" class="tab-panel">
+            <div id="my-trusting-list" class="trust-list"></div>
+          </div>
+          <div id="tab-my-trusted-by" class="tab-panel hidden">
+            <div id="my-trusted-by-list" class="trust-list"></div>
+          </div>
+          <div id="tab-my-mutual" class="tab-panel hidden">
+            <div id="my-mutual-list" class="trust-list"></div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
