@@ -27,7 +27,8 @@
 		},
 		'dandelion': {
 		    groupAddress: '0x1d3663CebF6c7f54bE62B210d68eeA0E38838582',
-			orgAddress: '0x33aa31e1392FFB37b1b3572A1E2cc0651D0BCb7F'
+			orgAddress: '0x33aa31e1392FFB37b1b3572A1E2cc0651D0BCb7F',
+			inviteSlug: 'xyHkiZyK'
 		},
 		'bfn': {
 			groupAddress: '0xeb614ef61367687704cd4628a68a02f3b10ce68c',
