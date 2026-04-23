@@ -4,7 +4,13 @@
 	import { env } from '$env/dynamic/public';
 
 	const REFERRALS_BASE = env.PUBLIC_REFERRALS_BASE ?? 'https://referrals.aboutcircles.com';
-	const DESTINATION_BASE = 'https://app.gnosis.io/referral';
+	const KITCHEN_SLUGS = new Set(['xyHkiZyK']);
+
+	function destinationBase(slug: string) {
+		return KITCHEN_SLUGS.has(slug)
+			? 'https://kitchen.app.gnosis.io/referral'
+			: 'https://app.gnosis.io/referral';
+	}
 
 	type Status = 'loading' | 'redirecting' | 'exhausted' | 'paused' | 'error';
 
@@ -15,6 +21,7 @@
 	async function fetchAndRedirect(currentSlug: string, storageKey: string) {
 		status = 'loading';
 		errorMessage = '';
+		const DESTINATION_BASE = destinationBase(currentSlug);
 
 		try {
 			const cached = localStorage.getItem(storageKey);
