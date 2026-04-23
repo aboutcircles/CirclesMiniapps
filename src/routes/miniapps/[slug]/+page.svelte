@@ -285,7 +285,7 @@
 				<iframe
 					bind:this={iframeEl}
 					src={iframeSrc}
-					sandbox="allow-scripts allow-forms allow-same-origin"
+					sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-top-navigation-by-user-activation"
 					title={app ? app.name : 'Mini App'}
 					onload={handleIframeLoad}
 				></iframe>

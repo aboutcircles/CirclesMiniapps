@@ -125,5 +125,18 @@
     "description": "Manage Circles groups",
     "tags": [],
     "category": "admin"
+  },
+  {
+    "slug": "self-demo",
+    "name": "Self Onboarding App",
+    "logo": "https://example.com/logo.svg",
+    "url": "https://aboutcircles.github.io/self-onboarding-app/",
+    "description": "Get invitation by proving you are a real human with Self",
+    "tags": [
+      "identity",
+      "self"
+    ],
+    "category": "miniapp",
+    "isHidden": true
   }
 ]
