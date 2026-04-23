@@ -60,14 +60,7 @@
 		const slug = activeConfig?.inviteSlug ?? DEFAULT_INVITE_SLUG;
 		return `https://circles.gnosis.io/invitation/${slug}?redirect_to=${encodeURIComponent(transferPath)}`;
 	});
-	const groupParam = $derived(page.url.searchParams.get('group'));
-	const configError = $derived(
-		!groupParam
-			? 'Missing required URL parameter: ?group=<key>'
-			: !activeConfig
-				? `Unknown group "${groupParam}". Add it to GROUP_CONFIGS in the source.`
-				: null
-	);
+
 
 	// circles_getTransferData entry — has sender, recipient encoded in data, and message
 	interface TransferEntry {
@@ -104,6 +97,7 @@
 	// ----- QR overlay state -----
 	let qrDataUrl = $state<string | null>(null);
 	let qrHref = $state<string>('#');
+	let qrMessage = $state<string>('');
 	let showQr = $state(false);
 
 	async function openKudos(e: MouseEvent) {
@@ -111,8 +105,10 @@
 		e.preventDefault();
 		if (kudosHref === '#') return;
 		const href = kudosHref;
+		const msg = kudosMessage;
 		qrDataUrl = await QRCode.toDataURL(href, { width: 240, margin: 2 });
 		qrHref = href;
+		qrMessage = msg;
 		kudosMessage = '';
 		showQr = true;
 	}
@@ -122,7 +118,7 @@
 	let amountMap = new SvelteMap<string, string>(); // txHash -> circles amount (incoming leg to org)
 	let txLoading = $state(false);
 	let txManualRefresh = $state(false);
-	let txError = $state('');
+
 	let hasMore = $state(false);
 	let kudosMessage = $state('');
 	let groupImageUrl = $state<string | null>(null);
@@ -227,7 +223,6 @@
 	async function loadHistory(orgAddr: string, groupAddr: string, manual = false) {
 		txLoading = true;
 		txManualRefresh = manual;
-		txError = '';
 		try {
 			// 1. Transfer data — source of truth for sender, recipient (in data), message
 			const transferResult = (await jsonRpc(CIRCLES_RPC_URL, 'circles_getTransferData', [orgAddr])) as { results: TransferEntry[]; hasMore: boolean };
@@ -256,9 +251,19 @@
 			]));
 			await fetchProfiles(addrs);
 			groupImageUrl = getProfile(groupAddr).imageUrl;
-		} catch (e: unknown) {
-			const msg = e instanceof Error ? e.message : String(e);
-			if (!msg.includes('429')) txError = msg;
+
+			if (showQr && !isMobile) {
+				const lower = recipientAddress?.toLowerCase() ?? null;
+				const matched = transferEntries.some((entry) => {
+					if (entry.to.toLowerCase() !== orgAddr.toLowerCase()) return false;
+					const r = decodeRecipient(entry.data);
+					if (!r || (lower && r.toLowerCase() !== lower)) return false;
+					return decodeMessage(entry.data) === qrMessage;
+				});
+				if (matched) showQr = false;
+			}
+		} catch {
+			// errors silently suppressed
 		} finally {
 			txLoading = false;
 		}
@@ -296,10 +301,6 @@
 <div class="page">
 	<div class="card">
 
-		<!-- Config error -->
-		{#if configError}
-			<div class="error-banner">{configError}</div>
-		{/if}
 
 		<!-- ===== KUDOS ===== -->
 			{#if recipientAddress}
@@ -416,10 +417,7 @@
 					↻ Refresh
 				</button>
 			</div>
-			{#if txError}
-				<div class="error-banner">{txError}</div>
-			{/if}
-			{#if !txLoading && kudosPairs.length === 0 && !txError}
+			{#if !txLoading && kudosPairs.length === 0}
 				<div class="empty">No appreciations found.</div>
 			{/if}
 
@@ -551,16 +549,6 @@
 	}
 
 	@keyframes spin { to { transform: rotate(360deg); } }
-
-	.error-banner {
-		padding: 12px 16px;
-		background: #fff0f0;
-		border: 1.5px solid #fca5a5;
-		border-radius: 10px;
-		color: #991b1b;
-		font-size: 0.88rem;
-		margin-bottom: 16px;
-	}
 
 	.empty {
 		text-align: center;
@@ -830,15 +818,7 @@
 		margin-bottom: 12px;
 	}
 
-	/* ----- Footer ----- */
-	.card-footer {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		margin-top: 16px;
-		padding-top: 12px;
-		border-top: 1px solid #ede1d8;
-	}
+
 
 	.btn-refresh {
 		padding: 6px 14px;
