@@ -313,7 +313,7 @@
 				>
 					<div class="kudos-top-row" role="button" tabindex="0" onclick={openKudos} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') openKudos(e as unknown as MouseEvent); }}>
 						<span class="kudos-arrow">
-							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="22" height="22">
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
 								<path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
 							</svg>
 						</span>
@@ -524,6 +524,18 @@
 		box-sizing: border-box;
 	}
 
+	@media (max-width: 450px) {
+		.page {
+			padding: 0;
+		}
+
+		.card {
+			border-radius: 0;
+			box-shadow: none;
+			padding: 16px;
+		}
+	}
+
 	.loading-state {
 		display: flex;
 		align-items: center;
@@ -584,8 +596,10 @@
 		flex-direction: row;
 		align-items: center;
 		justify-content: center;
-		gap: 10px;
-		padding: 14px 18px;
+		flex-wrap: nowrap;
+		gap: 8px;
+		padding: 12px 12px;
+		min-width: 0;
 	}
 
 	.kudos-input-row {
@@ -627,32 +641,34 @@
 	}
 
 	.kudos-label {
-		font-size: 1rem;
+		font-size: 0.88rem;
 		color: #d8daff;
 		flex-shrink: 0;
+		white-space: nowrap;
 	}
 
 	.kudos-avatar {
-		width: 34px;
-		height: 34px;
+		width: 28px;
+		height: 28px;
 		flex-shrink: 0;
 	}
 
 	.kudos-avatar img {
-		width: 34px;
-		height: 34px;
+		width: 28px;
+		height: 28px;
 		border-radius: 50%;
 		object-fit: cover;
 		display: block;
 	}
 
 	.kudos-name {
-		font-size: 1rem;
+		font-size: 0.9rem;
 		font-weight: 700;
 		color: #ffffff;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		min-width: 0;
 	}
 
 	.trust-name {
@@ -753,6 +769,33 @@
 		display: block;
 	}
 
+	@media (max-width: 450px) {
+		.tx-row {
+			flex-wrap: wrap;
+			gap: 6px;
+			padding: 10px 12px;
+		}
+
+		.tx-avatars {
+			width: 100%;
+		}
+
+		.tx-body {
+			width: 100%;
+		}
+
+		.avatar-wrap {
+			width: 24px;
+			height: 24px;
+		}
+
+		.avatar-img-sm,
+		.avatar-placeholder-sm {
+			width: 24px;
+			height: 24px;
+		}
+	}
+
 	.arrow {
 		font-size: 0.85rem;
 		color: #9b9db3;
@@ -821,24 +864,25 @@
 
 
 	.btn-refresh {
-		padding: 6px 14px;
-		background: #060a40;
-		color: #ffffff;
-		border: none;
+		padding: 5px 12px;
+		background: transparent;
+		color: #9b9db3;
+		border: 1px solid #d4d5e4;
 		border-radius: 8px;
-		font-size: 0.8rem;
-		font-weight: 600;
+		font-size: 0.78rem;
+		font-weight: 500;
 		cursor: pointer;
-		transition: opacity 0.15s;
+		transition: color 0.15s, border-color 0.15s;
 	}
 
 	.btn-refresh:disabled {
-		opacity: 0.45;
+		opacity: 0.4;
 		cursor: not-allowed;
 	}
 
 	.btn-refresh:not(:disabled):hover {
-		opacity: 0.82;
+		color: #060a40;
+		border-color: #9b9db3;
 	}
 
 	/* ----- QR overlay ----- */
