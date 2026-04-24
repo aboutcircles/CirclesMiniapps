@@ -1156,6 +1156,14 @@ Before marking the task complete, verify every item:
 7. **Miniapp appears blank in the iframe** → Deployment Protection is enabled. Go to Vercel Project Settings → Deployment Protection → Disabled. This is the most common post-deploy failure.
 8. **Passkey auto-connect error on wallet change** → Use `isPasskeyAutoConnectError()` (Pattern M) and show a specific message — do not show the raw error.
 9. **Safe operation fails silently** → Always call `assertSafeExecutionSuccess()` after Safe transactions and check for `ExecutionFailure` event in the receipt logs.
+10. **Blank white screen, no console errors** → The Circles SDK (`new Sdk(...)`) was constructed at module scope, before the page loaded. The SDK's internal fetch/module imports silently fail during initialisation. **Fix**: wrap SDK construction in a lazy `getSdk()` function that only creates the instance on first call:
+    ```javascript
+    let _sdk = null;
+    function getSdk(runner = null) {
+      if (!_sdk) _sdk = new Sdk('https://rpc.aboutcircles.com/', runner);
+      return _sdk;
+    }
+    ```
 
 ---
 

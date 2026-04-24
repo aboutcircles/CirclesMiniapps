@@ -85,6 +85,21 @@ fi
 echo ""
 echo "✅  Deployed: $DEPLOY_URL"
 echo ""
+
+# ── Auto-disable Vercel Deployment Protection ────────────────────────────────
+# Without this, the miniapp returns 401 inside the Gnosis wallet iframe.
+echo "🔓  Disabling Deployment Protection ..."
+PROTECT_ARGS=(--protection none)
+[[ -n "${VERCEL_TOKEN:-}" ]] && PROTECT_ARGS+=(--token "$VERCEL_TOKEN")
+[[ -n "${VERCEL_ORG_ID:-}" ]] && PROTECT_ARGS+=(--scope "$VERCEL_ORG_ID")
+if vercel project update "$PROJECT_NAME" "${PROTECT_ARGS[@]}" 2>/dev/null; then
+  echo "   Protection disabled."
+else
+  echo "⚠️  Could not auto-disable protection. Do it manually:"
+  echo "   Project Settings → Deployment Protection → Disabled"
+fi
+
+echo ""
 echo "Next steps:"
 echo "  1. Add this URL to static/miniapps.json"
 echo "  2. Run: ./scripts/open-pr.sh $SLUG \"<App Name>\" \"<Description>\""
