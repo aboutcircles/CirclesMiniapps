@@ -127,6 +127,18 @@
     "category": "admin"
   },
   {
+    "slug": "bulk-untrust",
+    "name": "Bulk Untrust",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "https://circles-miniapp-bulk-untrust.vercel.app",
+    "description": "Review all your outgoing trust connections, sort and filter by date, trust score, or name, and untrust multiple addresses in one batched transaction.",
+    "tags": [
+      "trust",
+      "tools"
+    ],
+    "category": "miniapp"
+  },
+  {
     "slug": "self-demo",
     "name": "Self Onboarding App",
     "logo": "https://example.com/logo.svg",

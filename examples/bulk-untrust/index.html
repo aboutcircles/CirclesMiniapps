@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bulk Untrust</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="title-row">
+        <h1>Bulk Untrust</h1>
+        <div id="wallet-status" class="badge">Not connected</div>
+      </div>
+    </header>
+
+    <main id="main-content">
+
+      <div id="disconnected-view" class="view">
+        <div class="card empty-state">
+          <div class="empty-icon">🔗</div>
+          <p>Connect your wallet via the Circles host to manage your trust connections.</p>
+        </div>
+      </div>
+
+      <div id="connected-view" class="view hidden">
+
+        <div id="loading-state" class="card empty-state">
+          <div class="spinner"></div>
+          <p>Loading trust connections…</p>
+        </div>
+
+        <div id="trust-content" class="hidden">
+
+          <div id="stats-bar" class="stats-bar card">
+            <span><strong id="total-count">0</strong> connections</span>
+            <span class="stats-sep">·</span>
+            <span><strong id="mutual-count">0</strong> mutual</span>
+            <span class="stats-sep">·</span>
+            <span><strong id="selected-count">0</strong> selected</span>
+          </div>
+
+          <div class="card controls-card">
+
+            <div class="sort-row">
+              <span class="sort-label">Sort:</span>
+              <div class="sort-btns">
+                <button class="btn-secondary btn-inline sort-btn active" data-sort="date" id="sort-date">Date</button>
+                <button class="btn-secondary btn-inline sort-btn" data-sort="score" id="sort-score">Score</button>
+                <button class="btn-secondary btn-inline sort-btn" data-sort="name" id="sort-name">Name</button>
+              </div>
+              <button class="btn-secondary btn-inline sort-dir-btn" id="sort-dir-btn" title="Toggle direction">↓</button>
+              <div class="row-spacer"></div>
+              <button class="btn-secondary btn-inline" id="filter-toggle-btn">Filter ▾</button>
+            </div>
+
+            <div id="filter-section" class="filter-section hidden">
+              <div class="filter-row">
+                <label class="filter-label">Min trust score: <strong id="score-val-display">0</strong></label>
+                <input type="range" id="score-filter" min="0" max="100" value="0" class="score-slider" />
+              </div>
+              <div class="filter-row date-range-row">
+                <div class="field date-field">
+                  <label>Trusted from</label>
+                  <input type="date" id="filter-from-date" />
+                </div>
+                <div class="field date-field">
+                  <label>Trusted to</label>
+                  <input type="date" id="filter-to-date" />
+                </div>
+              </div>
+              <div class="filter-row">
+                <label class="filter-label">Avatar type:</label>
+                <div class="type-toggles">
+                  <button class="btn-secondary btn-inline type-toggle" data-type="Human">Human</button>
+                  <button class="btn-secondary btn-inline type-toggle" data-type="Group">Group</button>
+                  <button class="btn-secondary btn-inline type-toggle" data-type="Organization">Org</button>
+                </div>
+                <div class="row-spacer"></div>
+                <button class="btn-secondary btn-inline" id="clear-filters-btn">Clear</button>
+              </div>
+            </div>
+
+            <div class="select-row">
+              <button class="btn-secondary btn-inline" id="select-all-btn">Select all visible</button>
+              <button class="btn-secondary btn-inline" id="deselect-all-btn">Deselect all</button>
+            </div>
+
+          </div>
+
+          <div id="trust-list" class="trust-list"></div>
+
+          <div id="empty-state" class="card empty-state hidden">
+            <p>No connections match your filters.</p>
+          </div>
+
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <div id="action-bar" class="action-bar hidden">
+    <div class="action-bar-inner">
+      <span id="action-summary" class="action-summary"></span>
+      <button class="btn-danger btn-inline" id="untrust-btn">Untrust selected</button>
+    </div>
+  </div>
+
+  <div id="confirm-modal" class="modal-overlay hidden">
+    <div class="modal-card card">
+      <h3 id="modal-title">Confirm bulk untrust</h3>
+      <p id="modal-msg"></p>
+      <div id="modal-warn" class="result result-warn hidden"></div>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="modal-cancel-btn">Cancel</button>
+        <button class="btn-danger" id="modal-confirm-btn">Untrust</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
