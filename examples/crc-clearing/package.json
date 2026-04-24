@@ -1,0 +1,16 @@
+{
+  "name": "crc-clearing",
+  "version": "1.0.0",
+  "description": "Clear your personal Circles (CRC) tokens — find reciprocal holdings and execute on-chain clearing",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  },
+  "dependencies": {
+    "@aboutcircles/sdk": "^0.1.29"
+  }
+}

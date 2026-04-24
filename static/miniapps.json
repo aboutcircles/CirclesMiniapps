@@ -127,6 +127,19 @@
     "category": "admin"
   },
   {
+    "slug": "crc-clearing",
+    "name": "CRC Clearing",
+    "logo": "/app-logos/crc-clearing.png",
+    "url": "https://dist-eight-rho-56.vercel.app",
+    "description": "Reclaim your personal Circles tokens. Clear reciprocal holdings with one click.",
+    "tags": [
+      "defi",
+      "clearing",
+      "tokens"
+    ],
+    "category": "miniapp"
+  },
+  {
     "slug": "self-demo",
     "name": "Self Onboarding App",
     "logo": "https://example.com/logo.svg",
