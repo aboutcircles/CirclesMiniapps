@@ -9,7 +9,10 @@ export default defineConfig({
     }),
   ],
   optimizeDeps: {
-    esbuildOptions: { define: { global: 'globalThis' } },
+    esbuildOptions: {
+      define: { global: 'globalThis' },
+      tsconfig: './tsconfig.json',
+    },
   },
   build: {
     outDir: 'dist',
