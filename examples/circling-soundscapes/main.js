@@ -6,21 +6,25 @@
  *
  * Sound parameters are deterministic functions of transaction data:
  *
- *   FROM ADDRESS (minor influence — sender's identity):
- *   - Pitch:       bytes 0-3  → root frequency from pentatonic scale
- *   - Pan:         bytes 6-8  → stereo position -0.4 to +0.4
+ *   TX HASH (dominant — unknowable until the tx is confirmed on-chain):
+ *   - Pitch base:        bytes 0-3   → note index in pentatonic scale
+ *   - Octave register:   byte 4      → selects low / mid / high band
+ *   - Pan:               bytes 5-6   → stereo position -0.45 to +0.45
+ *   - Harmonic weights:  bytes 7-17  → 6 partial amplitudes (additive timbre)
+ *   - Detune spread:     bytes 18-19 → subtle detuning of upper partials
+ *   - Filter character:  bytes 20-21 → lowpass cutoff for warmth
+ *   - Vibrato rate:      byte 22     → 0.03–0.4 Hz pitch wobble speed
+ *   - Vibrato depth:     byte 23     → 0–0.005 semitone-level wobble depth
+ *   - Amp LFO rate:      bytes 24-25 → 0.01–0.12 Hz breathing speed
+ *   - Amp LFO depth:     byte 26     → 10–35% amplitude modulation
+ *   - LFO shape:         byte 27     → sine / triangle crossfade
+ *   - Second osc detune: byte 28     → 0–8 cents detuned unison layer
+ *   - Second osc mix:    byte 29     → 0–40% blend of detuned layer
  *
- *   TX HASH (major influence — unknowable until confirmed):
- *   - Harmonic weights:  bytes 0-11  → 6 partial amplitudes (additive timbre)
- *   - Detune spread:     bytes 12-13 → subtle detuning of upper partials
- *   - Filter character:  bytes 14-15 → lowpass cutoff for warmth
- *   - Vibrato rate:      byte 16     → 0.03–0.4 Hz pitch wobble speed
- *   - Vibrato depth:     byte 17     → 0–0.006 semitone-level wobble depth
- *   - Amp LFO rate:      bytes 18-19 → 0.01–0.12 Hz breathing speed
- *   - Amp LFO depth:     byte 20     → 10–35% amplitude modulation
- *   - LFO shape:         byte 21     → sine / triangle / random-step crossfade
- *   - Second osc detune: byte 22     → 0–8 cents detuned unison layer
- *   - Second osc mix:    byte 23     → 0–40% blend of detuned layer
+ *   FROM ADDRESS (subtle colouring only — same sender stays recognisable
+ *                 but each tx still sounds distinct):
+ *   - Pitch nudge:  bytes 0-1 → ±2 scale steps offset on top of txHash pitch
+ *   - Pan nudge:    bytes 2-3 → ±0.1 stereo nudge on top of txHash pan
  *
  *   CRC VALUE + TIMESTAMP:
  *   - Amplitude:   log-proportional to CRC, decayed at 7% p.a. (demurrage)
@@ -168,67 +172,82 @@ function deriveParams(t) {
   const fromHex = stripHex(t.from);
   const txHex   = stripHex(t.transactionHash);
 
-  // ── FROM ADDRESS (identity, minor) ────────────────────────────────────
-  // Pitch: bytes 0-3 → pentatonic scale index
-  const pitchSeed = hexBytes(fromHex, 0, 4);
-  const pitchIdx  = pitchSeed % PITCH_TABLE.length;
-  const frequency = PITCH_TABLE[pitchIdx];
-  const noteName  = NOTE_NAMES[pitchIdx] || `${frequency.toFixed(0)}Hz`;
+  // ── TX HASH (dominant — changes every transaction) ────────────────────
 
-  // Pan: bytes 6-8 → -0.4 to +0.4 (biased toward centre)
-  const panSeed = hexBytes(fromHex, 6, 2);
-  const pan     = (panSeed / 65535) * 0.8 - 0.4;
+  // Pitch base: bytes 0-3 → index into the full pentatonic+overtone table
+  const txPitchSeed = hexBytes(txHex, 0, 4);
+  const txPitchBase = txPitchSeed % PITCH_TABLE.length;
 
-  // ── TX HASH (network entropy, major) ──────────────────────────────────
+  // Octave register: byte 4 → shifts the chosen note into low/mid/high band
+  // The table has 3 natural octave groups (indices 0-4, 5-9, 10-14) plus
+  // overtones (15-21). We pick one of 4 register offsets and clamp into table.
+  const octaveSeed  = hexBytes(txHex, 4, 1);
+  const octaveShift = [0, 5, 10, 5][octaveSeed % 4]; // lo, mid, hi, mid-bias
+  const pitchIdx    = (txPitchBase + octaveShift) % PITCH_TABLE.length;
+  const txFrequency = PITCH_TABLE[pitchIdx];
 
-  // Harmonic partial weights: bytes 0-11, two bytes per partial
-  // Partial 0 (fundamental) is always 1.0; upper partials vary 0–0.9
-  // Weighting scheme biases toward softer timbres: fundamental always dominant
+  // Pan: bytes 5-6 → -0.45 to +0.45 (fully per-transaction)
+  const txPanSeed = hexBytes(txHex, 5, 2);
+  const txPan     = (txPanSeed / 65535) * 0.9 - 0.45;
+
+  // Harmonic partial weights: bytes 7-17, two bytes per partial (skipping byte 6)
+  // Partial 0 (fundamental) is always 1.0; upper partials shaped toward pad timbres
   const partialWeights = PARTIAL_RATIOS.map((_, i) => {
-    if (i === 0) return 1.0; // fundamental always full
-    const raw = hexBytes(txHex, i * 2, 2) / 65535; // 0..1
-    // Exponential falloff: higher partials naturally quieter
-    // raw is further shaped so most voices are pad-like, not buzzy
+    if (i === 0) return 1.0;
+    const raw = hexBytes(txHex, 7 + i * 2, 2) / 65535;
     return Math.pow(raw, 1.5 + i * 0.4) * (1.0 - i * 0.12);
   });
 
-  // Detune spread: bytes 12-13 → 0–12 cents spread across partials
-  const detuneSeed   = hexBytes(txHex, 12, 2);
-  const detuneSpread = (detuneSeed / 65535) * 12; // cents
+  // Detune spread: bytes 18-19 → 0–12 cents spread across partials
+  const detuneSeed   = hexBytes(txHex, 18, 2);
+  const detuneSpread = (detuneSeed / 65535) * 12;
 
-  // Lowpass filter cutoff: bytes 14-15 → 300 Hz–6000 Hz
-  // Most voices will be warm/muffled; occasionally bright
-  const filterSeed = hexBytes(txHex, 14, 2);
+  // Lowpass filter cutoff: bytes 20-21 → 300–6000 Hz (squared for warmth bias)
+  const filterSeed = hexBytes(txHex, 20, 2);
   const filterFreq = 300 + Math.pow(filterSeed / 65535, 2) * 5700;
 
-  // Vibrato rate: byte 16 → 0.03–0.4 Hz (very slow for drone quality)
-  const vibratoRateSeed = hexBytes(txHex, 16, 1);
+  // Vibrato rate: byte 22 → 0.03–0.4 Hz
+  const vibratoRateSeed = hexBytes(txHex, 22, 1);
   const vibratoRate     = 0.03 + (vibratoRateSeed / 255) * 0.37;
 
-  // Vibrato depth: byte 17 → 0–0.005 (subtle pitch shimmer, semitone-level)
-  const vibratoDepthSeed = hexBytes(txHex, 17, 1);
+  // Vibrato depth: byte 23 → 0–0.005
+  const vibratoDepthSeed = hexBytes(txHex, 23, 1);
   const vibratoDepth     = (vibratoDepthSeed / 255) * 0.005;
 
-  // Amp LFO rate: bytes 18-19 → 0.01–0.12 Hz (very slow breathing)
-  const lfoRateSeed = hexBytes(txHex, 18, 2);
+  // Amp LFO rate: bytes 24-25 → 0.01–0.12 Hz
+  const lfoRateSeed = hexBytes(txHex, 24, 2);
   const lfoRate     = 0.01 + (lfoRateSeed / 65535) * 0.11;
 
-  // Amp LFO depth: byte 20 → 10–35%
-  const lfoDepthSeed = hexBytes(txHex, 20, 1);
+  // Amp LFO depth: byte 26 → 10–35%
+  const lfoDepthSeed = hexBytes(txHex, 26, 1);
   const lfoDepth     = 0.10 + (lfoDepthSeed / 255) * 0.25;
 
-  // LFO shape bias: byte 21 → 0 = sine-like, 255 = triangle-like
-  // Implemented as mix between smooth sine LFO and slower triangle LFO
-  const lfoShapeSeed = hexBytes(txHex, 21, 1);
-  const lfoShape     = lfoShapeSeed / 255; // 0=sine, 1=triangle
+  // LFO shape: byte 27 → 0=sine, 1=triangle
+  const lfoShapeSeed = hexBytes(txHex, 27, 1);
+  const lfoShape     = lfoShapeSeed / 255;
 
-  // Unison detune: byte 22 → 0–8 cents (second detuned layer)
-  const unisonDetuneSeed = hexBytes(txHex, 22, 1);
-  const unisonDetune     = (unisonDetuneSeed / 255) * 8; // cents
+  // Unison detune: byte 28 → 0–8 cents
+  const unisonDetuneSeed = hexBytes(txHex, 28, 1);
+  const unisonDetune     = (unisonDetuneSeed / 255) * 8;
 
-  // Unison mix: byte 23 → 0–40% blend of detuned layer
-  const unisonMixSeed = hexBytes(txHex, 23, 1);
+  // Unison mix: byte 29 → 0–40%
+  const unisonMixSeed = hexBytes(txHex, 29, 1);
   const unisonMix     = (unisonMixSeed / 255) * 0.40;
+
+  // ── FROM ADDRESS (subtle colouring — same sender stays recognisable) ──
+
+  // Pitch nudge: address bytes 0-1 → offset ±2 scale steps around txHash pitch
+  // Maps 0-255 → -2..+2 in integer steps (5 possible values)
+  const addrPitchByte  = hexBytes(fromHex, 0, 1);
+  const pitchNudge     = (addrPitchByte % 5) - 2; // -2, -1, 0, +1, +2
+  const finalPitchIdx  = ((pitchIdx + pitchNudge) % PITCH_TABLE.length + PITCH_TABLE.length) % PITCH_TABLE.length;
+  const frequency      = PITCH_TABLE[finalPitchIdx];
+  const noteName       = NOTE_NAMES[finalPitchIdx] || `${frequency.toFixed(0)}Hz`;
+
+  // Pan nudge: address bytes 2-3 → ±0.1 on top of txHash pan, clamped to ±0.5
+  const addrPanByte = hexBytes(fromHex, 2, 1);
+  const panNudge    = (addrPanByte / 255) * 0.2 - 0.1;
+  const pan         = Math.max(-0.5, Math.min(0.5, txPan + panNudge));
 
   // Build a human-readable timbre description from the dominant partials
   const dominantPartials = partialWeights.slice(1).filter(w => w > 0.25).length;
@@ -997,7 +1016,7 @@ function updateModalPreview() {
 
   // Timbre is from txHash which we don't know yet, so show "varies"
   $('preview-note').textContent = noteName;
-  $('preview-timbre').textContent = 'sine / triangle / soft-saw';
+  $('preview-timbre').textContent = 'varies per transaction';
   $('preview-pan').textContent = panLabel;
   $('voice-preview').classList.remove('hidden');
 }
