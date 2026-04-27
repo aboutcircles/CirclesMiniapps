@@ -25,7 +25,7 @@ const SOUNDSCAPE_ADDRESS = '0xC69A3Ac0bF61BCAd06752908F3330CA41c6fA1FD';
 const RPC_URL = 'https://rpc.aboutcircles.com/';
 
 const MAX_VOICES = 200;
-const MIN_CRC = 10;
+const MIN_CRC = 1;
 const DEMURRAGE_RATE = 0.07; // 7% per annum
 
 // Circles Hub V2
@@ -420,72 +420,98 @@ function stopVisualiser() {
 async function fetchAllTransfers() {
   const sdk = getSdk();
   const allEvents = [];
-  let cursor = null;
-  const limit = 1000;
-  let page = 0;
+  // circles_events returns an array directly (not paginated with cursor),
+  // so we use the address param to filter by the soundscape address and
+  // rely on the filterPredicates for the 'to' column.
+  // The response is an array of { event: string, values: {...} } objects.
 
-  do {
-    page++;
-    setLoading(`Loading transfers… (page ${page})`);
+  setLoading('Loading transfers…');
 
-    const params = [
-      null,           // address: not filtering at top level
-      null,           // fromBlock
-      null,           // toBlock
-      ['CrcV2_TransferSingle'],
-      [
-        {
-          Type: 'FilterPredicate',
-          FilterType: 'Equals',
-          Column: 'to',
-          Value: SOUNDSCAPE_ADDRESS.toLowerCase(),
-        }
-      ],
-      true,           // sortAscending
-      limit,
-      cursor,
-    ];
+  const params = [
+    SOUNDSCAPE_ADDRESS.toLowerCase(), // address filter (matches any field)
+    null,           // fromBlock
+    null,           // toBlock
+    ['CrcV2_TransferSingle'],
+    [
+      {
+        Type: 'FilterPredicate',
+        FilterType: 'Equals',
+        Column: 'to',
+        Value: SOUNDSCAPE_ADDRESS.toLowerCase(),
+      }
+    ],
+    true,           // sortAscending
+    1000,
+    null,
+  ];
 
-    let response;
-    try {
-      response = await sdk.circlesRpc.call('circles_events', params);
-    } catch (err) {
-      console.error('circles_events error:', err);
-      break;
-    }
+  let response;
+  try {
+    response = await sdk.circlesRpc.call('circles_events', params);
+  } catch (err) {
+    console.error('circles_events error:', err);
+    return allEvents;
+  }
 
-    const result = response?.result;
-    if (!result) break;
+  // The RPC returns the result directly as an array of event objects:
+  // [ { event: "CrcV2_TransferSingle", values: { blockNumber, timestamp, transactionHash, from, to, value, ... } }, ... ]
+  const rawArray = Array.isArray(response)
+    ? response
+    : Array.isArray(response?.result)
+      ? response.result
+      : [];
 
-    const cols = result.columns || [];
-    const rows = result.rows || [];
-
-    rows.forEach(row => {
-      const obj = Object.fromEntries(cols.map((col, i) => [col, row[i]]));
-      allEvents.push(obj);
-    });
-
-    cursor = result.nextCursor || result.cursor || null;
-    if (rows.length < limit) cursor = null; // no more pages
-  } while (cursor);
+  rawArray.forEach(item => {
+    // Each item is { event: "...", values: { ... } }
+    const v = item?.values || item;
+    if (v) allEvents.push(v);
+  });
 
   return allEvents;
 }
 
 /**
- * Parse raw event objects into transfer objects with normalised fields.
+ * Parse raw event values objects into normalised transfer objects.
+ * Handles hex-encoded fields (blockNumber, timestamp, value) from circles_events.
  */
 function parseTransfers(events) {
   return events
-    .filter(e => e.from && e.value && BigInt(e.value || '0') > 0n)
-    .map(e => ({
-      from: e.from,
-      to: e.to || SOUNDSCAPE_ADDRESS,
-      value: e.value,
-      transactionHash: e.transactionHash || e.txHash || '0x' + '00'.repeat(32),
-      timestamp: Number(e.timestamp || e.blockTimestamp || e.blockNumber || 0),
-      blockNumber: e.blockNumber,
-    }));
+    .filter(e => e.from && e.value)
+    .map(e => {
+      // Timestamps and values may be hex strings (0x...) or decimal strings
+      const parseHexOrDec = (v) => {
+        if (!v) return 0;
+        if (typeof v === 'number') return v;
+        const s = String(v);
+        return s.startsWith('0x') ? parseInt(s, 16) : Number(s);
+      };
+      const parseHexOrDecBigInt = (v) => {
+        if (!v) return 0n;
+        const s = String(v);
+        return s.startsWith('0x') ? BigInt(s) : BigInt(s);
+      };
+
+      const value = parseHexOrDecBigInt(e.value);
+      if (value === 0n) return null;
+
+      // Use the sender of the original transfer (the user who contributed),
+      // not the operator field. e.from is the immediate token sender in the
+      // flow matrix; e.operator is the Safe that signed — use operator as
+      // the "contributor identity" if available, else from.
+      const contributor = e.operator && e.operator !== '0x0000000000000000000000000000000000000000'
+        ? e.operator
+        : e.from;
+
+      return {
+        from: contributor,
+        to: e.to || SOUNDSCAPE_ADDRESS,
+        value: value.toString(),
+        transactionHash: e.transactionHash || e.txHash || ('0x' + '00'.repeat(32)),
+        timestamp: parseHexOrDec(e.timestamp || e.blockTimestamp),
+        blockNumber: parseHexOrDec(e.blockNumber),
+      };
+    })
+    .filter(Boolean);
 }
 
 // ── Voice history UI ───────────────────────────────────────────────────────
@@ -566,13 +592,19 @@ async function fetchMaxFlow(fromAddress) {
       liftERC20Address: LIFT_ERC20_ADDRESS,
     };
     const builder = new TransferBuilder(config);
-    const maxFlow = await builder.pathfinder.findMaxFlow({
-      from: fromAddress,
-      to: SOUNDSCAPE_ADDRESS,
-      targetFlow: BigInt('9999999999999999999999999999999999999'),
-      useWrappedBalances: false,
-    });
-    return BigInt(maxFlow);
+    // Use a large but safe targetFlow — the pathfinder returns actual maxFlow
+    // Use circlesV2_findPath directly to avoid any internal cap in pathfinder.findMaxFlow
+    const MAX_TARGET = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
+    const sdk = getSdk();
+    const result = await sdk.circlesRpc.call('circlesV2_findPath', [{
+      Source: fromAddress.toLowerCase(),
+      Sink: SOUNDSCAPE_ADDRESS.toLowerCase(),
+      TargetFlow: MAX_TARGET,
+      WithWrap: false,
+      QuantizedMode: false,
+    }]);
+    const maxFlowStr = result?.maxFlow || result?.result?.maxFlow || '0';
+    return BigInt(maxFlowStr);
   } catch (err) {
     console.warn('fetchMaxFlow error:', err);
     return 0n;
@@ -677,8 +709,12 @@ async function updateSliderMax() {
     return;
   }
 
-  const displayMax = Math.floor(maxFlowCrc * 100) / 100;
-  slider.max = Math.floor(maxFlowCrc);
+  // Use BigInt arithmetic to avoid float precision loss on large values
+  const maxFlowWhole = Number(userMaxFlow / BigInt(1e18));
+  const maxFlowFrac = Number(userMaxFlow % BigInt(1e18)) / 1e18;
+  const maxFlowCrcPrecise = maxFlowWhole + maxFlowFrac;
+  const displayMax = Math.floor(maxFlowCrcPrecise * 100) / 100;
+  slider.max = maxFlowWhole;
   slider.disabled = false;
   $('btn-send').disabled = false;
   maxLabel.textContent = `${displayMax.toFixed(2)} CRC`;
