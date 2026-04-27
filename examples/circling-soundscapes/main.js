@@ -82,6 +82,11 @@ let userMaxFlow = 0n; // max CRC user can send (bigint, atto)
 let animFrameId = null;
 let profileFetchQueue = new Set(); // addresses awaiting profile fetch
 
+// ── Solo state ─────────────────────────────────────────────────────────────
+let soloTxHash = null;        // txHash of currently soloed voice, or null
+let soloVoice = null;         // the live Voice object for the solo preview
+let soloTransfer = null;      // the transfer object being soloed
+
 // ── SDK (lazy) ─────────────────────────────────────────────────────────────
 
 let _sdk = null;
@@ -425,6 +430,8 @@ function createVoice(transfer, params, amplitude) {
 
   return {
     gainNode: voiceGain,
+    panner,
+    baseAmp,
     disconnect() {
       try {
         oscsToStop.forEach(o => { try { o.stop(); } catch {} });
@@ -445,6 +452,68 @@ function createVoice(transfer, params, amplitude) {
 function stopAllVoices() {
   voices.forEach(v => v.disconnect());
   voices = [];
+}
+
+/**
+ * Smoothly ramp a gain node to a target value over `ms` milliseconds.
+ */
+function rampGain(gainNode, target, ms = 300) {
+  const now = audioCtx.currentTime;
+  gainNode.gain.cancelScheduledValues(now);
+  gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+  gainNode.gain.linearRampToValueAtTime(target, now + ms / 1000);
+}
+
+/**
+ * Enter solo mode for a given transfer. Fades all other voices down,
+ * raises the selected voice, and starts a standalone preview if not playing.
+ */
+function enterSolo(transfer) {
+  ensureAudioContext();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  soloTxHash = transfer.transactionHash;
+  soloTransfer = transfer;
+
+  const maxLogValue = Math.log1p(maxContributed);
+  const params = deriveParams(transfer);
+  const amplitude = computeAmplitude(params, maxLogValue);
+
+  if (isPlaying) {
+    // Fade all existing voices: duck to near-zero, raise the matched one
+    voices.forEach(v => {
+      if (v.txHash === transfer.transactionHash) {
+        rampGain(v.gainNode, v.baseAmp, 250);
+      } else {
+        rampGain(v.gainNode, 0, 250);
+      }
+    });
+    soloVoice = null; // voice is already in the mix
+  } else {
+    // Not playing — spin up a one-off voice just for the preview
+    soloVoice = createVoice(transfer, params, amplitude);
+    soloVoice.txHash = transfer.transactionHash;
+  }
+}
+
+/**
+ * Exit solo mode, restoring all voices to their natural amplitudes.
+ */
+function exitSolo() {
+  soloTxHash = null;
+  soloTransfer = null;
+
+  if (soloVoice) {
+    soloVoice.disconnect();
+    soloVoice = null;
+  }
+
+  if (isPlaying) {
+    // Restore all ducked voices
+    voices.forEach(v => {
+      rampGain(v.gainNode, v.baseAmp, 300);
+    });
+  }
 }
 
 /**
@@ -475,6 +544,7 @@ function rebuildSoundscape() {
     active.forEach(({ t, params, amplitude }) => {
       if (amplitude < 0.001) return; // inaudibly quiet, skip
       const voice = createVoice(t, params, amplitude);
+      voice.txHash = t.transactionHash;
       voices.push(voice);
     });
   }
@@ -733,6 +803,9 @@ function buildVoiceRow(transfer, params, amplitude) {
       <span class="voice-value">${params.valueCrc.toFixed(2)} CRC</span>
       <span class="voice-note badge-small">${params.noteName}</span>
       <span class="voice-timbre badge-small">${params.timbreName}</span>
+      <button class="btn-solo" title="Listen to this voice" aria-label="Solo this voice">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+      </button>
     </div>
     <div class="voice-row-bottom">
       <div class="amp-bar-bg">
@@ -741,7 +814,57 @@ function buildVoiceRow(transfer, params, amplitude) {
       <span class="voice-age">${yearsAgo > 0 ? yearsAgo + 'y ago' : 'recent'}</span>
     </div>
   `;
+
+  // Solo button click
+  const soloBtn = row.querySelector('.btn-solo');
+  soloBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (soloTxHash === transfer.transactionHash) {
+      exitSolo();
+      updateSoloUI(null);
+    } else {
+      if (soloTxHash) exitSolo();
+      enterSolo(transfer);
+      updateSoloUI(transfer.transactionHash);
+    }
+  });
+
   return row;
+}
+
+/**
+ * Update the visual solo state across all rows.
+ * Highlights the active solo row; dims others; shows solo banner.
+ */
+function updateSoloUI(activeTxHash) {
+  const rows = document.querySelectorAll('.voice-row');
+  rows.forEach(row => {
+    const isActive = row.dataset.txHash === activeTxHash;
+    row.classList.toggle('solo-active', isActive && activeTxHash !== null);
+    row.classList.toggle('solo-dimmed', !isActive && activeTxHash !== null);
+    const btn = row.querySelector('.btn-solo');
+    if (btn) btn.classList.toggle('soloing', isActive && activeTxHash !== null);
+  });
+
+  // Show/hide solo banner
+  let banner = $('solo-banner');
+  if (activeTxHash && !banner) {
+    banner = document.createElement('div');
+    banner.id = 'solo-banner';
+    banner.className = 'solo-banner';
+    banner.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+      <span>Listening to one voice</span>
+      <button id="solo-exit-btn" class="solo-exit-btn">Back to all</button>
+    `;
+    document.querySelector('.player-card').appendChild(banner);
+    $('solo-exit-btn').addEventListener('click', () => {
+      exitSolo();
+      updateSoloUI(null);
+    });
+  } else if (!activeTxHash && banner) {
+    banner.remove();
+  }
 }
 
 function renderVoiceHistory() {
@@ -999,6 +1122,14 @@ async function initializeApp(address) {
   // Update modal preview
   updateModalPreview();
 }
+
+// ── Keyboard shortcut: Escape exits solo ──────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && soloTxHash) {
+    exitSolo();
+    updateSoloUI(null);
+  }
+});
 
 // ── Event wiring ───────────────────────────────────────────────────────────
 

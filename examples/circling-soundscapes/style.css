@@ -408,6 +408,99 @@ h1 {
   flex-shrink: 0;
 }
 
+/* ── Solo button ─────────────────────────────────────────────────────────── */
+.btn-solo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
+  padding: 0;
+}
+
+.btn-solo:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: rgba(14, 0, 168, 0.2);
+  transform: scale(1.1);
+}
+
+.btn-solo.soloing {
+  background: linear-gradient(130deg, var(--accent), var(--accent-mid));
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(14, 0, 168, 0.3);
+}
+
+/* ── Solo row states ─────────────────────────────────────────────────────── */
+.voice-row.solo-active {
+  background: rgba(234, 232, 255, 0.7);
+  border-color: rgba(14, 0, 168, 0.2);
+  box-shadow: 0 0 0 2px rgba(14, 0, 168, 0.08);
+}
+
+.voice-row.solo-dimmed {
+  opacity: 0.38;
+  transition: opacity 0.3s ease;
+}
+
+.voice-row.solo-active {
+  transition: opacity 0.3s ease, background 0.2s, border-color 0.2s;
+}
+
+/* ── Solo banner ─────────────────────────────────────────────────────────── */
+.solo-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--accent-soft);
+  border: 1px solid rgba(14, 0, 168, 0.15);
+  border-radius: 12px;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  animation: fade-in 0.2s ease;
+}
+
+.solo-banner svg {
+  flex-shrink: 0;
+}
+
+.solo-banner span {
+  flex: 1;
+}
+
+.solo-exit-btn {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: linear-gradient(130deg, var(--accent), var(--accent-mid));
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.15s;
+  flex-shrink: 0;
+}
+
+.solo-exit-btn:hover {
+  opacity: 0.85;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .badge-small {
   font-size: 11px;
   font-weight: 600;
