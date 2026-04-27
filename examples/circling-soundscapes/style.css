@@ -310,14 +310,67 @@ h1 {
   margin-top: 4px;
 }
 
+.history-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-left: 4px;
+}
+
 .section-title {
   font-size: 13px;
   font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  margin-bottom: 10px;
-  padding-left: 4px;
+  margin: 0;
+}
+
+/* ── Refresh button ──────────────────────────────────────────────────────── */
+.btn-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.btn-refresh:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: rgba(14, 0, 168, 0.2);
+}
+
+.btn-refresh:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+#refresh-icon.spin {
+  animation: spin 0.7s linear infinite;
+}
+
+/* ── New voice row flash ─────────────────────────────────────────────────── */
+@keyframes voice-row-flash {
+  0%   { background: rgba(234, 232, 255, 0.8); border-color: rgba(14, 0, 168, 0.25); }
+  100% { background: rgba(255, 255, 255, 0.85); border-color: var(--line-soft); }
+}
+
+.voice-row-new {
+  animation: voice-row-flash 1.6s ease-out forwards;
 }
 
 .voice-list {

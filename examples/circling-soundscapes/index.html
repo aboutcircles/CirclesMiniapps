@@ -75,7 +75,13 @@
 
       <!-- ── Voice history ──────────────────────────────────────── -->
       <section class="history-section">
-        <h2 class="section-title">Voice History</h2>
+        <div class="history-title-row">
+          <h2 class="section-title">Voice History</h2>
+          <button id="btn-refresh" class="btn-refresh" title="Check for new contributions">
+            <svg id="refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            <span id="refresh-label">Refresh</span>
+          </button>
+        </div>
         <div id="voice-list" class="voice-list">
           <div id="voice-empty" class="voice-empty">
             <span>No voices yet — be the first to contribute!</span>
@@ -97,10 +103,10 @@
       </div>
 
       <div class="modal-body">
-        <p class="modal-desc">Choose how much CRC to contribute. A larger amount means a louder, longer-lasting voice in the soundscape. Minimum: <strong>10 CRC</strong>.</p>
+        <p class="modal-desc">Choose how much CRC to contribute. A larger amount means a louder, longer-lasting voice in the soundscape. Minimum: <strong>1 CRC</strong>.</p>
 
         <div class="amount-display">
-          <span id="amount-display" class="amount-number">10</span>
+          <span id="amount-display" class="amount-number">1</span>
           <span class="amount-unit">CRC</span>
         </div>
 
@@ -108,10 +114,10 @@
           type="range"
           id="amount-slider"
           class="amount-slider"
-          min="10"
+          min="1"
           max="100"
           step="1"
-          value="10"
+          value="1"
         />
 
         <div class="slider-labels">

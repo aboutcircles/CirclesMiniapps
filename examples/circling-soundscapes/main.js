@@ -98,6 +98,7 @@ let maxContributed = 0; // max CRC in atto across all transfers (for log-normali
 let userMaxFlow = 0n; // max CRC user can send (bigint, atto)
 let animFrameId = null;
 let profileFetchQueue = new Set(); // addresses awaiting profile fetch
+let lastSeenBlock = null; // highest blockNumber seen across all loaded transfers
 
 // ── Solo state ─────────────────────────────────────────────────────────────
 let soloTxHash = null;        // txHash of currently soloed voice, or null
@@ -980,18 +981,22 @@ async function rpcCall(method, params) {
  * Fetch all CrcV2_TransferSingle events to SOUNDSCAPE_ADDRESS via direct fetch.
  * Uses circles_events_paginated which returns { events: [...], hasMore, nextCursor }.
  */
-async function fetchAllTransfers() {
+/**
+ * Core paginated fetch. fromBlock is optional — if provided, only fetches
+ * events from that block onward (used for incremental refresh).
+ */
+async function fetchTransfersSince(fromBlock = null, loadingLabel = 'Loading transfers…') {
   const allEvents = [];
   let cursor = null;
   let page = 0;
 
   do {
     page++;
-    setLoading(`Loading transfers… (page ${page})`);
+    setLoading(page === 1 ? loadingLabel : `${loadingLabel} (page ${page})`);
 
     const params = [
-      SOUNDSCAPE_ADDRESS.toLowerCase(), // address filter
-      null,           // fromBlock
+      SOUNDSCAPE_ADDRESS.toLowerCase(),
+      fromBlock,      // null = from genesis; number = incremental
       null,           // toBlock
       ['CrcV2_TransferSingle'],
       [
@@ -1015,7 +1020,6 @@ async function fetchAllTransfers() {
       break;
     }
 
-    // circles_events_paginated returns { events: [{event, values}], hasMore, nextCursor }
     const items = result?.events || [];
     items.forEach(item => {
       const v = item?.values || item;
@@ -1027,6 +1031,10 @@ async function fetchAllTransfers() {
   } while (cursor);
 
   return allEvents;
+}
+
+async function fetchAllTransfers() {
+  return fetchTransfersSince(null, 'Loading transfers…');
 }
 
 /**
@@ -1203,6 +1211,40 @@ function updateSoloUI(activeTxHash) {
   } else if (!activeTxHash && banner) {
     banner.remove();
   }
+}
+
+/**
+ * Prepend new voice rows to the top of the history list without wiping existing rows.
+ * New transfers are sorted by amplitude desc and inserted before existing rows.
+ */
+function prependVoiceRows(newTransfers) {
+  const list = $('voice-list');
+  const empty = $('voice-empty');
+  empty.classList.add('hidden');
+
+  const maxLogValue = Math.log1p(maxContributed);
+
+  const sorted = newTransfers
+    .map(t => {
+      const params = deriveParams(t);
+      const amplitude = computeAmplitude(params, maxLogValue);
+      return { t, params, amplitude };
+    })
+    .sort((a, b) => b.amplitude - a.amplitude);
+
+  // Insert before the first existing voice-row (or at end if none yet)
+  const firstExisting = list.querySelector('.voice-row');
+  sorted.forEach(({ t, params, amplitude }) => {
+    const row = buildVoiceRow(t, params, amplitude);
+    row.classList.add('voice-row-new'); // flash animation
+    if (firstExisting) {
+      list.insertBefore(row, firstExisting);
+    } else {
+      list.appendChild(row);
+    }
+    // Remove highlight class after animation completes
+    setTimeout(() => row.classList.remove('voice-row-new'), 1800);
+  });
 }
 
 function renderVoiceHistory() {
@@ -1421,6 +1463,18 @@ function pause() {
 
 // ── Initialisation ─────────────────────────────────────────────────────────
 
+/**
+ * Track the highest block number seen across all loaded transfers.
+ * Called whenever new transfers are merged in.
+ */
+function updateLastSeenBlock(newTransfers) {
+  for (const t of newTransfers) {
+    if (t.blockNumber && (lastSeenBlock === null || t.blockNumber > lastSeenBlock)) {
+      lastSeenBlock = t.blockNumber;
+    }
+  }
+}
+
 async function loadSoundscape() {
   setLoading('Fetching contributions…');
   $('btn-play').disabled = true;
@@ -1436,6 +1490,7 @@ async function loadSoundscape() {
       if (crc > maxContributed) maxContributed = crc;
     });
 
+    updateLastSeenBlock(transfers);
     renderVoiceHistory();
     updateVoiceCountFromTransfers();
     setLoading(null);
@@ -1451,6 +1506,78 @@ async function loadSoundscape() {
     setLoading(null);
     showToast(`Failed to load soundscape: ${decodeError(err)}`, 'error');
     $('btn-play').disabled = false;
+  }
+}
+
+/**
+ * Incremental refresh: only fetch blocks after lastSeenBlock.
+ * New transfers are merged into the existing list; existing voices are untouched.
+ */
+async function refreshSoundscape() {
+  const btn = $('btn-refresh');
+  const icon = $('refresh-icon');
+  const label = $('refresh-label');
+
+  btn.disabled = true;
+  icon.classList.add('spin');
+  label.textContent = 'Checking…';
+
+  try {
+    // Fetch only from the block after the last one we've seen
+    const fromBlock = lastSeenBlock !== null ? lastSeenBlock + 1 : null;
+    const events = await fetchTransfersSince(fromBlock, 'Checking for new voices…');
+    const newTransfers = parseTransfers(events);
+
+    // Deduplicate against existing transfers by txHash
+    const existingHashes = new Set(transfers.map(t => t.transactionHash));
+    const trulyNew = newTransfers.filter(t => !existingHashes.has(t.transactionHash));
+
+    setLoading(null);
+
+    if (trulyNew.length === 0) {
+      showToast('No new contributions yet', 'info', 2500);
+    } else {
+      // Merge new transfers in, update max, track block
+      transfers = [...transfers, ...trulyNew];
+      trulyNew.forEach(t => {
+        const crc = Number(BigInt(t.value || '0')) / 1e18;
+        if (crc > maxContributed) maxContributed = crc;
+      });
+      updateLastSeenBlock(trulyNew);
+
+      // Prepend new rows to the history list without wiping existing rows
+      prependVoiceRows(trulyNew);
+      updateVoiceCountFromTransfers();
+
+      // Add new voices to the running soundscape without stopping existing ones
+      if (isPlaying) {
+        const maxLogValue = Math.log1p(maxContributed);
+        trulyNew.forEach(t => {
+          const params = deriveParams(t);
+          const amplitude = computeAmplitude(params, maxLogValue);
+          if (amplitude < 0.001) return;
+          const voice = createVoice(t, params, amplitude);
+          voice.txHash = t.transactionHash;
+          if (soloTxHash && voice.txHash !== soloTxHash) {
+            voice.soloGate.gain.value = 0;
+          }
+          voices.push(voice);
+        });
+      }
+
+      // Load profiles for new contributors in background
+      loadProfilesForTransfers();
+
+      showToast(`${trulyNew.length} new voice${trulyNew.length !== 1 ? 's' : ''} added!`, 'success');
+    }
+  } catch (err) {
+    console.error('refreshSoundscape error:', err);
+    setLoading(null);
+    showToast(`Refresh failed: ${decodeError(err)}`, 'error');
+  } finally {
+    btn.disabled = false;
+    icon.classList.remove('spin');
+    label.textContent = 'Refresh';
   }
 }
 
@@ -1592,6 +1719,11 @@ if (!isMiniappMode()) {
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────
+
+// Refresh button
+$('btn-refresh').addEventListener('click', () => {
+  refreshSoundscape();
+});
 
 // Load the soundscape immediately (no wallet needed to listen)
 loadSoundscape();
