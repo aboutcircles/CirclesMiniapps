@@ -482,15 +482,25 @@ function buildToneCore(ctx, params) {
 }
 
 /**
- * Wrap a filter node in a panner → master, returning the standard voice object.
+ * Wrap a filter node in a panner → soloGate → master, returning the standard voice object.
+ *
+ * soloGate is a dedicated gain node inserted AFTER the panner.
+ * Solo mutes/unmutes by ramping soloGate, leaving the voice's own
+ * internal gain scheduling (pulse/drop/shimmer envelopes) completely untouched.
  */
 function wrapVoice(ctx, filterNode, voiceGain, panner, oscsToStop, cleanupNodes) {
+  // soloGate sits between panner and masterGain — it is the solo control point
+  const soloGate = ctx.createGain();
+  soloGate.gain.value = 1.0;
+
   filterNode.connect(voiceGain);
   voiceGain.connect(panner);
-  panner.connect(masterGain);
+  panner.connect(soloGate);
+  soloGate.connect(masterGain);
 
   return {
     gainNode: voiceGain,
+    soloGate,
     panner,
     baseAmp: voiceGain.gain.value,
     disconnect() {
@@ -499,6 +509,7 @@ function wrapVoice(ctx, filterNode, voiceGain, panner, oscsToStop, cleanupNodes)
         cleanupNodes.forEach(n => { try { n.disconnect(); } catch {} });
         voiceGain.disconnect();
         panner.disconnect();
+        soloGate.disconnect();
       } catch {}
     },
   };
@@ -750,8 +761,12 @@ function rampGain(gainNode, target, ms = 300) {
 }
 
 /**
- * Enter solo mode for a given transfer. Fades all other voices down,
- * raises the selected voice, and starts a standalone preview if not playing.
+ * Enter solo mode for a given transfer.
+ *
+ * We mute/unmute via soloGate — a dedicated gain node inserted between
+ * each voice's panner and masterGain. This leaves each voice's own internal
+ * gain scheduling (pulse on/off, drop envelope, shimmer swell) completely
+ * untouched, so the archetype behaviour keeps running correctly under the gate.
  */
 function enterSolo(transfer) {
   ensureAudioContext();
@@ -765,15 +780,15 @@ function enterSolo(transfer) {
   const amplitude = computeAmplitude(params, maxLogValue);
 
   if (isPlaying) {
-    // Fade all existing voices: duck to near-zero, raise the matched one
+    // Gate all voices: close everyone's soloGate, open only the matched one
     voices.forEach(v => {
       if (v.txHash === transfer.transactionHash) {
-        rampGain(v.gainNode, v.baseAmp, 250);
+        rampGain(v.soloGate, 1.0, 250);
       } else {
-        rampGain(v.gainNode, 0, 250);
+        rampGain(v.soloGate, 0.0, 250);
       }
     });
-    soloVoice = null; // voice is already in the mix
+    soloVoice = null;
   } else {
     // Not playing — spin up a one-off voice just for the preview
     soloVoice = createVoice(transfer, params, amplitude);
@@ -782,7 +797,7 @@ function enterSolo(transfer) {
 }
 
 /**
- * Exit solo mode, restoring all voices to their natural amplitudes.
+ * Exit solo mode, reopening all soloGates to full.
  */
 function exitSolo() {
   soloTxHash = null;
@@ -794,9 +809,9 @@ function exitSolo() {
   }
 
   if (isPlaying) {
-    // Restore all ducked voices
+    // Restore all gated voices
     voices.forEach(v => {
-      rampGain(v.gainNode, v.baseAmp, 300);
+      rampGain(v.soloGate, 1.0, 300);
     });
   }
 }
@@ -830,6 +845,10 @@ function rebuildSoundscape() {
       if (amplitude < 0.001) return; // inaudibly quiet, skip
       const voice = createVoice(t, params, amplitude);
       voice.txHash = t.transactionHash;
+      // If we're rebuilding while a solo is active, immediately gate new voices
+      if (soloTxHash && voice.txHash !== soloTxHash) {
+        voice.soloGate.gain.value = 0;
+      }
       voices.push(voice);
     });
   }
