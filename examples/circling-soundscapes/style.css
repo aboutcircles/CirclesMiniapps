@@ -358,19 +358,54 @@ h1 {
   margin-bottom: 7px;
 }
 
-.voice-addr {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 12px;
+.voice-who {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.voice-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+}
+
+.voice-avatar-placeholder {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-soft), var(--line-soft));
+  border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.voice-name {
+  font-size: 13px;
   color: var(--ink);
-  font-weight: 500;
-  min-width: 80px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
 }
 
 .voice-value {
   font-size: 13px;
   font-weight: 600;
   color: var(--ink);
-  margin-right: auto;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .badge-small {

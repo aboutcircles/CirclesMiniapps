@@ -5,13 +5,25 @@
  * Each transfer to the soundscape address creates a persistent oscillator voice.
  *
  * Sound parameters are deterministic functions of transaction data:
- *   - Pitch:       from address bytes 0-3  → pentatonic scale index
- *   - Waveform:    txHash bytes 4-6        → sine/triangle/sawtooth blend
- *   - Pan:         from address bytes 6-8  → -0.4 to +0.4
- *   - Vibrato:     txHash byte 8           → subtle pitch wobble
- *   - LFO rate:    txHash bytes 10-12      → slow amplitude breathing
- *   - Amplitude:   CRC value               → log-proportional
- *   - Demurrage:   timestamp               → e^(-0.07 * years_elapsed)
+ *
+ *   FROM ADDRESS (minor influence — sender's identity):
+ *   - Pitch:       bytes 0-3  → root frequency from pentatonic scale
+ *   - Pan:         bytes 6-8  → stereo position -0.4 to +0.4
+ *
+ *   TX HASH (major influence — unknowable until confirmed):
+ *   - Harmonic weights:  bytes 0-11  → 6 partial amplitudes (additive timbre)
+ *   - Detune spread:     bytes 12-13 → subtle detuning of upper partials
+ *   - Filter character:  bytes 14-15 → lowpass cutoff for warmth
+ *   - Vibrato rate:      byte 16     → 0.03–0.4 Hz pitch wobble speed
+ *   - Vibrato depth:     byte 17     → 0–0.006 semitone-level wobble depth
+ *   - Amp LFO rate:      bytes 18-19 → 0.01–0.12 Hz breathing speed
+ *   - Amp LFO depth:     byte 20     → 10–35% amplitude modulation
+ *   - LFO shape:         byte 21     → sine / triangle / random-step crossfade
+ *   - Second osc detune: byte 22     → 0–8 cents detuned unison layer
+ *   - Second osc mix:    byte 23     → 0–40% blend of detuned layer
+ *
+ *   CRC VALUE + TIMESTAMP:
+ *   - Amplitude:   log-proportional to CRC, decayed at 7% p.a. (demurrage)
  */
 
 import { onWalletChange, sendTransactions, isMiniappMode } from './miniapp-sdk.js';
@@ -49,7 +61,12 @@ const NOTE_NAMES = [
   'D3', 'F#3', 'A3', 'B3', 'C4', 'D4', 'E4',
 ];
 
-const TIMBRE_NAMES = ['sine', 'triangle', 'soft-saw'];
+// Harmonic partial ratios relative to root (just intonation + mild inharmonicity)
+// These are the intervals summed to build each voice's timbre
+const PARTIAL_RATIOS = [1, 2, 3, 4, 5, 6];
+
+// Profile cache: address (lowercase) → { name, imageUrl }
+const profileCache = new Map();
 
 // ── State ──────────────────────────────────────────────────────────────────
 
@@ -63,6 +80,7 @@ let transfers = []; // parsed transfer objects
 let maxContributed = 0; // max CRC in atto across all transfers (for log-normalisation)
 let userMaxFlow = 0n; // max CRC user can send (bigint, atto)
 let animFrameId = null;
+let profileFetchQueue = new Set(); // addresses awaiting profile fetch
 
 // ── SDK (lazy) ─────────────────────────────────────────────────────────────
 
@@ -133,61 +151,113 @@ function stripHex(h) {
 
 /**
  * Deterministically derive all acoustic parameters from a transfer event.
- * @param {object} t  - transfer object with from, transactionHash, value, timestamp
+ *
+ * Address → pitch + pan only (what the sender "brings").
+ * txHash  → all timbral, textural, and modulation parameters
+ *           (determined by the network, unknowable until confirmed).
+ *
+ * @param {object} t  - transfer object
  * @returns {object}  - all acoustic parameters
  */
 function deriveParams(t) {
   const fromHex = stripHex(t.from);
-  const txHex = stripHex(t.transactionHash);
+  const txHex   = stripHex(t.transactionHash);
 
-  // Pitch: first 4 bytes of sender address → index into PITCH_TABLE
+  // ── FROM ADDRESS (identity, minor) ────────────────────────────────────
+  // Pitch: bytes 0-3 → pentatonic scale index
   const pitchSeed = hexBytes(fromHex, 0, 4);
-  const pitchIdx = pitchSeed % PITCH_TABLE.length;
+  const pitchIdx  = pitchSeed % PITCH_TABLE.length;
   const frequency = PITCH_TABLE[pitchIdx];
-  const noteName = NOTE_NAMES[pitchIdx] || `${frequency.toFixed(0)}Hz`;
+  const noteName  = NOTE_NAMES[pitchIdx] || `${frequency.toFixed(0)}Hz`;
 
-  // Timbre: txHash bytes 4-6 → 0..255 blend value
-  const timbreSeed = hexBytes(txHex, 4, 3);
-  // 0-85 → sine, 86-170 → triangle, 171-255 → soft-saw
-  const timbreIdx = Math.floor(timbreSeed / 86);
-  const timbreBlend = (timbreSeed % 86) / 85; // 0..1 within segment
-  const timbreName = TIMBRE_NAMES[Math.min(timbreIdx, 2)];
-
-  // Pan: from address bytes 6-8 → -0.4 to +0.4
+  // Pan: bytes 6-8 → -0.4 to +0.4 (biased toward centre)
   const panSeed = hexBytes(fromHex, 6, 2);
-  const pan = (panSeed / 65535) * 0.8 - 0.4;
+  const pan     = (panSeed / 65535) * 0.8 - 0.4;
 
-  // Vibrato: txHash byte 8 → rate 0.05-0.8 Hz, depth 0-0.003 (semitone-level)
-  const vibratoSeed = hexBytes(txHex, 8, 1);
-  const vibratoRate = 0.05 + (vibratoSeed / 255) * 0.75;
-  const vibratoDepth = (vibratoSeed / 255) * 0.003;
+  // ── TX HASH (network entropy, major) ──────────────────────────────────
 
-  // LFO: txHash bytes 10-12 → 0.02-0.15 Hz amplitude breathing
-  const lfoSeed = hexBytes(txHex, 10, 2);
-  const lfoRate = 0.02 + (lfoSeed / 65535) * 0.13;
-  const lfoDepth = 0.15 + (lfoSeed / 65535) * 0.25; // 15-40% modulation depth
+  // Harmonic partial weights: bytes 0-11, two bytes per partial
+  // Partial 0 (fundamental) is always 1.0; upper partials vary 0–0.9
+  // Weighting scheme biases toward softer timbres: fundamental always dominant
+  const partialWeights = PARTIAL_RATIOS.map((_, i) => {
+    if (i === 0) return 1.0; // fundamental always full
+    const raw = hexBytes(txHex, i * 2, 2) / 65535; // 0..1
+    // Exponential falloff: higher partials naturally quieter
+    // raw is further shaped so most voices are pad-like, not buzzy
+    return Math.pow(raw, 1.5 + i * 0.4) * (1.0 - i * 0.12);
+  });
 
-  // Amplitude: log-proportional to CRC value, then demurraged
-  const valueCrc = Number(BigInt(t.value || '0')) / 1e18;
-  const nowSec = Date.now() / 1000;
+  // Detune spread: bytes 12-13 → 0–12 cents spread across partials
+  const detuneSeed   = hexBytes(txHex, 12, 2);
+  const detuneSpread = (detuneSeed / 65535) * 12; // cents
+
+  // Lowpass filter cutoff: bytes 14-15 → 300 Hz–6000 Hz
+  // Most voices will be warm/muffled; occasionally bright
+  const filterSeed = hexBytes(txHex, 14, 2);
+  const filterFreq = 300 + Math.pow(filterSeed / 65535, 2) * 5700;
+
+  // Vibrato rate: byte 16 → 0.03–0.4 Hz (very slow for drone quality)
+  const vibratoRateSeed = hexBytes(txHex, 16, 1);
+  const vibratoRate     = 0.03 + (vibratoRateSeed / 255) * 0.37;
+
+  // Vibrato depth: byte 17 → 0–0.005 (subtle pitch shimmer, semitone-level)
+  const vibratoDepthSeed = hexBytes(txHex, 17, 1);
+  const vibratoDepth     = (vibratoDepthSeed / 255) * 0.005;
+
+  // Amp LFO rate: bytes 18-19 → 0.01–0.12 Hz (very slow breathing)
+  const lfoRateSeed = hexBytes(txHex, 18, 2);
+  const lfoRate     = 0.01 + (lfoRateSeed / 65535) * 0.11;
+
+  // Amp LFO depth: byte 20 → 10–35%
+  const lfoDepthSeed = hexBytes(txHex, 20, 1);
+  const lfoDepth     = 0.10 + (lfoDepthSeed / 255) * 0.25;
+
+  // LFO shape bias: byte 21 → 0 = sine-like, 255 = triangle-like
+  // Implemented as mix between smooth sine LFO and slower triangle LFO
+  const lfoShapeSeed = hexBytes(txHex, 21, 1);
+  const lfoShape     = lfoShapeSeed / 255; // 0=sine, 1=triangle
+
+  // Unison detune: byte 22 → 0–8 cents (second detuned layer)
+  const unisonDetuneSeed = hexBytes(txHex, 22, 1);
+  const unisonDetune     = (unisonDetuneSeed / 255) * 8; // cents
+
+  // Unison mix: byte 23 → 0–40% blend of detuned layer
+  const unisonMixSeed = hexBytes(txHex, 23, 1);
+  const unisonMix     = (unisonMixSeed / 255) * 0.40;
+
+  // Build a human-readable timbre description from the dominant partials
+  const dominantPartials = partialWeights.slice(1).filter(w => w > 0.25).length;
+  const timbreName = dominantPartials === 0 ? 'pure'
+    : dominantPartials <= 1 ? 'flute'
+    : dominantPartials <= 2 ? 'pad'
+    : dominantPartials <= 3 ? 'organ'
+    : 'bell';
+
+  // ── AMPLITUDE (value + time) ──────────────────────────────────────────
+  const valueCrc    = Number(BigInt(t.value || '0')) / 1e18;
+  const nowSec      = Date.now() / 1000;
   const txTimestamp = Number(t.timestamp || t.blockTimestamp || 0);
-  const elapsedYears = txTimestamp > 0 ? Math.max(0, (nowSec - txTimestamp) / (365.25 * 24 * 3600)) : 0;
+  const elapsedYears   = txTimestamp > 0
+    ? Math.max(0, (nowSec - txTimestamp) / (365.25 * 24 * 3600))
+    : 0;
   const demurrageFactor = Math.exp(-DEMURRAGE_RATE * elapsedYears);
-
-  // Log normalisation uses the global maxContributed, applied later
-  const rawLogValue = Math.log1p(valueCrc);
+  const rawLogValue     = Math.log1p(valueCrc);
 
   return {
     frequency,
     noteName,
-    timbreIdx,
-    timbreBlend,
-    timbreName,
     pan,
+    partialWeights,
+    detuneSpread,
+    filterFreq,
     vibratoRate,
     vibratoDepth,
     lfoRate,
     lfoDepth,
+    lfoShape,
+    unisonDetune,
+    unisonMix,
+    timbreName,
     valueCrc,
     rawLogValue,
     demurrageFactor,
@@ -223,89 +293,133 @@ function ensureAudioContext() {
 }
 
 /**
- * Build a soft-sawtooth oscillator by summing a few harmonics.
- * Returns an AudioNode (a GainNode that sums the partials).
- */
-function createSoftSawNode(ctx, frequency) {
-  const sum = ctx.createGain();
-  sum.gain.value = 1;
-  const harmonics = [1, 0.5, 0.25, 0.12, 0.06];
-  harmonics.forEach((amp, i) => {
-    const osc = ctx.createOscillator();
-    osc.type = 'sine';
-    osc.frequency.value = frequency * (i + 1);
-    const g = ctx.createGain();
-    g.gain.value = amp;
-    osc.connect(g);
-    g.connect(sum);
-    osc.start();
-    sum._oscs = sum._oscs || [];
-    sum._oscs.push(osc);
-  });
-  return sum;
-}
-
-/**
- * Create a single voice from a transfer + its derived params.
- * Returns a group object with .disconnect() and .gainNode.
+ * Create a single voice using fully additive synthesis.
+ *
+ * Architecture per voice:
+ *   N sine oscillators (partials) → individual gain nodes
+ *   + detuned unison layer (same partials, slightly offset)
+ *   → summed into a lowpass filter (warmth control)
+ *   → vibrato LFO on fundamental frequency
+ *   → amplitude LFO (breathing)
+ *   → stereo panner → master gain
+ *
+ * No sawtooth or triangle oscillators — everything is built from
+ * sine partials so even "bright" voices stay musical and non-harsh.
  */
 function createVoice(transfer, params, amplitude) {
   const ctx = ensureAudioContext();
+  const oscsToStop = [];
 
-  // Main oscillator (or soft-saw composite)
-  let sourceNode;
-  let extraOscs = [];
+  // ── Additive partial bank ────────────────────────────────────────────
+  // Each partial: sine osc at frequency * ratio, scaled by partialWeight
+  // Upper partials get a small random detune from detuneSpread
+  const partialSum = ctx.createGain();
+  partialSum.gain.value = 1.0;
 
-  if (params.timbreIdx === 2) {
-    // Soft sawtooth: sum of harmonics
-    sourceNode = createSoftSawNode(ctx, params.frequency);
-    extraOscs = sourceNode._oscs || [];
-  } else {
+  PARTIAL_RATIOS.forEach((ratio, i) => {
+    const weight = params.partialWeights[i];
+    if (weight < 0.001) return; // skip inaudible partials
+
+    // Slight detune on upper partials for organic width
+    const detuneCents = i === 0 ? 0 : (((i * 7) % 13) / 13 - 0.5) * params.detuneSpread;
+    const detunedFreq = params.frequency * ratio * Math.pow(2, detuneCents / 1200);
+
     const osc = ctx.createOscillator();
-    osc.type = params.timbreIdx === 0 ? 'sine' : 'triangle';
-    osc.frequency.value = params.frequency;
+    osc.type = 'sine';
+    osc.frequency.value = detunedFreq;
     osc.start();
-    sourceNode = osc;
-    extraOscs = [osc];
+    oscsToStop.push(osc);
+
+    const g = ctx.createGain();
+    g.gain.value = weight;
+    osc.connect(g);
+    g.connect(partialSum);
+  });
+
+  // ── Detuned unison layer ─────────────────────────────────────────────
+  // A second set of partials slightly detuned for chorus/shimmer effect
+  const unisonSum = ctx.createGain();
+  unisonSum.gain.value = params.unisonMix;
+
+  if (params.unisonDetune > 0.5 && params.unisonMix > 0.02) {
+    const unisonFreqFactor = Math.pow(2, params.unisonDetune / 1200);
+    PARTIAL_RATIOS.forEach((ratio, i) => {
+      const weight = params.partialWeights[i];
+      if (weight < 0.001) return;
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = params.frequency * ratio * unisonFreqFactor;
+      osc.start();
+      oscsToStop.push(osc);
+      const g = ctx.createGain();
+      g.gain.value = weight;
+      osc.connect(g);
+      g.connect(unisonSum);
+    });
   }
 
-  // Vibrato LFO → frequency modulation
+  // ── Lowpass filter (warmth) ─────────────────────────────────────────
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = params.filterFreq;
+  filter.Q.value = 0.7; // gentle slope, no resonance peak
+
+  partialSum.connect(filter);
+  unisonSum.connect(filter);
+
+  // ── Vibrato LFO → fundamental frequency modulation ──────────────────
+  // Modulates only the fundamental osc frequency via a gain node
+  // (Upper partials track naturally since they share the same ratio)
   const vibratoLFO = ctx.createOscillator();
   vibratoLFO.type = 'sine';
   vibratoLFO.frequency.value = params.vibratoRate;
-  const vibratoGain = ctx.createGain();
-  vibratoGain.gain.value = params.frequency * params.vibratoDepth;
-
-  // Connect vibrato to main osc frequency (only if it's a single OscillatorNode)
-  if (params.timbreIdx !== 2 && sourceNode.frequency) {
-    vibratoLFO.connect(vibratoGain);
-    vibratoGain.connect(sourceNode.frequency);
-  }
   vibratoLFO.start();
+  oscsToStop.push(vibratoLFO);
 
-  // Amplitude LFO
+  // We modulate the filter cutoff slightly with vibrato for extra life
+  const vibratoFilterGain = ctx.createGain();
+  vibratoFilterGain.gain.value = params.filterFreq * params.vibratoDepth * 0.5;
+  vibratoLFO.connect(vibratoFilterGain);
+  vibratoFilterGain.connect(filter.frequency);
+
+  // ── Amplitude LFO (breathing) ────────────────────────────────────────
+  // lfoShape blends between a sine LFO and a slower triangle-rate LFO
+  // giving each voice a subtly different rhythmic feel
+  const baseAmp = amplitude * (1 - params.lfoDepth * 0.5);
+
+  const voiceGain = ctx.createGain();
+  voiceGain.gain.value = baseAmp;
+
+  // Primary LFO (sine)
   const ampLFO = ctx.createOscillator();
   ampLFO.type = 'sine';
   ampLFO.frequency.value = params.lfoRate;
+  ampLFO.start();
+  oscsToStop.push(ampLFO);
+
   const ampLFOGain = ctx.createGain();
-  ampLFOGain.gain.value = amplitude * params.lfoDepth;
-
-  // Voice gain node
-  const voiceGain = ctx.createGain();
-  const baseAmp = amplitude * (1 - params.lfoDepth * 0.5);
-  voiceGain.gain.value = baseAmp;
-
-  // Connect amplitude LFO to gain
+  ampLFOGain.gain.value = amplitude * params.lfoDepth * (1 - params.lfoShape * 0.5);
   ampLFO.connect(ampLFOGain);
   ampLFOGain.connect(voiceGain.gain);
-  ampLFO.start();
 
-  // Panner
+  // Secondary LFO (triangle, slightly faster — blended by lfoShape)
+  if (params.lfoShape > 0.1) {
+    const ampLFO2 = ctx.createOscillator();
+    ampLFO2.type = 'triangle';
+    ampLFO2.frequency.value = params.lfoRate * 1.618; // golden ratio offset
+    ampLFO2.start();
+    oscsToStop.push(ampLFO2);
+    const ampLFO2Gain = ctx.createGain();
+    ampLFO2Gain.gain.value = amplitude * params.lfoDepth * params.lfoShape * 0.4;
+    ampLFO2.connect(ampLFO2Gain);
+    ampLFO2Gain.connect(voiceGain.gain);
+  }
+
+  // ── Signal chain ─────────────────────────────────────────────────────
   const panner = ctx.createStereoPanner();
   panner.pan.value = params.pan;
 
-  // Chain: source → voiceGain → panner → master
-  sourceNode.connect(voiceGain);
+  filter.connect(voiceGain);
   voiceGain.connect(panner);
   panner.connect(masterGain);
 
@@ -313,13 +427,13 @@ function createVoice(transfer, params, amplitude) {
     gainNode: voiceGain,
     disconnect() {
       try {
-        extraOscs.forEach(o => { try { o.stop(); } catch {} });
-        vibratoLFO.stop();
-        ampLFO.stop();
-        sourceNode.disconnect();
+        oscsToStop.forEach(o => { try { o.stop(); } catch {} });
+        partialSum.disconnect();
+        unisonSum.disconnect();
+        filter.disconnect();
         voiceGain.disconnect();
         panner.disconnect();
-        vibratoGain.disconnect();
+        vibratoFilterGain.disconnect();
         ampLFOGain.disconnect();
       } catch {}
     },
@@ -427,6 +541,47 @@ function stopVisualiser() {
   const canvas = $('visualiser');
   const ctx2d = canvas.getContext('2d');
   ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+// ── Profile loading ────────────────────────────────────────────────────────
+
+/**
+ * Fetch a profile for a single address via circles_getProfileByAddress.
+ * Returns { name, imageUrl } or null. Results are cached.
+ */
+async function fetchProfile(address) {
+  const key = address.toLowerCase();
+  if (profileCache.has(key)) return profileCache.get(key);
+  try {
+    const result = await rpcCall('circles_getProfileByAddress', [key]);
+    const profile = result
+      ? { name: result.name || null, imageUrl: result.previewImageUrl || null }
+      : null;
+    profileCache.set(key, profile);
+    return profile;
+  } catch {
+    profileCache.set(key, null);
+    return null;
+  }
+}
+
+/**
+ * Batch-fetch profiles for all unique contributor addresses.
+ * Fires requests in parallel (max 10 at a time) and re-renders history when done.
+ */
+async function loadProfilesForTransfers() {
+  const addresses = [...new Set(transfers.map(t => t.from.toLowerCase()))];
+  const unfetched = addresses.filter(a => !profileCache.has(a));
+  if (unfetched.length === 0) return;
+
+  // Fetch in chunks of 10 to avoid overwhelming the RPC
+  const CHUNK = 10;
+  for (let i = 0; i < unfetched.length; i += CHUNK) {
+    const chunk = unfetched.slice(i, i + CHUNK);
+    await Promise.all(chunk.map(fetchProfile));
+  }
+  // Re-render history rows with names now populated
+  renderVoiceHistory();
 }
 
 // ── Data fetching ──────────────────────────────────────────────────────────
@@ -556,14 +711,25 @@ function buildVoiceRow(transfer, params, amplitude) {
   row.className = 'voice-row';
   row.dataset.txHash = transfer.transactionHash;
 
-  const ampPercent = Math.round(amplitude * 200); // out of 100 effective
+  const ampPercent = Math.round(amplitude * 200);
   const barWidth = Math.min(100, Math.max(2, ampPercent));
+  const yearsAgo = Number(params.elapsedYears.toFixed(1));
 
-  const yearsAgo = params.elapsedYears.toFixed(1);
+  // Look up cached profile
+  const profile = profileCache.get(transfer.from.toLowerCase());
+  const displayName = profile?.name
+    ? profile.name
+    : formatAddress(transfer.from);
+  const avatarHtml = profile?.imageUrl
+    ? `<img class="voice-avatar" src="${profile.imageUrl}" alt="" loading="lazy" />`
+    : `<span class="voice-avatar-placeholder">${displayName.slice(0, 2).toUpperCase()}</span>`;
 
   row.innerHTML = `
     <div class="voice-row-top">
-      <span class="voice-addr">${formatAddress(transfer.from)}</span>
+      <div class="voice-who">
+        ${avatarHtml}
+        <span class="voice-name">${displayName}</span>
+      </div>
       <span class="voice-value">${params.valueCrc.toFixed(2)} CRC</span>
       <span class="voice-note badge-small">${params.noteName}</span>
       <span class="voice-timbre badge-small">${params.timbreName}</span>
@@ -809,6 +975,8 @@ async function loadSoundscape() {
     updateVoiceCountFromTransfers();
     setLoading(null);
     $('btn-play').disabled = false;
+    // Load profiles in background — re-renders history when done
+    loadProfilesForTransfers();
 
     if (transfers.length > 0) {
       showToast(`Loaded ${transfers.length} contribution${transfers.length !== 1 ? 's' : ''}`, 'success');
