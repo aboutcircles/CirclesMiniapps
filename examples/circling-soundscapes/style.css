@@ -461,6 +461,46 @@ h1 {
   flex-shrink: 0;
 }
 
+/* ── Mute button ─────────────────────────────────────────────────────────── */
+.btn-mute {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.1s;
+  padding: 0;
+}
+
+.btn-mute:hover {
+  background: var(--error-bg);
+  color: var(--error-ink);
+  border-color: var(--error-line);
+  transform: scale(1.1);
+}
+
+.btn-mute.muted {
+  background: var(--error-bg);
+  color: var(--error-ink);
+  border-color: var(--error-line);
+}
+
+/* ── Muted row ───────────────────────────────────────────────────────────── */
+.voice-row.voice-muted {
+  opacity: 0.45;
+}
+
+.voice-row.voice-muted .amp-bar-fill {
+  background: var(--muted);
+  opacity: 0.4;
+}
+
 /* ── Solo button ─────────────────────────────────────────────────────────── */
 .btn-solo {
   display: inline-flex;

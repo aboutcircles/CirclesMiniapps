@@ -98,6 +98,7 @@ let maxContributed = 0; // max CRC in atto across all transfers (for log-normali
 let userMaxFlow = 0n; // max CRC user can send (bigint, atto)
 let animFrameId = null;
 let profileFetchQueue = new Set(); // addresses awaiting profile fetch
+const mutedTxHashes = new Set(); // persists across rebuilds
 let lastSeenBlock = null; // highest blockNumber seen across all loaded transfers
 
 // ── Solo state ─────────────────────────────────────────────────────────────
@@ -846,7 +847,11 @@ function rebuildSoundscape() {
       if (amplitude < 0.001) return; // inaudibly quiet, skip
       const voice = createVoice(t, params, amplitude);
       voice.txHash = t.transactionHash;
-      // If we're rebuilding while a solo is active, immediately gate new voices
+      // If muted, close gate immediately
+      if (mutedTxHashes.has(t.transactionHash)) {
+        voice.soloGate.gain.value = 0;
+      }
+      // If solo active and this isn't the solo voice, close gate
       if (soloTxHash && voice.txHash !== soloTxHash) {
         voice.soloGate.gain.value = 0;
       }
@@ -1126,7 +1131,10 @@ function buildVoiceRow(transfer, params, amplitude) {
       <span class="voice-value">${params.valueCrc.toFixed(2)} CRC</span>
       <span class="voice-note badge-small">${params.noteName}</span>
       <span class="voice-timbre badge-small badge-${params.archetype}">${params.timbreName}</span>
-      <button class="btn-solo" title="Listen to this voice" aria-label="Solo this voice">
+      <button class="btn-mute${mutedTxHashes.has(transfer.transactionHash) ? ' muted' : ''}" title="Mute this voice" aria-label="Mute this voice" aria-pressed="${mutedTxHashes.has(transfer.transactionHash)}">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+      </button>
+      <button class="btn-solo" title="Listen to this voice alone" aria-label="Solo this voice">
         <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
       </button>
       <button class="btn-expand" title="Show sound breakdown" aria-label="Expand breakdown" aria-expanded="false">
@@ -1149,6 +1157,48 @@ function buildVoiceRow(transfer, params, amplitude) {
       </div>
     </div>
   `;
+
+  // Mute button
+  const muteBtn = row.querySelector('.btn-mute');
+  muteBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isMuted = mutedTxHashes.has(transfer.transactionHash);
+    if (isMuted) {
+      // Unmute
+      mutedTxHashes.delete(transfer.transactionHash);
+      muteBtn.classList.remove('muted');
+      muteBtn.setAttribute('aria-pressed', 'false');
+      row.classList.remove('voice-muted');
+      // Restore gate unless in solo mode and this isn't the solo voice
+      const shouldBeOpen = !soloTxHash || soloTxHash === transfer.transactionHash;
+      voices.forEach(v => {
+        if (v.txHash === transfer.transactionHash) {
+          rampGain(v.soloGate, shouldBeOpen ? 1.0 : 0.0, 200);
+        }
+      });
+    } else {
+      // Mute
+      mutedTxHashes.add(transfer.transactionHash);
+      muteBtn.classList.add('muted');
+      muteBtn.setAttribute('aria-pressed', 'true');
+      row.classList.add('voice-muted');
+      voices.forEach(v => {
+        if (v.txHash === transfer.transactionHash) {
+          rampGain(v.soloGate, 0.0, 200);
+        }
+      });
+      // If this was the solo voice, exit solo
+      if (soloTxHash === transfer.transactionHash) {
+        exitSolo();
+        updateSoloUI(null);
+      }
+    }
+  });
+
+  // Apply muted state visually if already muted
+  if (mutedTxHashes.has(transfer.transactionHash)) {
+    row.classList.add('voice-muted');
+  }
 
   // Solo button
   const soloBtn = row.querySelector('.btn-solo');
@@ -1550,20 +1600,23 @@ async function refreshSoundscape() {
       updateVoiceCountFromTransfers();
 
       // Add new voices to the running soundscape without stopping existing ones
-      if (isPlaying) {
-        const maxLogValue = Math.log1p(maxContributed);
-        trulyNew.forEach(t => {
-          const params = deriveParams(t);
-          const amplitude = computeAmplitude(params, maxLogValue);
-          if (amplitude < 0.001) return;
-          const voice = createVoice(t, params, amplitude);
-          voice.txHash = t.transactionHash;
-          if (soloTxHash && voice.txHash !== soloTxHash) {
-            voice.soloGate.gain.value = 0;
-          }
-          voices.push(voice);
-        });
-      }
+        if (isPlaying) {
+          const maxLogValue = Math.log1p(maxContributed);
+          trulyNew.forEach(t => {
+            const params = deriveParams(t);
+            const amplitude = computeAmplitude(params, maxLogValue);
+            if (amplitude < 0.001) return;
+            const voice = createVoice(t, params, amplitude);
+            voice.txHash = t.transactionHash;
+            if (mutedTxHashes.has(t.transactionHash)) {
+              voice.soloGate.gain.value = 0;
+            }
+            if (soloTxHash && voice.txHash !== soloTxHash) {
+              voice.soloGate.gain.value = 0;
+            }
+            voices.push(voice);
+          });
+        }
 
       // Load profiles for new contributors in background
       loadProfilesForTransfers();
