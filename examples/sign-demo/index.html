@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Mini App - Sign Message</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="card">
+        <h2>Sign Message</h2>
+        <p class="subtitle">Demo mini app &mdash; requests message signing via host wallet</p>
+
+        <div class="status disconnected" id="status">
+            Waiting for wallet connection...
+        </div>
+
+        <div class="field">
+            <label>Message to sign</label>
+            <textarea id="messageInput">Hello from the mini app! This is an arbitrary message to be signed by the connected Safe wallet using passkeys.</textarea>
+        </div>
+
+        <button id="signBtn" disabled>Request Signature</button>
+
+        <div class="result" id="result"></div>
+    </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "name": "circling-soundscapes",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@aboutcircles/sdk": "^0.1.24",
+    "@aboutcircles/sdk-transfers": "^0.1.24",
+    "@aboutcircles/sdk-utils": "^0.1.24",
+    "@safe-global/safe-deployments": "^1.37.22",
+    "viem": "^2.46.3"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0",
+    "vite-plugin-node-polyfills": "^0.25.0"
+  }
+}

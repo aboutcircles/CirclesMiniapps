@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Circling Soundscapes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+
+    <!-- Header -->
+    <header class="app-header">
+      <div class="title-row">
+        <div class="title-group">
+          <span class="app-icon">🌊</span>
+          <h1>Circling Soundscapes</h1>
+        </div>
+        <div id="wallet-status" class="badge">Not connected</div>
+      </div>
+    </header>
+
+    <main id="main-content">
+
+      <!-- ── Player card ─────────────────────────────────────────── -->
+      <div class="card player-card">
+        <div class="voice-counter">
+          <span id="voice-count">0</span>
+          <span class="voice-label">voices active</span>
+        </div>
+
+        <!-- Visualiser canvas -->
+        <canvas id="visualiser" class="visualiser" width="640" height="80"></canvas>
+
+        <!-- Transport controls -->
+        <div class="transport">
+          <button id="btn-play" class="btn-play" disabled>
+            <svg id="icon-play" viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="icon-pause" viewBox="0 0 24 24" fill="currentColor" width="22" height="22" class="hidden"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+            <span id="play-label">Play</span>
+          </button>
+
+          <div class="volume-row">
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" class="vol-icon"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
+            <input type="range" id="volume-slider" min="0" max="100" value="70" class="volume-slider" />
+            <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" class="vol-icon"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zm-15.5 0c0-1.67.64-3.19 1.69-4.33L4.2 6.18C2.83 7.67 2 9.73 2 12c0 3.95 2.72 7.27 6.38 8.25l1.43-1.43C6.54 18.34 3.5 15.5 3.5 12z"/></svg>
+          </div>
+        </div>
+
+        <!-- Loading state -->
+        <div id="loading-state" class="loading-state">
+          <div class="spinner"></div>
+          <span id="loading-text">Loading soundscape…</span>
+        </div>
+      </div>
+
+      <!-- ── Contribute button (only when connected) ─────────────── -->
+      <div id="contribute-row" class="contribute-row hidden">
+        <button id="btn-contribute" class="btn-contribute">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 4v16m8-8H4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+          Add Your Voice
+        </button>
+        <p class="contribute-hint">Send CRC to add a permanent sound to the soundscape</p>
+      </div>
+
+      <!-- ── Disconnected hint ───────────────────────────────────── -->
+      <div id="disconnected-hint" class="card hint-card">
+        <p>Connect your Circles wallet to contribute a sound.<br/>
+        The soundscape loads for everyone — connect to add your voice.</p>
+      </div>
+
+      <!-- ── Voice history ──────────────────────────────────────── -->
+      <section class="history-section">
+        <div class="history-title-row">
+          <h2 class="section-title">Voice History</h2>
+          <button id="btn-refresh" class="btn-refresh" title="Check for new contributions">
+            <svg id="refresh-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            <span id="refresh-label">Refresh</span>
+          </button>
+        </div>
+        <div id="voice-list" class="voice-list">
+          <div id="voice-empty" class="voice-empty">
+            <span>No voices yet — be the first to contribute!</span>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ── Contribute modal ────────────────────────────────────────── -->
+  <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2 id="modal-title">Add Your Voice</h2>
+        <button id="modal-close" class="modal-close" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="18" height="18"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <p class="modal-desc">Choose how much CRC to contribute. A larger amount means a louder, longer-lasting voice in the soundscape. Minimum: <strong>1 CRC</strong>.</p>
+
+        <div class="amount-display">
+          <span id="amount-display" class="amount-number">1</span>
+          <span class="amount-unit">CRC</span>
+        </div>
+
+        <input
+          type="range"
+          id="amount-slider"
+          class="amount-slider"
+          min="1"
+          max="100"
+          step="1"
+          value="1"
+        />
+
+        <div class="slider-labels">
+          <span>10 CRC</span>
+          <span id="slider-max-label">max</span>
+        </div>
+
+        <!-- Preview of acoustic parameters -->
+        <div id="voice-preview" class="voice-preview hidden">
+          <div class="preview-title">Your sound preview</div>
+          <div class="preview-params">
+            <div class="param"><span class="param-label">Note</span><span id="preview-note" class="param-value">—</span></div>
+            <div class="param"><span class="param-label">Timbre</span><span id="preview-timbre" class="param-value">—</span></div>
+            <div class="param"><span class="param-label">Pan</span><span id="preview-pan" class="param-value">—</span></div>
+          </div>
+        </div>
+
+        <div id="modal-status" class="modal-status hidden"></div>
+
+        <div class="modal-actions">
+          <button id="btn-cancel" class="btn-secondary">Cancel</button>
+          <button id="btn-send" class="btn-send">
+            <span id="send-label">Contribute</span>
+            <div id="send-spinner" class="btn-spinner hidden"></div>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

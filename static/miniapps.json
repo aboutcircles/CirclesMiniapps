@@ -127,6 +127,19 @@
     "category": "admin"
   },
   {
+    "slug": "crc-clearing",
+    "name": "CRC Clearing",
+    "logo": "/app-logos/crc-clearing.png",
+    "url": "https://dist-eight-rho-56.vercel.app",
+    "description": "Reclaim your personal Circles tokens. Clear reciprocal holdings with one click.",
+    "tags": [
+      "defi",
+      "clearing",
+      "tokens"
+    ],
+    "category": "miniapp"
+  },
+  {
     "slug": "self-demo",
     "name": "Self Onboarding App",
     "logo": "https://example.com/logo.svg",
@@ -138,5 +151,19 @@
     ],
     "category": "miniapp",
     "isHidden": true
+  },
+  {
+    "slug": "circling-soundscapes",
+    "name": "Circling Soundscapes",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "https://circles-miniapp-circling-soundscape.vercel.app",
+    "description": "A living drone soundscape generated from CRC contributions. Each transfer adds a permanent voice — pitch, timbre, and rhythm are deterministic functions of the transaction. Sounds fade at 7% p.a., mirroring Circles demurrage.",
+    "tags": [
+      "music",
+      "art",
+      "community",
+      "circles"
+    ],
+    "category": "miniapp"
   }
 ]

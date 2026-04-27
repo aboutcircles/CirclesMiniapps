@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Mini App - ERC20 Transfer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="card">
+        <h2>ERC20 Token Transfer</h2>
+        <p class="subtitle">Demo mini app &mdash; requests tx signing via host wallet</p>
+
+        <div class="status disconnected" id="status">
+            Waiting for wallet connection...
+        </div>
+
+        <div class="field">
+            <label>Token Contract</label>
+            <input type="text" id="tokenAddr" value="0xeef7b1f06b092625228c835dd5d5b14641d1e54a" disabled>
+        </div>
+
+        <div class="field">
+            <label>Recipient</label>
+            <input type="text" id="recipient" value="0x1921481F27F16c7Fe4cE54f3276AAfb18149e72e" disabled>
+        </div>
+
+        <div class="field">
+            <label>Amount (wei)</label>
+            <input type="text" id="amount" value="1000000000000000000" placeholder="Amount in wei">
+        </div>
+
+        <button id="sendBtn" disabled>Send Transfer</button>
+
+        <div class="result" id="result"></div>
+    </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
