@@ -368,6 +368,24 @@ function rebuildSoundscape() {
   updateVoiceCount(active.filter(({ amplitude }) => amplitude >= 0.001).length);
 }
 
+/**
+ * Compute and display the voice count without starting audio.
+ * Called after data loads so the counter is accurate before the user presses Play.
+ */
+function updateVoiceCountFromTransfers() {
+  if (transfers.length === 0) {
+    updateVoiceCount(0);
+    return;
+  }
+  const maxLogValue = Math.log1p(maxContributed);
+  const count = transfers.reduce((n, t) => {
+    const params = deriveParams(t);
+    const amplitude = computeAmplitude(params, maxLogValue);
+    return amplitude >= 0.001 ? n + 1 : n;
+  }, 0);
+  updateVoiceCount(Math.min(count, MAX_VOICES));
+}
+
 function updateVoiceCount(n) {
   $('voice-count').textContent = n;
 }
@@ -414,58 +432,70 @@ function stopVisualiser() {
 // ── Data fetching ──────────────────────────────────────────────────────────
 
 /**
- * Fetch all CrcV2_TransferSingle events to SOUNDSCAPE_ADDRESS.
- * Paginates through all results.
+ * Low-level RPC fetch — bypasses the SDK client to avoid envelope handling surprises.
+ * Returns the parsed result field directly.
+ */
+async function rpcCall(method, params) {
+  const resp = await fetch(RPC_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+  });
+  if (!resp.ok) throw new Error(`RPC HTTP ${resp.status}`);
+  const json = await resp.json();
+  if (json.error) throw new Error(json.error.message || JSON.stringify(json.error));
+  return json.result;
+}
+
+/**
+ * Fetch all CrcV2_TransferSingle events to SOUNDSCAPE_ADDRESS via direct fetch.
+ * Uses circles_events_paginated which returns { events: [...], hasMore, nextCursor }.
  */
 async function fetchAllTransfers() {
-  const sdk = getSdk();
   const allEvents = [];
-  // circles_events returns an array directly (not paginated with cursor),
-  // so we use the address param to filter by the soundscape address and
-  // rely on the filterPredicates for the 'to' column.
-  // The response is an array of { event: string, values: {...} } objects.
+  let cursor = null;
+  let page = 0;
 
-  setLoading('Loading transfers…');
+  do {
+    page++;
+    setLoading(`Loading transfers… (page ${page})`);
 
-  const params = [
-    SOUNDSCAPE_ADDRESS.toLowerCase(), // address filter (matches any field)
-    null,           // fromBlock
-    null,           // toBlock
-    ['CrcV2_TransferSingle'],
-    [
-      {
-        Type: 'FilterPredicate',
-        FilterType: 'Equals',
-        Column: 'to',
-        Value: SOUNDSCAPE_ADDRESS.toLowerCase(),
-      }
-    ],
-    true,           // sortAscending
-    1000,
-    null,
-  ];
+    const params = [
+      SOUNDSCAPE_ADDRESS.toLowerCase(), // address filter
+      null,           // fromBlock
+      null,           // toBlock
+      ['CrcV2_TransferSingle'],
+      [
+        {
+          Type: 'FilterPredicate',
+          FilterType: 'Equals',
+          Column: 'to',
+          Value: SOUNDSCAPE_ADDRESS.toLowerCase(),
+        }
+      ],
+      true,           // sortAscending
+      1000,
+      cursor,
+    ];
 
-  let response;
-  try {
-    response = await sdk.circlesRpc.call('circles_events', params);
-  } catch (err) {
-    console.error('circles_events error:', err);
-    return allEvents;
-  }
+    let result;
+    try {
+      result = await rpcCall('circles_events_paginated', params);
+    } catch (err) {
+      console.error('circles_events_paginated error:', err);
+      break;
+    }
 
-  // The RPC returns the result directly as an array of event objects:
-  // [ { event: "CrcV2_TransferSingle", values: { blockNumber, timestamp, transactionHash, from, to, value, ... } }, ... ]
-  const rawArray = Array.isArray(response)
-    ? response
-    : Array.isArray(response?.result)
-      ? response.result
-      : [];
+    // circles_events_paginated returns { events: [{event, values}], hasMore, nextCursor }
+    const items = result?.events || [];
+    items.forEach(item => {
+      const v = item?.values || item;
+      if (v) allEvents.push(v);
+    });
 
-  rawArray.forEach(item => {
-    // Each item is { event: "...", values: { ... } }
-    const v = item?.values || item;
-    if (v) allEvents.push(v);
-  });
+    cursor = result?.nextCursor || null;
+    if (!result?.hasMore) cursor = null;
+  } while (cursor);
 
   return allEvents;
 }
@@ -776,6 +806,7 @@ async function loadSoundscape() {
     });
 
     renderVoiceHistory();
+    updateVoiceCountFromTransfers();
     setLoading(null);
     $('btn-play').disabled = false;
 
