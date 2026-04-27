@@ -151,5 +151,19 @@
     ],
     "category": "miniapp",
     "isHidden": true
+  },
+  {
+    "slug": "circling-soundscapes",
+    "name": "Circling Soundscapes",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "https://circles-miniapp-circling-soundscapes-c4msmw2gm.vercel.app",
+    "description": "A living drone soundscape generated from CRC contributions. Each transfer adds a permanent voice — pitch, timbre, and rhythm are deterministic functions of the transaction. Sounds fade at 7% p.a., mirroring Circles demurrage.",
+    "tags": [
+      "music",
+      "art",
+      "community",
+      "circles"
+    ],
+    "category": "miniapp"
   }
 ]
