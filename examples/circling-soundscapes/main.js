@@ -6,6 +6,12 @@
  *
  * Sound parameters are deterministic functions of transaction data:
  *
+ *   TX HASH byte 30 → ARCHETYPE (what kind of sound this voice makes):
+ *     0–63   drone    sustained additive pad, slowly breathing
+ *     64–127 pulse    rhythmic amplitude gate — slow on/off heartbeat
+ *     128–191 drop    pitched percussive hit repeating at slow intervals
+ *     192–255 shimmer high-register bell/glass attack-decay cycle
+ *
  *   TX HASH (dominant — unknowable until the tx is confirmed on-chain):
  *   - Pitch base:        bytes 0-3   → note index in pentatonic scale
  *   - Octave register:   byte 4      → selects low / mid / high band
@@ -15,11 +21,18 @@
  *   - Filter character:  bytes 20-21 → lowpass cutoff for warmth
  *   - Vibrato rate:      byte 22     → 0.03–0.4 Hz pitch wobble speed
  *   - Vibrato depth:     byte 23     → 0–0.005 semitone-level wobble depth
- *   - Amp LFO rate:      bytes 24-25 → 0.01–0.12 Hz breathing speed
- *   - Amp LFO depth:     byte 26     → 10–35% amplitude modulation
- *   - LFO shape:         byte 27     → sine / triangle crossfade
+ *   - Amp LFO rate:      bytes 24-25 → 0.01–0.12 Hz breathing speed (drone)
+ *   - Amp LFO depth:     byte 26     → 10–35% amplitude modulation (drone)
+ *   - LFO shape:         byte 27     → sine / triangle crossfade (drone)
  *   - Second osc detune: byte 28     → 0–8 cents detuned unison layer
  *   - Second osc mix:    byte 29     → 0–40% blend of detuned layer
+ *   - Archetype:         byte 30     → selects voice archetype (see above)
+ *   - Beat period:       bytes 31-32 → 0.5–4 s between pulses (pulse/drop)
+ *   - Pulse duty:        byte 33     → 10–80% on-time ratio (pulse)
+ *   - Drop decay:        byte 34     → 0.3–2.5 s decay time (drop)
+ *   - Drop interval:     bytes 35-36 → 1–8 s between hits (drop)
+ *   - Shimmer attack:    byte 37     → 20–400 ms attack (shimmer)
+ *   - Shimmer sustain:   bytes 38-39 → 0.5–3 s sustain (shimmer)
  *
  *   FROM ADDRESS (subtle colouring only — same sender stays recognisable
  *                 but each tx still sounds distinct):
@@ -249,13 +262,47 @@ function deriveParams(t) {
   const panNudge    = (addrPanByte / 255) * 0.2 - 0.1;
   const pan         = Math.max(-0.5, Math.min(0.5, txPan + panNudge));
 
-  // Build a human-readable timbre description from the dominant partials
+  // ── ARCHETYPE + RHYTHM PARAMS (txHash bytes 30–39) ───────────────────
+
+  // Archetype: byte 30
+  const archetypeSeed = hexBytes(txHex, 30, 1);
+  const archetype = archetypeSeed < 64 ? 'drone'
+    : archetypeSeed < 128 ? 'pulse'
+    : archetypeSeed < 192 ? 'drop'
+    : 'shimmer';
+
+  // Beat period: bytes 31-32 → 0.5–4 s  (pulse + drop)
+  const beatPeriodSeed = hexBytes(txHex, 31, 2);
+  const beatPeriod     = 0.5 + (beatPeriodSeed / 65535) * 3.5;
+
+  // Pulse duty cycle: byte 33 → 0.1–0.8
+  const pulseDutySeed = hexBytes(txHex, 33, 1);
+  const pulseDuty     = 0.10 + (pulseDutySeed / 255) * 0.70;
+
+  // Drop decay: byte 34 → 0.3–2.5 s
+  const dropDecaySeed = hexBytes(txHex, 34, 1);
+  const dropDecay     = 0.3 + (dropDecaySeed / 255) * 2.2;
+
+  // Drop interval: bytes 35-36 → 1–8 s
+  const dropIntervalSeed = hexBytes(txHex, 35, 2);
+  const dropInterval     = 1.0 + (dropIntervalSeed / 65535) * 7.0;
+
+  // Shimmer attack: byte 37 → 0.02–0.4 s
+  const shimmerAttackSeed = hexBytes(txHex, 37, 1);
+  const shimmerAttack     = 0.02 + (shimmerAttackSeed / 255) * 0.38;
+
+  // Shimmer sustain: bytes 38-39 → 0.5–3 s
+  const shimmerSustainSeed = hexBytes(txHex, 38, 2);
+  const shimmerSustain     = 0.5 + (shimmerSustainSeed / 65535) * 2.5;
+
+  // Timbre label: archetype takes precedence, then harmonic character
   const dominantPartials = partialWeights.slice(1).filter(w => w > 0.25).length;
-  const timbreName = dominantPartials === 0 ? 'pure'
+  const timbreDetail = dominantPartials === 0 ? 'pure'
     : dominantPartials <= 1 ? 'flute'
     : dominantPartials <= 2 ? 'pad'
     : dominantPartials <= 3 ? 'organ'
     : 'bell';
+  const timbreName = archetype; // shown as badge; timbreDetail available for tooltip
 
   // ── AMPLITUDE (value + time) ──────────────────────────────────────────
   const valueCrc    = Number(BigInt(t.value || '0')) / 1e18;
@@ -281,7 +328,15 @@ function deriveParams(t) {
     lfoShape,
     unisonDetune,
     unisonMix,
+    archetype,
+    beatPeriod,
+    pulseDuty,
+    dropDecay,
+    dropInterval,
+    shimmerAttack,
+    shimmerSustain,
     timbreName,
+    timbreDetail,
     valueCrc,
     rawLogValue,
     demurrageFactor,
@@ -316,54 +371,41 @@ function ensureAudioContext() {
   return audioCtx;
 }
 
-/**
- * Create a single voice using fully additive synthesis.
- *
- * Architecture per voice:
- *   N sine oscillators (partials) → individual gain nodes
- *   + detuned unison layer (same partials, slightly offset)
- *   → summed into a lowpass filter (warmth control)
- *   → vibrato LFO on fundamental frequency
- *   → amplitude LFO (breathing)
- *   → stereo panner → master gain
- *
- * No sawtooth or triangle oscillators — everything is built from
- * sine partials so even "bright" voices stay musical and non-harsh.
- */
-function createVoice(transfer, params, amplitude) {
-  const ctx = ensureAudioContext();
-  const oscsToStop = [];
+// ── Shared synth helpers ───────────────────────────────────────────────────
 
-  // ── Additive partial bank ────────────────────────────────────────────
-  // Each partial: sine osc at frequency * ratio, scaled by partialWeight
-  // Upper partials get a small random detune from detuneSpread
+/**
+ * Build the additive partial bank + unison layer + lowpass filter.
+ * Returns { filterNode, oscsToStop, cleanupNodes }.
+ * This is the tonal core shared by all four archetypes.
+ */
+function buildToneCore(ctx, params) {
+  const oscsToStop = [];
+  const cleanupNodes = [];
+
   const partialSum = ctx.createGain();
   partialSum.gain.value = 1.0;
+  cleanupNodes.push(partialSum);
 
   PARTIAL_RATIOS.forEach((ratio, i) => {
     const weight = params.partialWeights[i];
-    if (weight < 0.001) return; // skip inaudible partials
-
-    // Slight detune on upper partials for organic width
+    if (weight < 0.001) return;
     const detuneCents = i === 0 ? 0 : (((i * 7) % 13) / 13 - 0.5) * params.detuneSpread;
     const detunedFreq = params.frequency * ratio * Math.pow(2, detuneCents / 1200);
-
     const osc = ctx.createOscillator();
     osc.type = 'sine';
     osc.frequency.value = detunedFreq;
     osc.start();
     oscsToStop.push(osc);
-
     const g = ctx.createGain();
     g.gain.value = weight;
+    cleanupNodes.push(g);
     osc.connect(g);
     g.connect(partialSum);
   });
 
-  // ── Detuned unison layer ─────────────────────────────────────────────
-  // A second set of partials slightly detuned for chorus/shimmer effect
   const unisonSum = ctx.createGain();
   unisonSum.gain.value = params.unisonMix;
+  cleanupNodes.push(unisonSum);
 
   if (params.unisonDetune > 0.5 && params.unisonMix > 0.02) {
     const unisonFreqFactor = Math.pow(2, params.unisonDetune / 1200);
@@ -377,93 +419,285 @@ function createVoice(transfer, params, amplitude) {
       oscsToStop.push(osc);
       const g = ctx.createGain();
       g.gain.value = weight;
+      cleanupNodes.push(g);
       osc.connect(g);
       g.connect(unisonSum);
     });
   }
 
-  // ── Lowpass filter (warmth) ─────────────────────────────────────────
   const filter = ctx.createBiquadFilter();
   filter.type = 'lowpass';
   filter.frequency.value = params.filterFreq;
-  filter.Q.value = 0.7; // gentle slope, no resonance peak
+  filter.Q.value = 0.7;
+  cleanupNodes.push(filter);
 
   partialSum.connect(filter);
   unisonSum.connect(filter);
 
-  // ── Vibrato LFO → fundamental frequency modulation ──────────────────
-  // Modulates only the fundamental osc frequency via a gain node
-  // (Upper partials track naturally since they share the same ratio)
+  // Vibrato → filter frequency modulation
   const vibratoLFO = ctx.createOscillator();
   vibratoLFO.type = 'sine';
   vibratoLFO.frequency.value = params.vibratoRate;
   vibratoLFO.start();
   oscsToStop.push(vibratoLFO);
-
-  // We modulate the filter cutoff slightly with vibrato for extra life
   const vibratoFilterGain = ctx.createGain();
   vibratoFilterGain.gain.value = params.filterFreq * params.vibratoDepth * 0.5;
+  cleanupNodes.push(vibratoFilterGain);
   vibratoLFO.connect(vibratoFilterGain);
   vibratoFilterGain.connect(filter.frequency);
 
-  // ── Amplitude LFO (breathing) ────────────────────────────────────────
-  // lfoShape blends between a sine LFO and a slower triangle-rate LFO
-  // giving each voice a subtly different rhythmic feel
-  const baseAmp = amplitude * (1 - params.lfoDepth * 0.5);
+  return { filterNode: filter, oscsToStop, cleanupNodes };
+}
 
-  const voiceGain = ctx.createGain();
-  voiceGain.gain.value = baseAmp;
-
-  // Primary LFO (sine)
-  const ampLFO = ctx.createOscillator();
-  ampLFO.type = 'sine';
-  ampLFO.frequency.value = params.lfoRate;
-  ampLFO.start();
-  oscsToStop.push(ampLFO);
-
-  const ampLFOGain = ctx.createGain();
-  ampLFOGain.gain.value = amplitude * params.lfoDepth * (1 - params.lfoShape * 0.5);
-  ampLFO.connect(ampLFOGain);
-  ampLFOGain.connect(voiceGain.gain);
-
-  // Secondary LFO (triangle, slightly faster — blended by lfoShape)
-  if (params.lfoShape > 0.1) {
-    const ampLFO2 = ctx.createOscillator();
-    ampLFO2.type = 'triangle';
-    ampLFO2.frequency.value = params.lfoRate * 1.618; // golden ratio offset
-    ampLFO2.start();
-    oscsToStop.push(ampLFO2);
-    const ampLFO2Gain = ctx.createGain();
-    ampLFO2Gain.gain.value = amplitude * params.lfoDepth * params.lfoShape * 0.4;
-    ampLFO2.connect(ampLFO2Gain);
-    ampLFO2Gain.connect(voiceGain.gain);
-  }
-
-  // ── Signal chain ─────────────────────────────────────────────────────
-  const panner = ctx.createStereoPanner();
-  panner.pan.value = params.pan;
-
-  filter.connect(voiceGain);
+/**
+ * Wrap a filter node in a panner → master, returning the standard voice object.
+ */
+function wrapVoice(ctx, filterNode, voiceGain, panner, oscsToStop, cleanupNodes) {
+  filterNode.connect(voiceGain);
   voiceGain.connect(panner);
   panner.connect(masterGain);
 
   return {
     gainNode: voiceGain,
     panner,
-    baseAmp,
+    baseAmp: voiceGain.gain.value,
     disconnect() {
       try {
         oscsToStop.forEach(o => { try { o.stop(); } catch {} });
-        partialSum.disconnect();
-        unisonSum.disconnect();
-        filter.disconnect();
+        cleanupNodes.forEach(n => { try { n.disconnect(); } catch {} });
         voiceGain.disconnect();
         panner.disconnect();
-        vibratoFilterGain.disconnect();
-        ampLFOGain.disconnect();
       } catch {}
     },
   };
+}
+
+// ── Archetype: DRONE ──────────────────────────────────────────────────────
+// Sustained pad with slow breathing LFO. The classic drone voice.
+
+function createDroneVoice(params, amplitude) {
+  const ctx = ensureAudioContext();
+  const { filterNode, oscsToStop, cleanupNodes } = buildToneCore(ctx, params);
+
+  const baseAmp  = amplitude * (1 - params.lfoDepth * 0.5);
+  const voiceGain = ctx.createGain();
+  voiceGain.gain.value = baseAmp;
+  cleanupNodes.push(voiceGain);
+
+  // Primary breathing LFO
+  const ampLFO = ctx.createOscillator();
+  ampLFO.type = 'sine';
+  ampLFO.frequency.value = params.lfoRate;
+  ampLFO.start();
+  oscsToStop.push(ampLFO);
+  const ampLFOGain = ctx.createGain();
+  ampLFOGain.gain.value = amplitude * params.lfoDepth * (1 - params.lfoShape * 0.5);
+  cleanupNodes.push(ampLFOGain);
+  ampLFO.connect(ampLFOGain);
+  ampLFOGain.connect(voiceGain.gain);
+
+  // Secondary LFO (triangle, golden-ratio offset) blended by lfoShape
+  if (params.lfoShape > 0.1) {
+    const ampLFO2 = ctx.createOscillator();
+    ampLFO2.type = 'triangle';
+    ampLFO2.frequency.value = params.lfoRate * 1.618;
+    ampLFO2.start();
+    oscsToStop.push(ampLFO2);
+    const ampLFO2Gain = ctx.createGain();
+    ampLFO2Gain.gain.value = amplitude * params.lfoDepth * params.lfoShape * 0.4;
+    cleanupNodes.push(ampLFO2Gain);
+    ampLFO2.connect(ampLFO2Gain);
+    ampLFO2Gain.connect(voiceGain.gain);
+  }
+
+  const panner = ctx.createStereoPanner();
+  panner.pan.value = params.pan;
+  return wrapVoice(ctx, filterNode, voiceGain, panner, oscsToStop, cleanupNodes);
+}
+
+// ── Archetype: PULSE ──────────────────────────────────────────────────────
+// Rhythmic amplitude gate — the tone plays, then silences, then plays again.
+// Uses scheduled AudioParam automation in a recurring setTimeout loop.
+
+function createPulseVoice(params, amplitude) {
+  const ctx = ensureAudioContext();
+  const { filterNode, oscsToStop, cleanupNodes } = buildToneCore(ctx, params);
+
+  const voiceGain = ctx.createGain();
+  voiceGain.gain.value = 0;
+  cleanupNodes.push(voiceGain);
+
+  const panner = ctx.createStereoPanner();
+  panner.pan.value = params.pan;
+
+  const voice = wrapVoice(ctx, filterNode, voiceGain, panner, oscsToStop, cleanupNodes);
+
+  // onTime and offTime in seconds
+  const onTime  = params.beatPeriod * params.pulseDuty;
+  const offTime = params.beatPeriod * (1 - params.pulseDuty);
+
+  let stopped = false;
+  let timeoutId = null;
+
+  function scheduleOn() {
+    if (stopped) return;
+    const now = ctx.currentTime;
+    voiceGain.gain.cancelScheduledValues(now);
+    voiceGain.gain.setValueAtTime(0, now);
+    // Short attack (5% of onTime, min 10ms) then hold
+    const attack = Math.max(0.01, onTime * 0.05);
+    voiceGain.gain.linearRampToValueAtTime(amplitude, now + attack);
+    timeoutId = setTimeout(scheduleOff, onTime * 1000);
+  }
+
+  function scheduleOff() {
+    if (stopped) return;
+    const now = ctx.currentTime;
+    voiceGain.gain.cancelScheduledValues(now);
+    voiceGain.gain.setValueAtTime(voiceGain.gain.value, now);
+    // Short release (8% of offTime, min 20ms)
+    const release = Math.max(0.02, offTime * 0.08);
+    voiceGain.gain.linearRampToValueAtTime(0, now + release);
+    timeoutId = setTimeout(scheduleOn, offTime * 1000);
+  }
+
+  // Stagger start by a random offset within the period so not all pulses fire together
+  const startOffset = params.beatPeriod * ((hexBytes(stripHex(params._txHex || ''), 31, 1) / 255));
+  timeoutId = setTimeout(scheduleOn, startOffset * 1000);
+
+  // Wrap disconnect to also stop the scheduler
+  const origDisconnect = voice.disconnect.bind(voice);
+  voice.disconnect = () => {
+    stopped = true;
+    if (timeoutId !== null) clearTimeout(timeoutId);
+    origDisconnect();
+  };
+
+  return voice;
+}
+
+// ── Archetype: DROP ───────────────────────────────────────────────────────
+// Pitched percussive hit: fast attack, exponential decay, then silence,
+// then repeats at a slow irregular interval.
+
+function createDropVoice(params, amplitude) {
+  const ctx = ensureAudioContext();
+  const { filterNode, oscsToStop, cleanupNodes } = buildToneCore(ctx, params);
+
+  const voiceGain = ctx.createGain();
+  voiceGain.gain.value = 0;
+  cleanupNodes.push(voiceGain);
+
+  const panner = ctx.createStereoPanner();
+  panner.pan.value = params.pan;
+
+  const voice = wrapVoice(ctx, filterNode, voiceGain, panner, oscsToStop, cleanupNodes);
+
+  let stopped = false;
+  let timeoutId = null;
+
+  function scheduleHit() {
+    if (stopped) return;
+    const now = ctx.currentTime;
+    const attack = 0.008; // very fast percussive attack
+    voiceGain.gain.cancelScheduledValues(now);
+    voiceGain.gain.setValueAtTime(0, now);
+    voiceGain.gain.linearRampToValueAtTime(amplitude, now + attack);
+    // Exponential decay to near-zero over dropDecay seconds
+    voiceGain.gain.setTargetAtTime(0.0001, now + attack, params.dropDecay / 4);
+    // Schedule next hit
+    timeoutId = setTimeout(scheduleHit, params.dropInterval * 1000);
+  }
+
+  // Stagger first hit
+  const initDelay = params.dropInterval * (hexBytes(stripHex(params._txHex || ''), 35, 1) / 255);
+  timeoutId = setTimeout(scheduleHit, initDelay * 1000);
+
+  const origDisconnect = voice.disconnect.bind(voice);
+  voice.disconnect = () => {
+    stopped = true;
+    if (timeoutId !== null) clearTimeout(timeoutId);
+    origDisconnect();
+  };
+
+  return voice;
+}
+
+// ── Archetype: SHIMMER ────────────────────────────────────────────────────
+// Bell/glass-like: slow attack to peak, long sustain, then fade,
+// cycling continuously. Pitched in the upper register.
+
+function createShimmerVoice(params, amplitude) {
+  const ctx = ensureAudioContext();
+
+  // Shimmer uses higher partials more heavily — shift partialWeights upward
+  const shimmerParams = {
+    ...params,
+    // Boost upper harmonics for a glassy bell character
+    partialWeights: params.partialWeights.map((w, i) =>
+      i === 0 ? w * 0.6 : w * (1 + i * 0.3)
+    ),
+    // Brighter filter for shimmer
+    filterFreq: Math.min(params.filterFreq * 2.5, 8000),
+  };
+
+  const { filterNode, oscsToStop, cleanupNodes } = buildToneCore(ctx, shimmerParams);
+
+  const voiceGain = ctx.createGain();
+  voiceGain.gain.value = 0;
+  cleanupNodes.push(voiceGain);
+
+  const panner = ctx.createStereoPanner();
+  panner.pan.value = params.pan;
+
+  const voice = wrapVoice(ctx, filterNode, voiceGain, panner, oscsToStop, cleanupNodes);
+
+  let stopped = false;
+  let timeoutId = null;
+
+  const cycleDuration = params.shimmerAttack + params.shimmerSustain;
+
+  function scheduleCycle() {
+    if (stopped) return;
+    const now = ctx.currentTime;
+    voiceGain.gain.cancelScheduledValues(now);
+    voiceGain.gain.setValueAtTime(0, now);
+    // Slow swell up
+    voiceGain.gain.linearRampToValueAtTime(amplitude, now + params.shimmerAttack);
+    // Hold then gentle fade over sustain period
+    voiceGain.gain.setTargetAtTime(0.0001, now + params.shimmerAttack, params.shimmerSustain / 3);
+    // Reschedule after full cycle
+    timeoutId = setTimeout(scheduleCycle, cycleDuration * 1000 * 1.15);
+  }
+
+  // Stagger start
+  const initDelay = cycleDuration * (hexBytes(stripHex(params._txHex || ''), 38, 1) / 255);
+  timeoutId = setTimeout(scheduleCycle, initDelay * 1000);
+
+  const origDisconnect = voice.disconnect.bind(voice);
+  voice.disconnect = () => {
+    stopped = true;
+    if (timeoutId !== null) clearTimeout(timeoutId);
+    origDisconnect();
+  };
+
+  return voice;
+}
+
+/**
+ * Dispatch to the correct archetype creator.
+ * All four share the same params/amplitude interface.
+ */
+function createVoice(transfer, params, amplitude) {
+  // Stash txHex on params so pulse/drop/shimmer can use it for stagger offsets
+  params._txHex = stripHex(transfer.transactionHash);
+
+  switch (params.archetype) {
+    case 'pulse':   return createPulseVoice(params, amplitude);
+    case 'drop':    return createDropVoice(params, amplitude);
+    case 'shimmer': return createShimmerVoice(params, amplitude);
+    default:        return createDroneVoice(params, amplitude);
+  }
 }
 
 // ── Soundscape management ──────────────────────────────────────────────────
@@ -821,7 +1055,7 @@ function buildVoiceRow(transfer, params, amplitude) {
       </div>
       <span class="voice-value">${params.valueCrc.toFixed(2)} CRC</span>
       <span class="voice-note badge-small">${params.noteName}</span>
-      <span class="voice-timbre badge-small">${params.timbreName}</span>
+      <span class="voice-timbre badge-small badge-${params.archetype}">${params.timbreName}</span>
       <button class="btn-solo" title="Listen to this voice" aria-label="Solo this voice">
         <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
       </button>
