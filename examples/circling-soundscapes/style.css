@@ -511,7 +511,109 @@ h1 {
   white-space: nowrap;
 }
 
-/* Archetype badge colour variants */
+/* ── Expand button ───────────────────────────────────────────────────────── */
+.btn-expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.btn-expand:hover {
+  background: var(--line-soft);
+  color: var(--ink);
+}
+
+.expand-icon {
+  transition: transform 0.2s ease;
+}
+
+.btn-expand.expanded .expand-icon {
+  transform: rotate(180deg);
+}
+
+/* ── Voice breakdown panel ───────────────────────────────────────────────── */
+.voice-breakdown {
+  margin-top: 10px;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 10px;
+}
+
+.breakdown-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.breakdown-tx {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--accent);
+  cursor: default;
+}
+
+.breakdown-caption {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.breakdown-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.breakdown-row {
+  display: grid;
+  grid-template-columns: 110px 1fr auto;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.breakdown-row:last-child {
+  border-bottom: none;
+}
+
+.breakdown-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.breakdown-value {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  font-family: "JetBrains Mono", monospace;
+  word-break: break-all;
+}
+
+.breakdown-bytes {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: "JetBrains Mono", monospace;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+/* ── Archetype badge colour variants */
 .badge-drone {
   background: rgba(14, 0, 168, 0.08);
   color: var(--accent);

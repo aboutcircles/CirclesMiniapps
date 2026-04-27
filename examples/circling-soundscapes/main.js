@@ -262,38 +262,69 @@ function deriveParams(t) {
   const panNudge    = (addrPanByte / 255) * 0.2 - 0.1;
   const pan         = Math.max(-0.5, Math.min(0.5, txPan + panNudge));
 
-  // ── ARCHETYPE + RHYTHM PARAMS (txHash bytes 30–39) ───────────────────
+  // ── ARCHETYPE + RHYTHM PARAMS ─────────────────────────────────────────
 
-  // Archetype: byte 30
-  const archetypeSeed = hexBytes(txHex, 30, 1);
+  // Archetype: XOR bytes 30, 13, 25 together for better distribution
+  // (single bytes can cluster; mixing three spread-out bytes gives uniform spread)
+  const archetypeSeed = (hexBytes(txHex, 30, 1) ^ hexBytes(txHex, 13, 1) ^ hexBytes(txHex, 25, 1)) & 0xff;
   const archetype = archetypeSeed < 64 ? 'drone'
     : archetypeSeed < 128 ? 'pulse'
     : archetypeSeed < 192 ? 'drop'
     : 'shimmer';
 
-  // Beat period: bytes 31-32 → 0.5–4 s  (pulse + drop)
-  const beatPeriodSeed = hexBytes(txHex, 31, 2);
-  const beatPeriod     = 0.5 + (beatPeriodSeed / 65535) * 3.5;
+  // Beat period: XOR bytes 31-32 with bytes 6-7 → 0.75–5 s
+  // Minimum raised to 0.75s so even short periods feel musical not frantic
+  const beatPeriodSeed = (hexBytes(txHex, 31, 2) ^ hexBytes(txHex, 6, 2)) & 0xffff;
+  const beatPeriod     = 0.75 + (beatPeriodSeed / 65535) * 4.25;
 
-  // Pulse duty cycle: byte 33 → 0.1–0.8
-  const pulseDutySeed = hexBytes(txHex, 33, 1);
-  const pulseDuty     = 0.10 + (pulseDutySeed / 255) * 0.70;
+  // Pulse duty cycle: byte 33 XOR byte 11 → 0.15–0.75
+  const pulseDutySeed = (hexBytes(txHex, 33, 1) ^ hexBytes(txHex, 11, 1)) & 0xff;
+  const pulseDuty     = 0.15 + (pulseDutySeed / 255) * 0.60;
 
-  // Drop decay: byte 34 → 0.3–2.5 s
-  const dropDecaySeed = hexBytes(txHex, 34, 1);
-  const dropDecay     = 0.3 + (dropDecaySeed / 255) * 2.2;
+  // Drop decay: byte 34 XOR byte 9 → 0.4–3.0 s
+  const dropDecaySeed = (hexBytes(txHex, 34, 1) ^ hexBytes(txHex, 9, 1)) & 0xff;
+  const dropDecay     = 0.4 + (dropDecaySeed / 255) * 2.6;
 
-  // Drop interval: bytes 35-36 → 1–8 s
-  const dropIntervalSeed = hexBytes(txHex, 35, 2);
-  const dropInterval     = 1.0 + (dropIntervalSeed / 65535) * 7.0;
+  // Drop interval: bytes 35-36 XOR bytes 2-3 → 1.5–9 s
+  const dropIntervalSeed = (hexBytes(txHex, 35, 2) ^ hexBytes(txHex, 2, 2)) & 0xffff;
+  const dropInterval     = 1.5 + (dropIntervalSeed / 65535) * 7.5;
 
-  // Shimmer attack: byte 37 → 0.02–0.4 s
-  const shimmerAttackSeed = hexBytes(txHex, 37, 1);
-  const shimmerAttack     = 0.02 + (shimmerAttackSeed / 255) * 0.38;
+  // Shimmer attack: byte 37 XOR byte 15 → 0.05–0.6 s
+  // Minimum raised so even fast shimmers have an audible swell
+  const shimmerAttackSeed = (hexBytes(txHex, 37, 1) ^ hexBytes(txHex, 15, 1)) & 0xff;
+  const shimmerAttack     = 0.05 + (shimmerAttackSeed / 255) * 0.55;
 
-  // Shimmer sustain: bytes 38-39 → 0.5–3 s
-  const shimmerSustainSeed = hexBytes(txHex, 38, 2);
-  const shimmerSustain     = 0.5 + (shimmerSustainSeed / 65535) * 2.5;
+  // Shimmer sustain: bytes 38-39 XOR bytes 16-17 → 1.0–5 s
+  const shimmerSustainSeed = (hexBytes(txHex, 38, 2) ^ hexBytes(txHex, 16, 2)) & 0xffff;
+  const shimmerSustain     = 1.0 + (shimmerSustainSeed / 65535) * 4.0;
+
+  // ── BREAKDOWN (human-readable per-parameter explanation) ─────────────
+  // Stored on params so the UI detail panel can display it without re-deriving.
+  const breakdown = [
+    { label: 'Archetype',      value: archetype,                         bytes: 'tx[30]⊕[13]⊕[25]' },
+    { label: 'Note',           value: noteName,                          bytes: 'tx[0–3] + octave tx[4]' },
+    { label: 'Pan',            value: pan >= 0 ? `R ${(pan*100).toFixed(0)}%` : `L ${(Math.abs(pan)*100).toFixed(0)}%`, bytes: 'tx[5–6] + addr[2]' },
+    { label: 'Filter',         value: `${Math.round(filterFreq)} Hz`,    bytes: 'tx[20–21]' },
+    { label: 'Vibrato rate',   value: `${vibratoRate.toFixed(2)} Hz`,    bytes: 'tx[22]' },
+    { label: 'Vibrato depth',  value: `${(vibratoDepth*1000).toFixed(1)}‰`, bytes: 'tx[23]' },
+    { label: 'Breathe rate',   value: `${lfoRate.toFixed(3)} Hz`,        bytes: 'tx[24–25]' },
+    { label: 'Breathe depth',  value: `${(lfoDepth*100).toFixed(0)}%`,   bytes: 'tx[26]' },
+    { label: 'Unison detune',  value: `${unisonDetune.toFixed(1)} ¢`,    bytes: 'tx[28]' },
+    { label: 'Unison mix',     value: `${(unisonMix*100).toFixed(0)}%`,  bytes: 'tx[29]' },
+    ...(archetype === 'pulse' ? [
+      { label: 'Beat period',  value: `${beatPeriod.toFixed(2)} s`,      bytes: 'tx[31–32]⊕[6–7]' },
+      { label: 'Duty cycle',   value: `${(pulseDuty*100).toFixed(0)}%`,  bytes: 'tx[33]⊕[11]' },
+    ] : []),
+    ...(archetype === 'drop' ? [
+      { label: 'Decay',        value: `${dropDecay.toFixed(2)} s`,       bytes: 'tx[34]⊕[9]' },
+      { label: 'Interval',     value: `${dropInterval.toFixed(2)} s`,    bytes: 'tx[35–36]⊕[2–3]' },
+    ] : []),
+    ...(archetype === 'shimmer' ? [
+      { label: 'Attack',       value: `${shimmerAttack.toFixed(2)} s`,   bytes: 'tx[37]⊕[15]' },
+      { label: 'Sustain',      value: `${shimmerSustain.toFixed(2)} s`,  bytes: 'tx[38–39]⊕[16–17]' },
+    ] : []),
+    { label: 'Partials',       value: partialWeights.slice(1).map((w,i) => `${i+2}×:${(w*100).toFixed(0)}%`).join('  '), bytes: 'tx[7–17]' },
+  ];
 
   // Timbre label: archetype takes precedence, then harmonic character
   const dominantPartials = partialWeights.slice(1).filter(w => w > 0.25).length;
@@ -337,6 +368,7 @@ function deriveParams(t) {
     shimmerSustain,
     timbreName,
     timbreDetail,
+    breakdown,
     valueCrc,
     rawLogValue,
     demurrageFactor,
@@ -1047,6 +1079,17 @@ function buildVoiceRow(transfer, params, amplitude) {
     ? `<img class="voice-avatar" src="${profile.imageUrl}" alt="" loading="lazy" />`
     : `<span class="voice-avatar-placeholder">${displayName.slice(0, 2).toUpperCase()}</span>`;
 
+  // Build breakdown rows HTML
+  const breakdownRowsHtml = params.breakdown.map(item => `
+    <div class="breakdown-row">
+      <span class="breakdown-label">${item.label}</span>
+      <span class="breakdown-value">${item.value}</span>
+      <span class="breakdown-bytes">${item.bytes}</span>
+    </div>
+  `).join('');
+
+  const txShort = transfer.transactionHash.slice(0, 10) + '…' + transfer.transactionHash.slice(-6);
+
   row.innerHTML = `
     <div class="voice-row-top">
       <div class="voice-who">
@@ -1059,6 +1102,9 @@ function buildVoiceRow(transfer, params, amplitude) {
       <button class="btn-solo" title="Listen to this voice" aria-label="Solo this voice">
         <svg viewBox="0 0 24 24" fill="currentColor" width="13" height="13"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg>
       </button>
+      <button class="btn-expand" title="Show sound breakdown" aria-label="Expand breakdown" aria-expanded="false">
+        <svg class="expand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="12" height="12"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
     </div>
     <div class="voice-row-bottom">
       <div class="amp-bar-bg">
@@ -1066,9 +1112,18 @@ function buildVoiceRow(transfer, params, amplitude) {
       </div>
       <span class="voice-age">${yearsAgo > 0 ? yearsAgo + 'y ago' : 'recent'}</span>
     </div>
+    <div class="voice-breakdown hidden">
+      <div class="breakdown-header">
+        <span class="breakdown-tx" title="${transfer.transactionHash}">tx ${txShort}</span>
+        <span class="breakdown-caption">Sound parameters derived from transaction hash</span>
+      </div>
+      <div class="breakdown-grid">
+        ${breakdownRowsHtml}
+      </div>
+    </div>
   `;
 
-  // Solo button click
+  // Solo button
   const soloBtn = row.querySelector('.btn-solo');
   soloBtn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -1080,6 +1135,17 @@ function buildVoiceRow(transfer, params, amplitude) {
       enterSolo(transfer);
       updateSoloUI(transfer.transactionHash);
     }
+  });
+
+  // Expand/collapse breakdown
+  const expandBtn = row.querySelector('.btn-expand');
+  const breakdown = row.querySelector('.voice-breakdown');
+  expandBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const open = !breakdown.classList.contains('hidden');
+    breakdown.classList.toggle('hidden', open);
+    expandBtn.setAttribute('aria-expanded', String(!open));
+    expandBtn.classList.toggle('expanded', !open);
   });
 
   return row;
