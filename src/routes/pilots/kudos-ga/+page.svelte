@@ -498,8 +498,8 @@
 <style>
 	:global(body) {
 		margin: 0;
-		background: #f0e8dc;
-		color: #060a40;
+		background: #f5f5f5;
+		color: #101010;
 		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 		-webkit-font-smoothing: antialiased;
 	}
@@ -511,13 +511,13 @@
 		justify-content: center;
 		padding: 48px 16px 80px;
 		box-sizing: border-box;
-		background: #f0e8dc;
+		background: #f5f5f5;
 	}
 
 	.card {
-		background: #faf5f1;
+		background: #ffffff;
 		border-radius: 24px;
-		box-shadow: 0 8px 40px rgba(6, 10, 64, 0.12);
+		box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
 		max-width: 480px;
 		width: 100%;
 		padding: 28px 28px 28px;
@@ -540,7 +540,7 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
-		color: #6a6c8c;
+		color: #7d7d7d;
 		font-size: 0.85rem;
 		flex: 1;
 	}
@@ -553,8 +553,8 @@
 		display: inline-block;
 		width: 18px;
 		height: 18px;
-		border: 2.5px solid #ede1d8;
-		border-top-color: #060a40;
+		border: 2.5px solid #ddd;
+		border-top-color: #00af5e;
 		border-radius: 50%;
 		animation: spin 0.75s linear infinite;
 		flex-shrink: 0;
@@ -564,13 +564,13 @@
 
 	.empty {
 		text-align: center;
-		color: #9b9db3;
+		color: #999;
 		font-size: 0.9rem;
 		padding: 24px 0;
 	}
 
 	.row-even { background: #ffffff; }
-	.row-odd  { background: #faf5f1; }
+	.row-odd  { background: #f9f9f9; }
 
 	/* ----- Kudos button ----- */
 	.kudos-btn {
@@ -578,7 +578,7 @@
 		flex-direction: column;
 		align-items: stretch;
 		gap: 0;
-		background: #3a3f7a;
+		background: #00af5e;
 		color: #ffffff;
 		border-radius: 16px;
 		padding: 0;
@@ -589,7 +589,7 @@
 		overflow: hidden;
 	}
 
-	.kudos-btn:hover { opacity: 0.85; }
+	.kudos-btn:hover { opacity: 0.88; }
 
 	.kudos-top-row {
 		display: flex;
@@ -603,7 +603,7 @@
 	}
 
 	.kudos-input-row {
-		border-top: 1px solid rgba(255, 255, 255, 0.15);
+		border-top: 1px solid rgba(255, 255, 255, 0.25);
 		padding: 10px 14px;
 		display: flex;
 		flex-direction: column;
@@ -618,8 +618,8 @@
 
 	.kudos-suggestion {
 		flex: 1;
-		background: rgba(255, 255, 255, 0.12);
-		border: 1px solid rgba(255, 255, 255, 0.2);
+		background: rgba(255, 255, 255, 0.15);
+		border: 1px solid rgba(255, 255, 255, 0.3);
 		border-radius: 8px;
 		padding: 6px 0;
 		font-size: 1.1rem;
@@ -630,11 +630,11 @@
 	}
 
 	.kudos-suggestion:hover {
-		background: rgba(255, 255, 255, 0.22);
+		background: rgba(255, 255, 255, 0.28);
 	}
 
 	.kudos-arrow {
-		color: #c0c4f0;
+		color: rgba(255, 255, 255, 0.75);
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
@@ -642,7 +642,7 @@
 
 	.kudos-label {
 		font-size: 0.88rem;
-		color: #d8daff;
+		color: rgba(255, 255, 255, 0.85);
 		flex-shrink: 0;
 		white-space: nowrap;
 	}
@@ -674,7 +674,7 @@
 	.trust-name {
 		font-size: 1rem;
 		font-weight: 700;
-		color: #060a40;
+		color: #101010;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -687,9 +687,9 @@
 		align-items: center;
 		justify-content: center;
 		gap: 6px;
-		background: #f0e8dc;
-		color: #060a40;
-		border: 1.5px solid #c8caeb;
+		background: #f5f5f5;
+		color: #101010;
+		border: 1.5px solid #ddd;
 		border-radius: 16px;
 		padding: 12px 18px;
 		text-decoration: none;
@@ -702,7 +702,7 @@
 
 	.trust-label {
 		font-size: 1rem;
-		color: #060a40;
+		color: #101010;
 		flex-shrink: 0;
 	}
 
@@ -711,27 +711,27 @@
 		width: 100%;
 		box-sizing: border-box;
 		padding: 8px 12px;
-		border: 1.5px solid rgba(255, 255, 255, 0.2);
+		border: 1.5px solid rgba(255, 255, 255, 0.3);
 		border-radius: 8px;
 		font-size: 0.88rem;
 		color: #ffffff;
-		background: rgba(255, 255, 255, 0.1);
+		background: rgba(255, 255, 255, 0.15);
 		outline: none;
 		transition: border-color 0.15s, background 0.15s;
 	}
 
 	.kudos-msg-input:focus {
-		border-color: rgba(255, 255, 255, 0.5);
-		background: rgba(255, 255, 255, 0.15);
+		border-color: rgba(255, 255, 255, 0.6);
+		background: rgba(255, 255, 255, 0.22);
 	}
 
 	.kudos-msg-input::placeholder {
-		color: rgba(255, 255, 255, 0.45);
+		color: rgba(255, 255, 255, 0.55);
 	}
 
 	/* ----- Appreciations ----- */
 	.tx-list {
-		border: 1.5px solid #ede1d8;
+		border: 1.5px solid #ddd;
 		border-radius: 14px;
 		overflow: hidden;
 		margin-bottom: 4px;
@@ -742,7 +742,7 @@
 		align-items: center;
 		gap: 14px;
 		padding: 14px 16px;
-		border-bottom: 1px solid #ede1d8;
+		border-bottom: 1px solid #ddd;
 	}
 
 	.tx-row:last-child { border-bottom: none; }
@@ -798,7 +798,7 @@
 
 	.arrow {
 		font-size: 0.85rem;
-		color: #9b9db3;
+		color: #999;
 		font-weight: 700;
 		padding: 0 2px;
 	}
@@ -808,7 +808,7 @@
 	.tx-sentence {
 		margin: 0;
 		font-size: 0.88rem;
-		color: #060a40;
+		color: #101010;
 		line-height: 1.4;
 	}
 
@@ -825,30 +825,30 @@
 	.tx-msg {
 		margin: 4px 0 0;
 		font-size: 0.82rem;
-		color: #6a6c8c;
+		color: #666;
 		font-style: italic;
 		line-height: 1.3;
 	}
 
 	.tx-name {
 		font-weight: 700;
-		color: #060a40;
+		color: #101010;
 	}
 
 	.tx-verb {
-		color: #6a6c8c;
+		color: #666;
 		font-weight: 400;
 	}
 
 	.tx-amount {
 		font-weight: 400;
-		color: #6a6c8c;
+		color: #666;
 	}
 
 	.has-more {
 		text-align: center;
 		font-size: 0.78rem;
-		color: #9b9db3;
+		color: #999;
 		font-style: italic;
 		margin: 8px 0 4px;
 	}
@@ -866,8 +866,8 @@
 	.btn-refresh {
 		padding: 5px 12px;
 		background: transparent;
-		color: #9b9db3;
-		border: 1px solid #d4d5e4;
+		color: #999;
+		border: 1px solid #ddd;
 		border-radius: 8px;
 		font-size: 0.78rem;
 		font-weight: 500;
@@ -881,15 +881,15 @@
 	}
 
 	.btn-refresh:not(:disabled):hover {
-		color: #060a40;
-		border-color: #9b9db3;
+		color: #333;
+		border-color: #999;
 	}
 
 	/* ----- QR overlay ----- */
 	.qr-overlay {
 		position: fixed;
 		inset: 0;
-		background: rgba(6, 10, 64, 0.6);
+		background: rgba(0, 0, 0, 0.55);
 		backdrop-filter: blur(4px);
 		display: flex;
 		align-items: center;
@@ -906,7 +906,7 @@
 		align-items: center;
 		gap: 0;
 		position: relative;
-		box-shadow: 0 24px 64px rgba(6, 10, 64, 0.28);
+		box-shadow: 0 24px 64px rgba(0, 0, 0, 0.22);
 		width: 320px;
 	}
 
@@ -919,11 +919,11 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		background: #f0f0f4;
+		background: #f0f0f0;
 		border: none;
 		border-radius: 50%;
 		font-size: 0.75rem;
-		color: #6a6c8c;
+		color: #666;
 		cursor: pointer;
 		line-height: 1;
 		padding: 0;
@@ -931,8 +931,8 @@
 	}
 
 	.qr-close:hover {
-		background: #e2e2ea;
-		color: #060a40;
+		background: #e0e0e0;
+		color: #101010;
 	}
 
 	.qr-header {
@@ -955,19 +955,19 @@
 		margin: 0;
 		font-size: 1.05rem;
 		font-weight: 700;
-		color: #060a40;
+		color: #101010;
 		text-align: center;
 	}
 
 	.qr-subtitle {
 		margin: 0;
 		font-size: 0.8rem;
-		color: #9b9db3;
+		color: #999;
 		text-align: center;
 	}
 
 	.qr-frame {
-		background: #f7f7fa;
+		background: #f5f5f5;
 		border-radius: 16px;
 		padding: 12px;
 		margin-bottom: 20px;
@@ -986,16 +986,16 @@
 		box-sizing: border-box;
 		text-align: center;
 		padding: 10px 16px;
-		background: #f0f0f8;
+		background: #f0faf5;
 		border-radius: 10px;
 		font-size: 0.82rem;
 		font-weight: 600;
-		color: #3a3f7a;
+		color: #00874a;
 		text-decoration: none;
 		transition: background 0.12s;
 	}
 
 	.qr-link-btn:hover {
-		background: #e4e4f4;
+		background: #e0f5eb;
 	}
 </style>
