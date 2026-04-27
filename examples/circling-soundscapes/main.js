@@ -23,7 +23,7 @@ import { getAddress } from 'viem';
 
 const SOUNDSCAPE_ADDRESS = '0xC69A3Ac0bF61BCAd06752908F3330CA41c6fA1FD';
 const RPC_URL = 'https://rpc.aboutcircles.com/';
-const PATHFINDER_URL = 'https://pathfinder.aboutcircles.com';
+
 const MAX_VOICES = 200;
 const MIN_CRC = 10;
 const DEMURRAGE_RATE = 0.07; // 7% per annum
@@ -556,20 +556,23 @@ function renderVoiceHistory() {
 
 /**
  * Query maximum transferable flow from user to SOUNDSCAPE_ADDRESS.
- * Uses the REST pathfinder API with max uint256.
+ * Uses TransferBuilder's internal pathfinder (circlesV2_findPath via RPC).
  */
 async function fetchMaxFlow(fromAddress) {
-  const MAX_UINT256 = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
   try {
-    const url = new URL(`${PATHFINDER_URL}/findMaxFlow`);
-    url.searchParams.set('from', fromAddress);
-    url.searchParams.set('to', SOUNDSCAPE_ADDRESS);
-    url.searchParams.set('amount', MAX_UINT256);
-
-    const resp = await fetch(url.toString());
-    if (!resp.ok) throw new Error(`Pathfinder HTTP ${resp.status}`);
-    const data = await resp.json();
-    return BigInt(data.maxFlow || '0');
+    const config = {
+      circlesRpcUrl: RPC_URL,
+      v2HubAddress: HUB_V2_ADDRESS,
+      liftERC20Address: LIFT_ERC20_ADDRESS,
+    };
+    const builder = new TransferBuilder(config);
+    const maxFlow = await builder.pathfinder.findMaxFlow({
+      from: fromAddress,
+      to: SOUNDSCAPE_ADDRESS,
+      targetFlow: BigInt('9999999999999999999999999999999999999'),
+      useWrappedBalances: false,
+    });
+    return BigInt(maxFlow);
   } catch (err) {
     console.warn('fetchMaxFlow error:', err);
     return 0n;
@@ -596,7 +599,7 @@ async function sendCrcTransfer(fromAddress, amountCrc) {
       fromAddress,
       SOUNDSCAPE_ADDRESS,
       BigInt(amountWei),
-      { useWrappedBalances: true },
+      { useWrappedBalances: false },
       false
     );
   } catch (err) {
