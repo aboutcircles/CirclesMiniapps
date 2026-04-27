@@ -905,24 +905,16 @@ function renderVoiceHistory() {
  */
 async function fetchMaxFlow(fromAddress) {
   try {
-    const config = {
-      circlesRpcUrl: RPC_URL,
-      v2HubAddress: HUB_V2_ADDRESS,
-      liftERC20Address: LIFT_ERC20_ADDRESS,
-    };
-    const builder = new TransferBuilder(config);
-    // Use a large but safe targetFlow — the pathfinder returns actual maxFlow
-    // Use circlesV2_findPath directly to avoid any internal cap in pathfinder.findMaxFlow
     const MAX_TARGET = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
-    const sdk = getSdk();
-    const result = await sdk.circlesRpc.call('circlesV2_findPath', [{
+    // Use raw fetch — bypasses SDK client which may not handle circlesV2_findPath reliably
+    const result = await rpcCall('circlesV2_findPath', [{
       Source: fromAddress.toLowerCase(),
       Sink: SOUNDSCAPE_ADDRESS.toLowerCase(),
       TargetFlow: MAX_TARGET,
       WithWrap: false,
       QuantizedMode: false,
     }]);
-    const maxFlowStr = result?.maxFlow || result?.result?.maxFlow || '0';
+    const maxFlowStr = result?.maxFlow || '0';
     return BigInt(maxFlowStr);
   } catch (err) {
     console.warn('fetchMaxFlow error:', err);
@@ -1017,23 +1009,35 @@ async function updateSliderMax() {
 
   const maxFlowWei = await fetchMaxFlow(connectedAddress);
   userMaxFlow = maxFlowWei;
-  const maxFlowCrc = Number(maxFlowWei) / 1e18;
+
+  // Use BigInt arithmetic throughout — avoid Number() on large wei values
+  const ONE_CRC = BigInt(1e18);
+  const maxFlowWhole = Number(maxFlowWei / ONE_CRC);           // whole CRC, safe
+  const maxFlowFrac  = Number(maxFlowWei % ONE_CRC) / 1e18;   // fractional part
+  const maxFlowCrc   = maxFlowWhole + maxFlowFrac;
+
+  // Always set slider min first so the range is valid before setting max/value
+  slider.min = MIN_CRC;
 
   if (maxFlowCrc < MIN_CRC) {
     maxLabel.textContent = 'no path found';
     slider.max = MIN_CRC;
+    slider.value = MIN_CRC;
     slider.disabled = true;
     $('btn-send').disabled = true;
+    $('amount-display').textContent = MIN_CRC;
     setModalStatus(`No transfer path found to soundscape. You need at least ${MIN_CRC} CRC reachable.`, 'error');
     return;
   }
 
-  // Use BigInt arithmetic to avoid float precision loss on large values
-  const maxFlowWhole = Number(userMaxFlow / BigInt(1e18));
-  const maxFlowFrac = Number(userMaxFlow % BigInt(1e18)) / 1e18;
-  const maxFlowCrcPrecise = maxFlowWhole + maxFlowFrac;
-  const displayMax = Math.floor(maxFlowCrcPrecise * 100) / 100;
+  const displayMax = Math.floor(maxFlowCrc * 100) / 100;
   slider.max = maxFlowWhole;
+  // Clamp current slider value into the valid range
+  const currentVal = Number(slider.value);
+  if (currentVal < MIN_CRC || currentVal > maxFlowWhole) {
+    slider.value = MIN_CRC;
+    $('amount-display').textContent = MIN_CRC;
+  }
   slider.disabled = false;
   $('btn-send').disabled = false;
   maxLabel.textContent = `${displayMax.toFixed(2)} CRC`;
