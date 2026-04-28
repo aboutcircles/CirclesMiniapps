@@ -191,10 +191,6 @@
         postAppData();
     }
 
-    function goBack() {
-        goto("/miniapps");
-    }
-
     async function handleApprove(): Promise<string> {
         if (!pendingRequest) return "";
 
@@ -259,7 +255,6 @@
 <div class="page">
     <div class="iframe-topbar">
         <div class="topbar-left">
-            <button class="back-btn" onclick={goBack}>&#8592; mini apps</button>
             <AppNavigation />
             <h1>Playground</h1>
         </div>
@@ -404,24 +399,6 @@
         font-size: 20px;
         font-weight: 600;
         letter-spacing: -0.02em;
-        color: var(--ink);
-    }
-
-    .back-btn {
-        background: none;
-        border: none;
-        color: var(--muted);
-        font-size: 14px;
-        font-weight: 500;
-        cursor: pointer;
-        padding: 0;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        transition: color 0.15s;
-    }
-
-    .back-btn:hover {
         color: var(--ink);
     }
 

@@ -427,9 +427,10 @@
     .tile-icon-wrap {
         width: 100%;
         aspect-ratio: 1;
+        border: 1px solid #000;
         border-radius: var(--radius-card);
         overflow: hidden;
-        background: transparent;
+        background: #ffffff;
         position: relative;
         outline: 2px solid transparent;
         transition: outline-color 0.15s;
@@ -531,9 +532,10 @@
     .popup-icon-wrap {
         width: 80px;
         height: 80px;
+        border: 1px solid #000;
         border-radius: 18px;
         overflow: hidden;
-        background: var(--line-soft);
+        background: #ffffff;
         position: relative;
         flex-shrink: 0;
     }
