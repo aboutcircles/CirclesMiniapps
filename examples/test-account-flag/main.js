@@ -14,7 +14,7 @@ import { cidV0ToHex } from '@aboutcircles/sdk-utils';
 
 // ─── Constants ──────────────────────────────────────────────
 const RPC_URL = 'https://rpc.aboutcircles.com/';
-const NAME_REGISTRY_ADDRESS = '0x4c16bA1a3CA3E347D85e881EaaAB0663FF5E6bd9';
+const NAME_REGISTRY_ADDRESS = '0xA27566fD89162cC3D40Cb59c87AAaA49B85F3474';
 const TEST_FLAG_KEY = 'isTestAccount';
 
 // ─── DOM refs ───────────────────────────────────────────────
@@ -68,13 +68,12 @@ const receiptClients = RPC_FALLBACKS.map(url =>
   createPublicClient({ chain: gnosis, transport: http(url) })
 );
 
-// ─── NameRegistry ABI (updateMetadata) ──────────────────────
+// ─── NameRegistry ABI (updateMetadataDigest) ────────────────
 const NAME_REGISTRY_ABI = [{
   type: 'function',
-  name: 'updateMetadata',
+  name: 'updateMetadataDigest',
   inputs: [
-    { name: 'avatar', type: 'address' },
-    { name: 'metadataDigest', type: 'bytes32' },
+    { name: '_metadataDigest', type: 'bytes32' },
   ],
   outputs: [],
   stateMutability: 'nonpayable',
@@ -308,7 +307,7 @@ async function updateTestFlag(flagValue) {
   const updatedCustomFields = { ...existingFields, [TEST_FLAG_KEY]: flagValue };
 
   const profileData = {
-    name: currentProfile.name || currentProfile.registerredName || '',
+    name: currentProfile.name || currentProfile.registeredName || '',
     description: currentProfile.description || '',
     imageUrl: currentProfile.imageUrl || '',
     customFields: updatedCustomFields,
@@ -324,11 +323,11 @@ async function updateTestFlag(flagValue) {
   const metadataDigest = cidV0ToHex(profileCid);
   console.log('[test-flag] Metadata digest:', metadataDigest);
 
-  // 4. Build updateMetadata transaction
+  // 4. Build updateMetadataDigest transaction
   const data = encodeFunctionData({
     abi: NAME_REGISTRY_ABI,
-    functionName: 'updateMetadata',
-    args: [connectedAddress, metadataDigest],
+    functionName: 'updateMetadataDigest',
+    args: [metadataDigest],
   });
 
   const tx = {
