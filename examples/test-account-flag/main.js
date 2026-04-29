@@ -153,23 +153,14 @@ async function loadProfile() {
   try {
     const sdk = getReadSdk();
 
-    // Step 1: Verify this is a registered Circles avatar
-    console.log('[test-flag] Checking avatar for:', connectedAddress);
-    let avatarInfo = null;
-    try {
-      avatarInfo = await sdk.getAvatar(connectedAddress);
-      console.log('[test-flag] Avatar info:', avatarInfo);
-    } catch (e) {
-      console.warn('[test-flag] getAvatar failed:', decodeError(e));
-    }
-
-    // Step 2: Try to load existing profile (multiple strategies)
+    // Step 1: Load existing profile from the Circles profile service
+    console.log('[test-flag] Loading profile for:', connectedAddress);
     let profile = null;
 
     // Strategy A: direct lookup with checksummed address
     try {
       profile = await sdk.rpc.profile.getProfileByAddress(connectedAddress);
-      console.log('[test-flag] getProfileByAddress (checksummed):', profile);
+      console.log('[test-flag] getProfileByAddress:', profile);
     } catch (e) {
       console.warn('[test-flag] getProfileByAddress failed:', decodeError(e));
     }
@@ -190,7 +181,6 @@ async function loadProfile() {
         const results = await sdk.rpc.profile.searchByAddressOrName(connectedAddress, 5, 0);
         console.log('[test-flag] searchByAddressOrName results:', results);
         if (results && results.length > 0) {
-          // Find exact match
           profile = results.find(r =>
             r.address?.toLowerCase() === connectedAddress.toLowerCase() ||
             r.avatarAddress?.toLowerCase() === connectedAddress.toLowerCase()
@@ -201,27 +191,17 @@ async function loadProfile() {
       }
     }
 
-    console.log('[test-flag] Final profile:', profile, 'avatarInfo:', avatarInfo);
+    console.log('[test-flag] Final profile:', profile);
 
-    // Step 3: Decide what to show
-    const hasAvatar = !!(avatarInfo && avatarInfo.safeAddress);
-    const hasProfile = !!profile;
-
-    if (!hasAvatar && !hasProfile) {
-      // Truly no Circles account
+    // Step 2: Decide what to show
+    if (!profile) {
+      // No Circles profile found for this address
       noProfileAddress.textContent = connectedAddress;
       showView('no-profile-view');
       return;
     }
 
-    // We have at least an avatar — allow flagging
-    currentProfile = profile || {
-      name: '',
-      description: '',
-      imageUrl: '',
-      customFields: {},
-      _isNew: true,  // flag to indicate we're creating a fresh profile
-    };
+    currentProfile = profile;
 
     const customFields = currentProfile.customFields || {};
     isCurrentlyFlagged = !!(customFields[TEST_FLAG_KEY] === true);
