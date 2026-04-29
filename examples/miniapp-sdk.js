@@ -2,7 +2,7 @@
  * Tiny SDK for mini apps running inside the miniapps iframe host.
  *
  * Usage:
- *   import { onWalletChange, sendTransactions, signMessage } from './miniapp-sdk.js';
+ *   import { onWalletChange, sendTransactions, signMessage } from '../miniapp-sdk.js';
  *
  * Works identically whether loaded inside the host iframe or opened standalone
  * (standalone simply never receives wallet_connected, so the UI stays disconnected).
