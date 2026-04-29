@@ -138,5 +138,18 @@
     ],
     "category": "miniapp",
     "isHidden": true
+  },
+  {
+    "slug": "test-account-flag",
+    "name": "Test Account Flag",
+    "logo": "https://cdn.prod.website-files.com/6810a659196f7f9bd5d23846/6810d11cb36563358376b4da_logo-color.svg",
+    "url": "https://test-account-flag.vercel.app",
+    "description": "Flag your Circles account as a test account to improve data quality across the ecosystem. Only the account owner can set or remove this flag.",
+    "tags": [
+      "admin",
+      "identity",
+      "tools"
+    ],
+    "category": "admin"
   }
 ]

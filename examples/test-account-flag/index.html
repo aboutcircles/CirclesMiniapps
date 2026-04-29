@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Test Account Flag</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="title-row">
+        <h1>🧪 Test Account Flag</h1>
+        <span id="badge" class="badge badge-disconnected">Not connected</span>
+      </div>
+      <p class="subtitle">Mark your account as a test account to improve Circles data quality.</p>
+    </header>
+
+    <!-- Disconnected State -->
+    <div id="disconnected-view" class="view">
+      <div class="card">
+        <div class="card-icon">🔗</div>
+        <h2>Connect Your Wallet</h2>
+        <p class="card-text">
+          Open this app from the Circles wallet to connect your account and manage your test account flag.
+        </p>
+      </div>
+    </div>
+
+    <!-- Connected / Loading State -->
+    <div id="loading-view" class="view hidden">
+      <div class="card">
+        <div class="spinner"></div>
+        <p class="card-text" style="text-align:center;margin-top:16px">Loading profile…</p>
+      </div>
+    </div>
+
+    <!-- No Profile State -->
+    <div id="no-profile-view" class="view hidden">
+      <div class="card card-warning">
+        <div class="card-icon">⚠️</div>
+        <h2>No Circles Profile Found</h2>
+        <p class="card-text">
+          Your wallet is connected but no Circles profile was found for this address.
+          You need a registered Circles avatar before you can flag your account.
+        </p>
+        <div class="address-display" id="no-profile-address"></div>
+      </div>
+    </div>
+
+    <!-- Main Flagging View -->
+    <div id="flag-view" class="view hidden">
+      <!-- Profile Info -->
+      <div class="card">
+        <div class="profile-row">
+          <div class="profile-avatar" id="profile-avatar">?</div>
+          <div class="profile-info">
+            <div class="profile-name" id="profile-name">Unknown</div>
+            <div class="address-display" id="profile-address"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Current Status -->
+      <div class="card">
+        <h2>Current Status</h2>
+        <div class="status-row">
+          <div class="status-label">Test Account Flag</div>
+          <div id="flag-status" class="badge badge-neutral">Checking…</div>
+        </div>
+        <p class="status-desc" id="flag-description">
+          Loading your current flag status…
+        </p>
+      </div>
+
+      <!-- Flag Action -->
+      <div class="card" id="flag-action-card">
+        <h2 id="action-title">Flag as Test Account</h2>
+        <p class="card-text" id="action-description">
+          Mark this account as a test account. This signals to the Circles ecosystem that this account is used for testing purposes and should be excluded from growth analytics, group invitations, and other user-facing features.
+        </p>
+
+        <div class="info-box" id="action-implication">
+          <strong>What this means:</strong>
+          <ul>
+            <li>Your account will be flagged as a test account in your Circles profile</li>
+            <li>TMS services will exclude you from group invitations</li>
+            <li>Analytics dashboards will filter your account from growth metrics</li>
+            <li>This can be reversed at any time by removing the flag</li>
+          </ul>
+        </div>
+
+        <button id="flag-btn" class="btn-primary" disabled>
+          <span class="btn-text">Flag as Test Account</span>
+          <span class="btn-spinner hidden">⏳</span>
+        </button>
+      </div>
+
+      <!-- Confirmation Modal -->
+      <div id="confirm-modal" class="modal hidden">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content card">
+          <h2 id="confirm-title">Confirm Action</h2>
+          <p id="confirm-message" class="card-text"></p>
+          <div class="modal-actions">
+            <button id="confirm-cancel" class="btn-secondary">Cancel</button>
+            <button id="confirm-proceed" class="btn-primary btn-danger">Confirm</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Result / Success -->
+      <div id="result-box" class="result-box hidden">
+        <div class="result-icon" id="result-icon">✅</div>
+        <p id="result-message"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast container -->
+  <div id="toast-container"></div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
