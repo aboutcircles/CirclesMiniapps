@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Circles Backing Factory Mini Dapp</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@safe-global/safe-apps-sdk@7.0.0/dist/safe-apps-sdk.umd.min.js"></script>
+  <style>
+    body { font-family: Inter, Arial, sans-serif; background: #e5e3fb; color: #222; margin: 0; }
+    .container { max-width: 540px; margin: 40px auto; background: #fff; border-radius: 10px; box-shadow: 0 2px 12px 0 rgba(25,21,104,0.07); padding: 32px 24px; }
+    h1 { color: #191568; font-size: 1.4rem; margin-bottom: 0.5em; }
+    label { font-weight: 600; display: block; margin-top: 1.2em; }
+    input, select { width: 100%; padding: 10px; margin-top: 0.3em; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
+    button { margin-top: 1.2em; padding: 10px 20px; background: #191568; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; font-weight: 600; }
+    button:disabled { background: #aaa; }
+    .step { margin-top: 2em; padding: 1em; background: #fafaff; border-radius: 8px; border: 1px solid #eee; }
+    .status { margin-top: 0.5em; font-size: 0.97em; }
+    .success { color: #1a7f37; }
+    .error { color: #c00; }
+    .tx-box { background: #ffede8; border-radius: 6px; padding: 8px; font-family: monospace; font-size: 0.97em; margin-top: 0.5em; word-break: break-all; }
+    .small { font-size: 0.93em; color: #666; }
+    .address-box { background: #ffede8; border-radius: 6px; padding: 6px 10px; font-family: monospace; font-size: 1em; display: inline-block; margin-left: 0.5em; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Circles Backing Factory Mini Dapp</h1>
+    <button id="connectBtn">Connect Wallet</button>
+    <span id="walletStatus" class="small"></span>
+    <label for="safeInput">Safe Address (backer):</label>
+    <input id="safeInput" placeholder="0x..." />
+    <label for="assetSelect">Backing Asset:</label>
+    <select id="assetSelect">
+      <option value="0x8e5bbbb09ed1ebde8674cda39a0c169401db4252">WBTC</option>
+      <option value="0x6a023ccd1ff6f2045c3309768ead9e68f978f6e1">WETH</option>
+      <option value="0x9c58bacc331c9aa871afd802db6379a98e80cedb">GNO</option>
+      <option value="0xaf204776c7245bf4147c2612bf6e5972ee483701">sDAI</option>
+    </select>
+    <label for="usdcInput">USDC.e Amount (default 100):</label>
+    <input id="usdcInput" type="number" min="1" max="10000" value="100" />
+    <button id="computeBtn">1. Compute CirclesBacking Address</button>
+    <div class="step" id="step1" style="display:none">
+      <b>CirclesBacking Address:</b> <span id="cbAddress"></span>
+      <div class="small">(Lowercase, deterministic for this Safe)</div>
+      <button id="registerAppDataBtn">2. Register appData with CowSwap</button>
+      <div class="status" id="appDataStatus"></div>
+    </div>
+    <div class="step" id="step2" style="display:none">
+      <b>3. Safe Batch Transactions</b>
+      <div class="small">(You can send these directly from your wallet below)</div>
+      <div style="margin-top:0.7em"><b>Approve USDC.e:</b></div>
+      <div class="tx-box" id="approveTx"></div>
+      <button id="sendApproveBtn" disabled>Send Approve</button>
+      <div class="status" id="approveStatus"></div>
+      <div style="margin-top:0.7em"><b>safeTransferFrom (Hub v2):</b></div>
+      <div class="tx-box" id="transferTx"></div>
+      <button id="sendTransferBtn" disabled>Send safeTransferFrom</button>
+      <div class="status" id="transferStatus"></div>
+    </div>
+  </div>
+  <script>
+    // Addresses and ABIs
+    const backingFactory = "0xecEd91232C609A42F6016860E8223B8aEcaA7bd0";
+    const backingFactoryABI = ["function computeAddress(address backer) public view returns (address)"];
+    const hubV2 = "0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8";
+    const usdc = "0x2a22f9c3b484c3629090FeED35F17Ff8F88f76F0";
+    const usdcABI = ["function approve(address spender, uint256 amount) public returns (bool)"];
+    const hubABI = ["function safeTransferFrom(address from, address to, uint256 id, uint256 value, bytes data) external"];
+    // UI Elements
+    const connectBtn = document.getElementById('connectBtn');
+    const walletStatus = document.getElementById('walletStatus');
+    const safeInput = document.getElementById('safeInput');
+    const assetSelect = document.getElementById('assetSelect');
+    const usdcInput = document.getElementById('usdcInput');
+    const computeBtn = document.getElementById('computeBtn');
+    const cbAddressSpan = document.getElementById('cbAddress');
+    const step1 = document.getElementById('step1');
+    const registerAppDataBtn = document.getElementById('registerAppDataBtn');
+    const appDataStatus = document.getElementById('appDataStatus');
+    const step2 = document.getElementById('step2');
+    const approveTx = document.getElementById('approveTx');
+    const transferTx = document.getElementById('transferTx');
+    const sendApproveBtn = document.getElementById('sendApproveBtn');
+    const sendTransferBtn = document.getElementById('sendTransferBtn');
+    const approveStatus = document.getElementById('approveStatus');
+    const transferStatus = document.getElementById('transferStatus');
+    // State
+    let cbAddress = "";
+    let safeAddr = "";
+    let assetAddr = "";
+    let provider = null;
+    let signer = null;
+    let connectedAddress = null;
+    let isSafeApp = false;
+    // Helper: Ensure Gnosis Chain
+    async function ensureGnosisChain() {
+      if (window.ethereum) {
+        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+        if (chainId !== '0x64') { // 0x64 == 100
+          try {
+            await window.ethereum.request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: '0x64' }],
+            });
+            return true;
+          } catch (switchError) {
+            alert('Please switch your wallet to Gnosis Chain (chainId 100) to use this dapp.');
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+    // Wallet connect logic
+    connectBtn.onclick = async () => {
+      walletStatus.textContent = '';
+      // Try Safe Apps SDK
+      try {
+        const safeSdk = new window.SafeAppsSDK();
+        const safeInfo = await safeSdk.safe.getInfo();
+        if (safeInfo && safeInfo.safeAddress) {
+          isSafeApp = true;
+          connectedAddress = safeInfo.safeAddress;
+          provider = new ethers.providers.JsonRpcProvider("https://rpc.gnosischain.com");
+          signer = provider.getSigner(connectedAddress);
+          safeInput.value = connectedAddress;
+          safeInput.disabled = true;
+          walletStatus.textContent = 'Connected to Safe: ' + connectedAddress;
+          walletStatus.className = 'small success';
+          return;
+        }
+      } catch (e) {
+        // Not a Safe app, fallback
+      }
+      // Fallback: MetaMask or injected wallet
+      if (window.ethereum) {
+        try {
+          await window.ethereum.request({ method: 'eth_requestAccounts' });
+          const ok = await ensureGnosisChain();
+          if (!ok) return;
+          provider = new ethers.providers.Web3Provider(window.ethereum);
+          signer = provider.getSigner();
+          connectedAddress = await signer.getAddress();
+          safeInput.value = connectedAddress;
+          safeInput.disabled = true;
+          walletStatus.textContent = 'Connected: ' + connectedAddress;
+          walletStatus.className = 'small success';
+        } catch (e) {
+          walletStatus.textContent = 'Wallet connection failed.';
+          walletStatus.className = 'small error';
+        }
+      } else {
+        walletStatus.textContent = 'No wallet found. Please install MetaMask or use Safe.';
+        walletStatus.className = 'small error';
+      }
+    };
+    // Step 1: Compute CirclesBacking Address
+    computeBtn.onclick = async () => {
+      safeAddr = safeInput.value.trim();
+      assetAddr = assetSelect.value;
+      if (!ethers.utils.isAddress(safeAddr)) {
+        alert("Please connect a wallet or enter a valid Safe address.");
+        return;
+      }
+      step1.style.display = 'none';
+      step2.style.display = 'none';
+      cbAddressSpan.textContent = '...';
+      try {
+        // Use connected provider if available, else fallback
+        const usedProvider = provider || new ethers.providers.JsonRpcProvider("https://rpc.gnosischain.com");
+        const factory = new ethers.Contract(backingFactory, backingFactoryABI, usedProvider);
+        cbAddress = await factory.computeAddress(safeAddr);
+        cbAddress = cbAddress.toLowerCase();
+        cbAddressSpan.textContent = cbAddress;
+        step1.style.display = 'block';
+        appDataStatus.textContent = '';
+      } catch (e) {
+        cbAddressSpan.textContent = 'Error!';
+        alert('Failed to compute address: ' + e.message);
+      }
+    };
+    // Step 2: Register appData with CowSwap
+    registerAppDataBtn.onclick = async () => {
+      appDataStatus.textContent = 'Registering...';
+      appDataStatus.className = 'status';
+      const appData = {
+        version: "1.1.0",
+        appCode: "Circles backing powered by AboutCircles",
+        metadata: {
+          hooks: {
+            version: "0.1.0",
+            post: [
+              {
+                target: cbAddress,
+                callData: "0x13e8f89f",
+                gasLimit: "6000000"
+              }
+            ]
+          }
+        }
+      };
+      const payload = {
+        fullAppData: JSON.stringify(appData)
+      };
+      try {
+        const res = await fetch('https://api.cow.fi/xdai/api/v1/app_data', {
+          method: 'PUT',
+          headers: { 'accept': 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error('CowSwap API error: ' + res.status);
+        const data = await res.json();
+        appDataStatus.textContent = 'Registered! appDataId: ' + (data.appDataId || '[see response]');
+        appDataStatus.className = 'status success';
+        // Show next step
+        step2.style.display = 'block';
+        // Prepare Safe batch txs
+        const usdcAmount = ethers.utils.parseUnits(usdcInput.value || '100', 6);
+        approveTx.textContent = `approve(${backingFactory}, ${usdcAmount.toString()})\nTo: ${usdc}`;
+        // Hub v2 safeTransferFrom
+        // id = Safe address, value = 48 * 1e18, data = asset as bytes32
+        const value = ethers.utils.parseUnits('48', 18);
+        const assetBytes32 = '0x' + assetAddr.replace('0x','').padStart(64, '0');
+        const iface = new ethers.utils.Interface(hubABI);
+        const txData = iface.encodeFunctionData('safeTransferFrom', [safeAddr, backingFactory, safeAddr, value, assetBytes32]);
+        transferTx.textContent = `safeTransferFrom(${safeAddr}, ${backingFactory}, ${safeAddr}, ${value.toString()}, ${assetBytes32})\nTo: ${hubV2}\nData: ${txData}`;
+        // Enable buttons if connected and on Gnosis
+        if (signer && provider && (!window.ethereum || (await provider.getNetwork()).chainId === 100)) {
+          sendApproveBtn.disabled = false;
+          sendTransferBtn.disabled = false;
+        } else {
+          sendApproveBtn.disabled = true;
+          sendTransferBtn.disabled = true;
+        }
+      } catch (e) {
+        appDataStatus.textContent = 'Error: ' + e.message;
+        appDataStatus.className = 'status error';
+      }
+    };
+    // Send Approve
+    sendApproveBtn.onclick = async () => {
+      approveStatus.textContent = 'Sending approve...';
+      approveStatus.className = 'status';
+      try {
+        const usdcAmount = ethers.utils.parseUnits(usdcInput.value || '100', 6);
+        const usdcContract = new ethers.Contract(usdc, usdcABI, signer);
+        const tx = await usdcContract.approve(backingFactory, usdcAmount);
+        approveStatus.textContent = 'Approve sent! Waiting for confirmation...';
+        await tx.wait();
+        approveStatus.innerHTML = `Approve confirmed! <a href='https://gnosisscan.io/tx/${tx.hash}' target='_blank'>View on Gnosisscan</a>`;
+        approveStatus.className = 'status success';
+      } catch (e) {
+        approveStatus.textContent = 'Error: ' + e.message;
+        approveStatus.className = 'status error';
+      }
+    };
+    // Send safeTransferFrom
+    sendTransferBtn.onclick = async () => {
+      transferStatus.textContent = 'Sending safeTransferFrom...';
+      transferStatus.className = 'status';
+      try {
+        const value = ethers.utils.parseUnits('48', 18);
+        const assetBytes32 = '0x' + assetAddr.replace('0x','').padStart(64, '0');
+        const hubContract = new ethers.Contract(hubV2, hubABI, signer);
+        const tx = await hubContract.safeTransferFrom(safeAddr, backingFactory, safeAddr, value, assetBytes32);
+        transferStatus.textContent = 'Transaction sent! Waiting for confirmation...';
+        await tx.wait();
+        transferStatus.innerHTML = `Transfer confirmed! <a href='https://gnosisscan.io/tx/${tx.hash}' target='_blank'>View on Gnosisscan</a>`;
+        transferStatus.className = 'status success';
+      } catch (e) {
+        transferStatus.textContent = 'Error: ' + e.message;
+        transferStatus.className = 'status error';
+      }
+    };
+  </script>
+</body>
+</html> 
