@@ -5,7 +5,8 @@
  * Stores the flag in the user's extensible Circles profile (IPFS + on-chain CID).
  */
 
-import { onWalletChange, sendTransactions, signMessage, isMiniappMode } from '@aboutcircles/miniapp-sdk';
+// @ts-nocheck
+import { onWalletChange, sendTransactions, signMessage, isMiniappMode } from './miniapp-sdk.js';
 import { Sdk } from '@aboutcircles/sdk';
 import { getAddress, encodeFunctionData, createPublicClient, http } from 'viem';
 import { gnosis } from 'viem/chains';
