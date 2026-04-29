@@ -6,7 +6,7 @@
  */
 
 // @ts-nocheck
-import { onWalletChange, sendTransactions, signMessage, isMiniappMode } from './miniapp-sdk.js';
+import { onWalletChange, sendTransactions, signMessage, isMiniappMode } from '../miniapp-sdk.js';
 import { Sdk } from '@aboutcircles/sdk';
 import { getAddress, encodeFunctionData, createPublicClient, http } from 'viem';
 import { gnosis } from 'viem/chains';
@@ -54,7 +54,7 @@ let pendingAction = null; // 'flag' | 'unflag'
 // ─── SDK instances (lazy) ───────────────────────────────────
 let _readSdk = null;
 function getReadSdk() {
-  if (!_readSdk) _readSdk = new Sdk(RPC_URL, null);
+  if (!_readSdk) _readSdk = new Sdk();
   return _readSdk;
 }
 
