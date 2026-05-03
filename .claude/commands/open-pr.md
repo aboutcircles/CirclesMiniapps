@@ -8,7 +8,7 @@ Arguments: slug, display name, one-line description, and the Vercel deployment U
 
 1. **Create branch**:
    ```bash
-   git checkout -B claude/miniapp-<slug>
+   git checkout -B feature/miniapp-<slug>
    ```
 
 2. **Stage and commit**:
@@ -19,21 +19,19 @@ Arguments: slug, display name, one-line description, and the Vercel deployment U
 
    - Miniapp: examples/<slug>/
    - <description>
-   - Deployed: <vercel-url>
-
-   Co-Authored-By: Claude <noreply@anthropic.com>"
+   - Deployed: <vercel-url>"
    ```
 
 3. **Push**:
    ```bash
-   git push origin claude/miniapp-<slug> --force-with-lease
+   git push origin feature/miniapp-<slug> --force-with-lease
    ```
 
 4. **Open draft PR**:
    ```bash
    gh pr create \
      --base master \
-     --head claude/miniapp-<slug> \
+     --head feature/miniapp-<slug> \
      --draft \
      --title "feat: add <Display Name>" \
      --body "$(cat <<'EOF'
@@ -55,7 +53,6 @@ Arguments: slug, display name, one-line description, and the Vercel deployment U
 
    ---
 
-   > Built autonomously by Claude Code with no human intervention.
    > See `AGENT.md` for the workflow used.
    EOF
    )"
