@@ -88,7 +88,7 @@ Two skills are available in the repo. Use them when the user or the task calls f
 | `gnosis-wallet-brand-aligner` | When asked to rebrand, restyle, or align a miniapp's look with the Gnosis wallet UI. Provides full colour, typography, layout, and component pattern references. |
 | `ui-pattern-extractor` | When asked to analyse an existing codebase and extract its design system into agent-consumable reference docs. Supports React/Next.js and Svelte/SvelteKit. |
 
-The scaffold already applies Gnosis branding via correct CSS tokens (see Pattern I below), so you do **not** need to invoke the brand-aligner for standard builds. Use it only if the user explicitly asks for a branding pass or if you're working on an app that wasn't scaffolded with `new-miniapp.sh`. -->
+The scaffold already applies Gnosis branding via correct CSS tokens (see Pattern I below), so you do **not** need to invoke the brand-aligner for standard builds. Use it only if the user explicitly asks for a branding pass. -->
 
 By the end of Phase 0 you should understand:
 - What Circles is and who uses miniapps
@@ -102,7 +102,7 @@ By the end of Phase 0 you should understand:
 ### Design language — Gnosis wallet
 
 MiniApps render inside the Gnosis wallet iframe and must feel native to it.
-The scaffold (`scripts/new-miniapp.sh`) generates CSS with the correct tokens — **do not
+The design system CSS (Pattern I below) provides the correct tokens — **do not
 override these with your own colours or fonts**.
 
 Key visual rules:
@@ -262,16 +262,23 @@ Any data structures stored or fetched.
 
 ## Phase 3: Scaffold the MiniApp (~10 min)
 
-```bash
-./scripts/new-miniapp.sh <slug> "<Display Name>"
+Run the scaffold command — it creates the directory, copies the SDK, generates all template files from the patterns below, and installs dependencies:
+
+```
+/scaffold <slug> "<Display Name>"
 ```
 
-This creates `examples/<slug>/` with the correct structure. Then install deps:
+The command creates `examples/<slug>/` with these files using the patterns in this document:
 
-```bash
-cd examples/<slug>
-npm install
-```
+| File | Template source |
+|---|---|
+| `index.html` | Pattern H (UI shell) |
+| `main.js` | Pattern A (wallet connection) |
+| `style.css` | Pattern I (design system CSS) |
+| `package.json` | Pattern J |
+| `vite.config.js` | Pattern K |
+| `vercel.json` | Static (build + rewrite config) |
+| `.gitignore` | Static (node_modules, dist, env) |
 
 ---
 
@@ -687,7 +694,7 @@ const transfers = await circlesQuery(
 
 ### Pattern I: Design system CSS
 
-The scaffold (`scripts/new-miniapp.sh`) generates the full CSS automatically.
+The scaffold Phase 3 creates the full CSS automatically using the tokens below.
 The design system aligns with the **Gnosis wallet UI** — warm beige backgrounds, navy text,
 deep blue accents. Fonts: **Space Grotesk** for
 UI text, **JetBrains Mono** for addresses and code fields (both loaded via Google Fonts).
@@ -1048,7 +1055,7 @@ Use `read_network_requests` filtered to `rpc.aboutcircles.com`. All RPC calls sh
 ```bash
 # Fix the bug, then:
 cd examples/<slug> && npm run build && cd ../..
-./scripts/deploy-miniapp.sh examples/<slug>
+vercel examples/<slug> --name circles-miniapp-<slug> --yes --prod
 # Navigate to the new URL and repeat Steps 2–3
 ```
 
@@ -1061,36 +1068,15 @@ Search for `[DEBUG]` in `main.js` and remove all temporary logs before the PR co
 
 ## Phase 5: Deploy (~10 min)
 
-```bash
-cd /path/to/repo/root
+Run the deploy command — it builds, deploys to Vercel, and disables deployment protection:
 
-# Build the miniapp
-cd examples/<slug>
-npm run build
-cd ../..
-
-# Deploy to Vercel
-./scripts/deploy-miniapp.sh examples/<slug>
+```
+/deploy <slug>
 ```
 
-The script prints the deployment URL. Save it — you need it for Phase 6.
+The command prints the deployment URL. Save it — you need it for Phase 6.
 
-If the script fails, check:
-- `VERCEL_TOKEN` is set
-- The miniapp builds cleanly (`npm run build` in the examples dir)
-- `vercel.json` exists in the miniapp dir (script creates a basic one if not)
-
-⚠️ **After deploying, you must disable Vercel Deployment Protection** on the project, or the miniapp will return a 401 when loaded inside the iframe and appear completely blank. Do this immediately after the first successful deployment:
-
-```bash
-# Via Vercel dashboard:
-# Project Settings → Deployment Protection → set to "Disabled"
-
-# Or via Vercel CLI:
-vercel project update circles-miniapp-<slug> --protection none
-```
-
-This is a one-time step per project. Without it, the miniapp URL is valid but the iframe blocks it silently.
+⚠️ **Deployment Protection** must be disabled for the miniapp to load inside the Gnosis wallet iframe. The `/deploy` command handles this automatically, but if it fails, do it manually: Vercel dashboard → Project Settings → Deployment Protection → Disabled.
 
 ---
 
@@ -1115,15 +1101,11 @@ Use the Circles logo URL above as a placeholder if you don't have a specific log
 
 ## Phase 7: Open the PR (~5 min)
 
-```bash
-./scripts/open-pr.sh <slug> "<Display Name>" "<one-line description>"
-```
+Run the PR command — it creates a branch, commits, pushes, and opens a draft PR:
 
-The script:
-1. Creates a branch `claude/miniapp-<slug>`
-2. Commits all changes
-3. Pushes to origin
-4. Opens a draft PR against `master` on `aboutcircles/CirclesMiniapps`
+```
+/open-pr <slug> "<Display Name>" "<description>" "<vercel-url>"
+```
 
 If GitHub Actions is configured, a Vercel preview will deploy automatically and the URL will be posted as a PR comment.
 

@@ -16,7 +16,7 @@ If your task is to **build a miniapp autonomously**, follow `AGENT.md` at the re
 - **SDK split**:
   - `miniapp-sdk.js` = postMessage bridge for wallet ops (transactions, signing) only
   - `@aboutcircles/sdk` + `viem` = read Circles state (profiles, trust, avatars, balances)
-- **Deployment**: Vercel (use `scripts/deploy-miniapp.sh`)
+- **Deployment**: Vercel (`vercel --name circles-miniapp-<slug> --yes --prod`)
 - **PR target**: `master` on `aboutcircles/CirclesMiniapps`
 
 ## Security
