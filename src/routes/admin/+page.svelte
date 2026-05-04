@@ -2,16 +2,12 @@
     import { onMount } from "svelte";
     import AppNavigation from "$lib/AppNavigation.svelte";
     import { wallet } from "$lib/wallet.svelte.ts";
-    import ApprovalPopup from "$lib/ApprovalPopup.svelte";
-
+    import IframeHost from "$lib/IframeHost.svelte";
     import { page } from "$app/stores";
     import { goto } from "$app/navigation";
     import {
         truncateAddr,
-        getAvatarInitial as _getAvatarInitial,
-        createMessageHandler,
-        createApprovalHandlers,
-        type PendingRequest
+        getAvatarInitial as _getAvatarInitial
     } from "$lib/iframeHost.ts";
 
     const baseUrl = import.meta.env.VITE_BASE_URL;
@@ -35,9 +31,6 @@
     }
 
     let iframeSrc = $state("");
-    let pendingSource: MessageEventSource | null = null;
-    let pendingRequest: PendingRequest | null = $state(null);
-    let iframeEl: HTMLIFrameElement = $state() as HTMLIFrameElement;
     let showLogout = $state(false);
     let chipEl = $state<HTMLElement>();
 
@@ -49,22 +42,7 @@
 
     const getAvatarInitial = () => _getAvatarInitial(wallet.avatarName, wallet.address);
 
-    function postToIframe(data: any) {
-        try {
-            iframeEl?.contentWindow?.postMessage(data, "*");
-        } catch {
-            // cross-origin access blocked
-        }
-    }
-
-    const handleMessage = createMessageHandler({
-        getAppData: () => $page.url.searchParams.get("data"),
-        setPending: (req) => { pendingRequest = req; },
-        setPendingSource: (s) => { pendingSource = s; }
-    });
-
     onMount(() => {
-        window.addEventListener("message", handleMessage);
         fetch("/miniapps.json")
             .then((r) => r.json())
             .then((data: MiniApp[]) => {
@@ -75,33 +53,7 @@
             });
 
         wallet.autoConnectAndPick();
-
-        return () => {
-            window.removeEventListener("message", handleMessage);
-        };
     });
-
-    $effect(() => {
-        if (wallet.connected) {
-            postToIframe({ type: "wallet_connected", address: wallet.address });
-        } else {
-            postToIframe({ type: "wallet_disconnected" });
-        }
-    });
-
-    function handleIframeLoad() {
-        if (wallet.connected) {
-            postToIframe({ type: "wallet_connected", address: wallet.address });
-        }
-        const raw = $page.url.searchParams.get("data");
-        if (raw) {
-            try {
-                postToIframe({ type: "app_data", data: atob(raw) });
-            } catch {
-                postToIframe({ type: "app_data", data: raw });
-            }
-        }
-    }
 
     function launchApp(app: MiniApp) {
         if (app.slug) {
@@ -120,13 +72,6 @@
     function getInitial(name: string): string {
         return name.trim().charAt(0).toUpperCase();
     }
-
-    const { handleApprove, handleReject } = createApprovalHandlers({
-        getPending: () => pendingRequest,
-        getPendingSource: () => pendingSource,
-        setPending: (req) => { pendingRequest = req; },
-        setPendingSource: (s) => { pendingSource = s; }
-    });
 </script>
 
 <svelte:window onclick={handleWindowClick} />
@@ -310,90 +255,16 @@
         </div>
     {:else}
         <div class="iframe-view">
-            <div class="iframe-topbar">
-                <div class="topbar-left">
-                    <button class="back-btn" onclick={goBack}
-                        >&#8592; back</button
-                    >
-                    <AppNavigation />
-                </div>
-                <div class="header-right">
-                    {#if wallet.connected}
-                        <div
-                            class="user-chip"
-                            bind:this={chipEl}
-                            class:open={showLogout}
-                            onclick={() => (showLogout = !showLogout)}
-                            role="button"
-                            tabindex="0"
-                            onkeydown={(e) =>
-                                e.key === "Enter" && (showLogout = !showLogout)}
-                        >
-                            <div class="avatar-img-wrap">
-                                {#if wallet.avatarImageUrl}
-                                    <img
-                                        class="avatar-img"
-                                        src={wallet.avatarImageUrl}
-                                        alt="avatar"
-                                    />
-                                {:else}
-                                    <span class="avatar-placeholder"
-                                        >{getAvatarInitial()}</span
-                                    >
-                                {/if}
-                            </div>
-                            <span class="user-name"
-                                >{wallet.avatarName ||
-                                    truncateAddr(wallet.address)}</span
-                            >
-                            {#if showLogout}
-                                <button
-                                    class="logout-btn"
-                                    onclick={(e) => {
-                                        e.stopPropagation();
-                                        wallet.disconnect();
-                                        showLogout = false;
-                                    }}>Log out</button
-                                >
-                            {/if}
-                        </div>
-                    {:else}
-                        <button
-                            class="connect-btn"
-                            onclick={() => wallet.connectAndPick()}
-                            disabled={wallet.connecting}
-                        >
-                            {#if wallet.connecting}
-                                <span class="btn-spinner"></span>
-                                Connecting...
-                            {:else}
-                                Sign in
-                            {/if}
-                        </button>
-                    {/if}
-                </div>
-            </div>
-
-            <div class="card iframe-card">
-                <iframe
-                    bind:this={iframeEl}
-                    src={iframeSrc}
-                    sandbox="allow-scripts allow-forms allow-same-origin"
-                    title="Mini App"
-                    onload={handleIframeLoad}
-                ></iframe>
-            </div>
+            <IframeHost
+                src={iframeSrc}
+                iframeTitle="Mini App"
+                sandbox="allow-scripts allow-forms allow-same-origin"
+                onBack={goBack}
+                getAppData={() => $page.url.searchParams.get("data")}
+            />
         </div>
     {/if}
 </div>
-
-{#if pendingRequest}
-    <ApprovalPopup
-        request={pendingRequest}
-        onapprove={handleApprove}
-        onreject={handleReject}
-    />
-{/if}
 
 <style>
     .page {
@@ -433,22 +304,6 @@
         font-weight: 600;
         letter-spacing: -0.02em;
         color: var(--ink);
-    }
-
-    .user-chip {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 4px 10px 4px 4px;
-        border: 1px solid var(--line);
-        border-radius: var(--radius-pill);
-        background: var(--card);
-        cursor: pointer;
-        user-select: none;
-        transition:
-            border-color 0.15s,
-            background 0.15s;
-        position: relative;
     }
 
     .app-grid {
@@ -661,37 +516,5 @@
         min-height: 0;
         display: flex;
         flex-direction: column;
-    }
-
-    .iframe-topbar {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        flex-wrap: wrap;
-        gap: 12px;
-        padding-bottom: 16px;
-        border-bottom: 1px solid var(--line);
-        margin-bottom: 16px;
-        flex-shrink: 0;
-    }
-
-    .iframe-card {
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        border: 1px solid var(--line);
-        border-radius: var(--radius-card);
-        overflow: hidden;
-        background: var(--card);
-        box-shadow: var(--shadow-card);
-    }
-
-    iframe {
-        flex: 1;
-        width: 100%;
-        height: 100%;
-        border: none;
-        display: block;
     }
 </style>
