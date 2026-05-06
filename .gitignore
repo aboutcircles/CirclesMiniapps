@@ -21,5 +21,9 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# llm files
 .claude/
 .context/
+AGENT.md
+CLAUDE.md

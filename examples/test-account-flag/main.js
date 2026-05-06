@@ -6,7 +6,7 @@
  */
 
 // @ts-nocheck
-import { onWalletChange, sendTransactions, signMessage, isMiniappMode } from '../miniapp-sdk.js';
+import { onWalletChange, sendTransactions, signMessage, isMiniappMode } from '@aboutcircles/miniapp-sdk';
 import { Sdk } from '@aboutcircles/sdk';
 import { getAddress, encodeFunctionData, createPublicClient, http } from 'viem';
 import { gnosis } from 'viem/chains';
