@@ -295,7 +295,7 @@
 </script>
 
 <svelte:head>
-	<title>Kudos</title>
+	<title>Appreciations</title>
 </svelte:head>
 
 <div class="page">
