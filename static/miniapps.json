@@ -151,5 +151,18 @@
       "tools"
     ],
     "category": "admin"
+  },
+  {
+    "slug": "group-liquidity-bootstrapper",
+    "name": "Group Liquidity Bootstrapper",
+    "logo": "/app-logos/liquidity.png",
+    "url": "https://group-liquidity-bootstrapper.vercel.app/",
+    "description": "Deploy Liquidity Pools for your Circles groups",
+    "tags": [
+      "admin",
+      "groups",
+      "liquidity pools"
+    ],
+    "category": "admin"
   }
 ]
