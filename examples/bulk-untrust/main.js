@@ -1,4 +1,4 @@
-import { onWalletChange, sendTransactions, isMiniappMode } from './miniapp-sdk.js';
+import { onWalletChange, sendTransactions, isMiniappMode } from '@aboutcircles/miniapp-sdk';
 import { Sdk } from '@aboutcircles/sdk';
 import { createPublicClient, http, getAddress, encodeFunctionData, parseAbiItem } from 'viem';
 import { gnosis } from 'viem/chains';
@@ -30,7 +30,7 @@ const POLL_MS = 3000;
 const TIMEOUT_MS = 12 * 60 * 1000;
 
 // ── SDK & RPC clients ──────────────────────────────────────────────────────
-const sdk = new Sdk('https://rpc.aboutcircles.com/', null);
+const sdk = new Sdk();
 
 const receiptClients = RPC_FALLBACK_URLS.map(url =>
   createPublicClient({ chain: gnosis, transport: http(url) })
@@ -39,9 +39,9 @@ const receiptClients = RPC_FALLBACK_URLS.map(url =>
 // ── App state ──────────────────────────────────────────────────────────────
 let connectedAddress = null;
 let entries = [];
-let sortKey = 'date';
+let sortKey = 'score';
 let sortAsc = false;
-let filterMinScore = 0;
+let filterMaxScore = 100;
 let filterFromDate = null;
 let filterToDate = null;
 let filterTypes = new Set();
@@ -158,9 +158,9 @@ function updateStats() {
 // ── Sort + filter ──────────────────────────────────────────────────────────
 function getFilteredSorted() {
   let list = entries.filter(e => {
-    if (filterMinScore > 0) {
+    if (filterMaxScore < 100) {
       if (e.trustScore === null) return true; // still loading — keep
-      if (e.trustScore < 0 || e.trustScore < filterMinScore) return false;
+      if (e.trustScore >= 0 && e.trustScore > filterMaxScore) return false;
     }
     if (filterFromDate && e.timestamp * 1000 < filterFromDate.getTime()) return false;
     if (filterToDate && e.timestamp * 1000 > filterToDate.getTime()) return false;
@@ -478,8 +478,8 @@ function wireControls() {
 
   // Score slider
   $('score-filter').addEventListener('input', e => {
-    filterMinScore = Number(e.target.value);
-    $('score-val-display').textContent = filterMinScore;
+    filterMaxScore = Number(e.target.value);
+    $('score-val-display').textContent = filterMaxScore;
     renderList();
   });
 
@@ -510,12 +510,12 @@ function wireControls() {
 
   // Clear filters
   $('clear-filters-btn').addEventListener('click', () => {
-    filterMinScore = 0;
+    filterMaxScore = 100;
     filterFromDate = null;
     filterToDate = null;
     filterTypes = new Set();
-    $('score-filter').value = 0;
-    $('score-val-display').textContent = 0;
+    $('score-filter').value = 100;
+    $('score-val-display').textContent = 100;
     $('filter-from-date').value = '';
     $('filter-to-date').value = '';
     document.querySelectorAll('.type-toggle').forEach(b => b.classList.remove('active'));

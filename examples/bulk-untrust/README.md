@@ -24,6 +24,6 @@ Load it in the Circles MiniApp host via the Advanced tab at `https://circles.gno
 
 ## Architecture
 
-- **Wallet bridge**: `miniapp-sdk.js` — postMessage protocol for transactions and signing
+- **Wallet bridge**: `@aboutcircles/miniapp-sdk` — postMessage protocol for transactions and signing
 - **Circles reads**: `@aboutcircles/sdk` — profiles, trust, balances, RPC queries
 - **Chain**: Gnosis Chain (ID 100)
