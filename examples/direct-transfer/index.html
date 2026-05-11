@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Direct Transfer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="title-row">
+        <h1 id="screen-title">Your CRC balance</h1>
+        <span id="badge" class="badge badge-disconnected">Not connected</span>
+      </div>
+      <p class="subtitle" id="screen-subtitle">Send CRC you hold directly to others.</p>
+    </header>
+
+    <!-- Disconnected -->
+    <div id="disconnected-view" class="view">
+      <div class="card">
+        <div class="card-icon">🔗</div>
+        <h2>Connect your wallet</h2>
+        <p class="card-text">
+          Open this app from the Circles wallet to view your balances and send transfers.
+        </p>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading-view" class="view hidden">
+      <div class="card">
+        <div class="spinner"></div>
+        <p class="card-text" style="text-align:center;margin-top:16px">Loading your balances…</p>
+      </div>
+    </div>
+
+    <!-- Balances list -->
+    <div id="balances-view" class="view hidden">
+      <div class="balances-search-row">
+        <input
+          type="text"
+          id="balances-search"
+          placeholder="Filter tokens by name or address…"
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <button class="btn-clear hidden" id="balances-search-clear" type="button" title="Clear">×</button>
+      </div>
+      <div class="filter-row">
+        <label class="toggle">
+          <input type="checkbox" id="hide-tiny" checked />
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+          <span class="toggle-label">Hide under 0.1 CRC</span>
+        </label>
+        <div class="unit-switch-wrap">
+          <div class="unit-switch" role="radiogroup" aria-label="Display unit">
+            <button class="unit-btn unit-active" data-unit="demurraged" type="button" role="radio" aria-checked="true">demurraged</button>
+            <button class="unit-btn" data-unit="static" type="button" role="radio" aria-checked="false">static</button>
+          </div>
+          <span class="unit-switch-label">units</span>
+        </div>
+        <button class="btn-ghost" id="refresh-btn" type="button" title="Refresh">↻</button>
+      </div>
+
+      <div id="balances-list"></div>
+
+      <div id="empty-balances" class="card hidden">
+        <div class="card-icon">📭</div>
+        <h2>No balances</h2>
+        <p class="card-text">No Circles tokens above the current threshold. Toggle the filter to see all balances.</p>
+      </div>
+    </div>
+
+    <!-- Send screen -->
+    <div id="send-view" class="view hidden">
+      <button class="btn-back" id="back-btn" type="button">← Back to balances</button>
+
+      <div class="card token-card">
+        <div class="community-row">
+          <div class="community-avatar" id="send-token-avatar">●</div>
+          <div class="community-info">
+            <div class="community-label">Sending</div>
+            <div class="community-name" id="send-token-name">—</div>
+          </div>
+        </div>
+        <div class="token-total-row">
+          <span class="detail-label">Total available</span>
+          <span class="detail-value" id="send-token-total">— CRC</span>
+        </div>
+      </div>
+
+      <!-- Recipient -->
+      <div class="card">
+        <h2>Recipient</h2>
+        <div class="search-row">
+          <input
+            type="text"
+            id="recipient-input"
+            placeholder="Search by name or paste address (0x…)"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button class="btn-ghost btn-clear hidden" id="recipient-clear" type="button" title="Clear">×</button>
+        </div>
+        <div id="recipient-results" class="search-results hidden"></div>
+        <div id="recipient-selected" class="recipient-selected hidden">
+          <div class="community-avatar" id="recipient-avatar">?</div>
+          <div class="recipient-meta">
+            <div class="recipient-name" id="recipient-name"></div>
+            <div class="recipient-address" id="recipient-address"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Amount -->
+      <div class="card">
+        <h2>Amount</h2>
+        <div class="amount-row">
+          <input
+            type="text"
+            inputmode="decimal"
+            id="amount-input"
+            placeholder="0.00"
+          />
+          <span class="amount-unit" id="amount-unit">CRC</span>
+          <button class="btn-mini" id="max-btn" type="button">Max</button>
+        </div>
+        <div class="amount-hint" id="amount-hint"></div>
+      </div>
+
+      <!-- Target form -->
+      <div class="card">
+        <h2>Send as</h2>
+        <div class="form-options">
+          <label class="form-option">
+            <input type="radio" name="target-form" value="ERC1155" checked />
+            <div class="form-option-body">
+              <div class="form-option-title">ERC1155 (Hub native)</div>
+              <div class="form-option-sub">Personal/group token transfer through Hub V2</div>
+            </div>
+          </label>
+          <label class="form-option">
+            <input type="radio" name="target-form" value="ERC20_DEM" />
+            <div class="form-option-body">
+              <div class="form-option-title">ERC20 — Demurraged</div>
+              <div class="form-option-sub">Wrapped ERC-20, decays over time (1:1 with CRC today)</div>
+            </div>
+          </label>
+          <label class="form-option">
+            <input type="radio" name="target-form" value="ERC20_INFL" />
+            <div class="form-option-body">
+              <div class="form-option-title">ERC20 — Static / Inflationary</div>
+              <div class="form-option-sub">Non-decaying wrapper, ideal for DeFi integrations</div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Route preview (collapsed by default) -->
+      <details class="card route-card">
+        <summary>Route details</summary>
+        <div class="route-body">
+          <div id="route-preview" class="route-preview">
+            <em class="route-empty">Pick recipient and amount to see the route.</em>
+          </div>
+        </div>
+      </details>
+
+      <button class="btn-primary" id="send-btn" type="button" disabled>
+        <span class="btn-text">Send</span>
+        <span class="btn-spinner spinner hidden"></span>
+      </button>
+
+      <div id="send-result" class="result-box hidden">
+        <div id="send-result-icon" class="card-icon"></div>
+        <p id="send-result-message"></p>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div id="error-view" class="view hidden">
+      <div class="card card-warning">
+        <div class="card-icon">⚠️</div>
+        <h2>Something went wrong</h2>
+        <p class="card-text" id="error-message"></p>
+        <button class="btn-primary" id="error-retry" type="button" style="margin-top:14px">Try again</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-host"></div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
