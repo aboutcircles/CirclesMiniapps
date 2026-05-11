@@ -5,6 +5,10 @@
 
 	// ----- Constants -----
 	const CIRCLES_RPC_URL = 'https://rpc.aboutcircles.com/';
+	// Test/demo transactions to hide from the feed. Keyed by lower-cased tx hash.
+	const HIDDEN_TX_HASHES = new Set<string>([
+		'0x8feed3dfa747cd230ffef84d6d3eb3a34cf8273136782792d498a11086307501'
+	]);
 	// ----- Group config dictionary -----
 	// Add entries here for each group this page supports.
 	// The key is the value of the ?group= URL param.
@@ -133,6 +137,7 @@
 		for (const entry of transferEntries) {
 			// entry.from = actual sender, entry.to = org, entry.data = 0x<recipientAddr40><msgHex>
 			if (entry.to.toLowerCase() !== orgLower) continue;
+			if (HIDDEN_TX_HASHES.has(entry.transactionHash.toLowerCase())) continue;
 			const recipient = decodeRecipient(entry.data);
 			if (!recipient) continue;
 			// when ?address is set, only show kudos received by that address
