@@ -548,7 +548,7 @@
 		display: flex;
 		align-items: flex-start;
 		justify-content: center;
-		padding: 48px 16px 80px;
+		padding: 48px 16px;
 		box-sizing: border-box;
 		background: #ffffff;
 	}
