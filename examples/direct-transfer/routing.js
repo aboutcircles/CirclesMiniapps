@@ -15,10 +15,17 @@
  *     issuer at a given moment, just computed per-issuer for resilience.
  */
 
-import { encodeFunctionData } from 'viem';
-import { hubV2Abi } from '@aboutcircles/sdk-abis/hubV2';
-import { demurrageCirclesAbi } from '@aboutcircles/sdk-abis/demurrageCircles';
-import { inflationaryCirclesAbi } from '@aboutcircles/sdk-abis/inflationaryCircles';
+// Tx encoding goes through `@aboutcircles/sdk-core`'s typed contract wrappers.
+// Each method (`core.hubV2.wrap(...)`, `wrapperInstance.transfer(...)` etc.)
+// returns a `TransactionRequest = {to, data, value?}` *without* sending, so
+// we can keep building the same batched routes and hand them to the host
+// bridge — no hand-rolled calldata, no raw ABI imports.
+import {
+  Core,
+  circlesConfig,
+  DemurrageCirclesContract,
+  InflationaryCirclesContract,
+} from '@aboutcircles/sdk-core';
 
 // ─── Constants ──────────────────────────────────────────────
 export const HUB_V2 = '0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8';
@@ -70,77 +77,66 @@ export function classifyBalance(b) {
   return null;
 }
 
-// ─── Tx encoders ────────────────────────────────────────────
-export function makeSafeTransfer1155({ from, to, tokenId, atto }) {
+// ─── SDK contract instances (lazy, cached) ──────────────────
+// `circlesConfig[100]` is Gnosis Chain mainnet. We pass `rpcUrl` to wrapper
+// instances even though we never call their read methods here — only the
+// tx-building methods, which don't touch the network. The URL is required by
+// the constructor signature.
+let _core = null;
+function getCore() {
+  if (!_core) _core = new Core(circlesConfig[100]);
+  return _core;
+}
+const _demCache = new Map();
+const _inflCache = new Map();
+function getDemurrageContract(addr) {
+  const k = addr.toLowerCase();
+  if (!_demCache.has(k)) {
+    _demCache.set(k, new DemurrageCirclesContract({ address: addr, rpcUrl: circlesConfig[100].circlesRpcUrl }));
+  }
+  return _demCache.get(k);
+}
+function getInflationaryContract(addr) {
+  const k = addr.toLowerCase();
+  if (!_inflCache.has(k)) {
+    _inflCache.set(k, new InflationaryCirclesContract({ address: addr, rpcUrl: circlesConfig[100].circlesRpcUrl }));
+  }
+  return _inflCache.get(k);
+}
+
+// `TransactionRequest` from the SDK has `value?: bigint`. The miniapp host
+// bridge expects `value` as a hex string. Serialize at the edge.
+function toBridgeTx(req) {
   return {
-    to: HUB_V2,
-    data: encodeFunctionData({
-      abi: hubV2Abi,
-      functionName: 'safeTransferFrom',
-      args: [from, to, tokenId, atto, '0x'],
-    }),
-    value: '0x0',
+    to: req.to,
+    data: req.data,
+    value: req.value == null ? '0x0' : `0x${BigInt(req.value).toString(16)}`,
   };
+}
+
+// ─── Tx encoders (SDK-typed under the hood) ─────────────────
+export function makeSafeTransfer1155({ from, to, tokenId, atto }) {
+  return toBridgeTx(getCore().hubV2.safeTransferFrom(from, to, tokenId, atto, '0x'));
 }
 
 export function makeHubWrap({ issuer, atto, typeEnum }) {
-  return {
-    to: HUB_V2,
-    data: encodeFunctionData({
-      abi: hubV2Abi,
-      functionName: 'wrap',
-      args: [issuer, atto, typeEnum],
-    }),
-    value: '0x0',
-  };
+  return toBridgeTx(getCore().hubV2.wrap(issuer, atto, typeEnum));
 }
 
 export function makeUnwrapDem({ wrapperAddr, atto }) {
-  return {
-    to: wrapperAddr,
-    data: encodeFunctionData({
-      abi: demurrageCirclesAbi,
-      functionName: 'unwrap',
-      args: [atto],
-    }),
-    value: '0x0',
-  };
+  return toBridgeTx(getDemurrageContract(wrapperAddr).unwrap(atto));
 }
 
 export function makeUnwrapInfl({ wrapperAddr, nativeAtto }) {
-  return {
-    to: wrapperAddr,
-    data: encodeFunctionData({
-      abi: inflationaryCirclesAbi,
-      functionName: 'unwrap',
-      args: [nativeAtto],
-    }),
-    value: '0x0',
-  };
+  return toBridgeTx(getInflationaryContract(wrapperAddr).unwrap(nativeAtto));
 }
 
 export function makeDemTransfer({ wrapperAddr, to, atto }) {
-  return {
-    to: wrapperAddr,
-    data: encodeFunctionData({
-      abi: demurrageCirclesAbi,
-      functionName: 'transfer',
-      args: [to, atto],
-    }),
-    value: '0x0',
-  };
+  return toBridgeTx(getDemurrageContract(wrapperAddr).transfer(to, atto));
 }
 
 export function makeInflTransfer({ wrapperAddr, to, nativeAtto }) {
-  return {
-    to: wrapperAddr,
-    data: encodeFunctionData({
-      abi: inflationaryCirclesAbi,
-      functionName: 'transfer',
-      args: [to, nativeAtto],
-    }),
-    value: '0x0',
-  };
+  return toBridgeTx(getInflationaryContract(wrapperAddr).transfer(to, nativeAtto));
 }
 
 // ─── Conversion ─────────────────────────────────────────────

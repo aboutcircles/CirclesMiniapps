@@ -20,12 +20,13 @@ A Circles miniapp that lets a user send CRC they hold directly to another user, 
 
 ## Tech
 
-- `@aboutcircles/miniapp-sdk` — host bridge (`onWalletChange`, `sendTransactions`, `isMiniappMode`)
-- `@aboutcircles/sdk` — read-only SDK (`new Sdk()` for profiles, balances, wrapper lookups)
-- `@aboutcircles/sdk-abis` — Hub V2, demurrageCircles, inflationaryCircles ABIs
-- `viem` — `encodeFunctionData` for raw calldata + `formatUnits`/`parseUnits` for atto-CRC conversion
+- `@aboutcircles/miniapp-sdk` — host bridge (`onWalletChange`, `sendTransactions`, `isMiniappMode`).
+- `@aboutcircles/sdk` — high-level read SDK (`new Sdk()` for profile search, balances, wrapper-address lookups).
+- `@aboutcircles/sdk-core` — typed contract wrappers (`core.hubV2.wrap(...)`, `DemurrageCirclesContract(addr).transfer(...)` etc.). Each method returns a `TransactionRequest` *without* sending, so the route planner builds a batch and the host bridge signs it. **No raw `encodeFunctionData` in the app code.**
+- `viem` — `formatUnits` / `parseUnits` for atto-CRC ↔ string conversion.
+- `@aboutcircles/sdk-abis` — only pulled in by the test suite to decode + verify produced calldata.
 
-The miniapp host signs everything with the user's Safe, so we just emit `{to, data, value}` tuples and let the host batch them.
+The miniapp host signs everything with the user's Safe, so we just emit `{to, data, value}` tuples and let the host batch them in one approval.
 
 Source layout:
 - `main.js` — UI + wallet bridge wiring.
