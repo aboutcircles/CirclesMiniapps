@@ -383,6 +383,7 @@
 							placeholder="Add a message… (optional)"
 							bind:value={kudosMessage}
 							onclick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+							onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); openKudos(e as unknown as MouseEvent); } }}
 						/>
 						<!--<div class="kudos-suggestions">
 							{#each ['🙏', '🌟', '💪', '❤️'] as emoji}
