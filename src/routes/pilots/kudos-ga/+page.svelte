@@ -266,9 +266,8 @@
 			// errors silently suppressed
 		} finally {
 			txLoading = false;
-			// nudge iframe-resizer in case content shrank — its MutationObserver catches growth but not all shrinkage.
 			queueMicrotask(() => {
-				const pi = (window as unknown as { parentIframe?: { size?: () => void } }).parentIframe;
+				const pi = (window as unknown as { parentIFrame?: { size?: () => void } }).parentIFrame;
 				pi?.size?.();
 			});
 		}
@@ -302,10 +301,10 @@
 	// Done imperatively (not in <svelte:head>) because SvelteKit's prerender strips raw <script> tags from head.
 	$effect(() => {
 		if (typeof window === 'undefined') return;
-		if (window.parent === window) return; // not in an iframe — skip
+		if (window.parent === window) return;
 		if (document.querySelector('script[data-iframe-resizer-child]')) return;
 		const s = document.createElement('script');
-		s.src = 'https://cdn.jsdelivr.net/npm/@iframe-resizer/child@5';
+		s.src = 'https://cdn.jsdelivr.net/npm/iframe-resizer@4.2.10/js/iframeResizer.contentWindow.min.js';
 		s.async = true;
 		s.dataset.iframeResizerChild = 'true';
 		document.head.appendChild(s);
