@@ -164,5 +164,17 @@
       "liquidity pools"
     ],
     "category": "admin"
+  },
+  {
+    "slug": "circles-trivia",
+    "name": "Circles Trivia",
+    "logo": "/app-logos/trivia.png",
+    "url": "https://trivia-circles.vercel.app/",
+    "description": "Test your Circles and Gnosis knowledge. 10 random questions, speed-based scoring, and a global leaderboard.",
+    "tags": [
+      "game",
+      "education"
+    ],
+    "category": "miniapp"
   }
 ]
