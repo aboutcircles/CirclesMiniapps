@@ -169,7 +169,7 @@
     "slug": "direct-transfer",
     "name": "Direct Transfer",
     "logo": "/app-logos/direct-transfer.png",
-    "url": "",
+    "url": "/apps/direct-transfer",
     "description": "Send CRC you hold directly to others, with auto wrap/unwrap routing across ERC1155 and ERC20 forms.",
     "tags": [
       "payments",

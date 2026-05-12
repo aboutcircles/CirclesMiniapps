@@ -1,3 +1,9 @@
+// Test fixtures intentionally pass through viem's `decodeFunctionData` whose
+// return type is a wide union (one tuple per ABI function). Narrowing every
+// arg access by hand bloats the suite without catching real bugs — the tests
+// already discriminate via `expect(decoded.functionName).toBe(...)`. Skip
+// type-checking this file; vitest still runs it normally.
+// @ts-nocheck
 import { describe, it, expect } from 'vitest';
 import { decodeFunctionData } from 'viem';
 import { hubV2Abi } from '@aboutcircles/sdk-abis/hubV2';
@@ -23,29 +29,44 @@ import {
   makeDemTransfer,
   makeInflTransfer,
   computeRoute,
-} from './routing.js';
+  type Address,
+  type IssuerEntry,
+  type ComputeRouteInput,
+  type TargetForm,
+  type DisplayUnit,
+} from './routing';
 
 // ─── Test fixtures ──────────────────────────────────────────
-const FROM = '0xf48554937f18885c7f15c432c596b5843648231D';
-const RECIPIENT = '0x000000000000000000000000000000000000beef';
-const ISSUER = '0x1111111111111111111111111111111111111111';
-const DEM_WRAPPER = '0x2222222222222222222222222222222222222222';
-const INFL_WRAPPER = '0x3333333333333333333333333333333333333333';
+const FROM: Address = '0xf48554937f18885c7f15c432c596b5843648231D';
+const RECIPIENT: Address = '0x000000000000000000000000000000000000beef';
+const ISSUER: Address = '0x1111111111111111111111111111111111111111';
+const DEM_WRAPPER: Address = '0x2222222222222222222222222222222222222222';
+const INFL_WRAPPER: Address = '0x3333333333333333333333333333333333333333';
 
 // All TokenBalance rows for the same issuer share today, so the static factor
 // is the same across rows. Pick a non-trivial ratio so tests catch unit bugs:
 // 1 today-CRC == 1.25 static-CRC.
 const STATIC_FACTOR = (10n ** 18n * 125n) / 100n; // 1.25e18
 
+interface MakeEntryOpts {
+  erc1155?: bigint;
+  dem?: bigint;
+  infl?: bigint;
+  inflNative?: bigint | null;
+  demAddr?: Address;
+  inflAddr?: Address;
+  staticFactor?: bigint;
+}
+
 function makeEntry({
   erc1155 = 0n,
   dem = 0n,
   infl = 0n,
-  inflNative = null, // defaults derived from STATIC_FACTOR if not provided
+  inflNative = null,
   demAddr = DEM_WRAPPER,
   inflAddr = INFL_WRAPPER,
   staticFactor = STATIC_FACTOR,
-} = {}) {
+}: MakeEntryOpts = {}): IssuerEntry {
   const native =
     inflNative != null ? inflNative : (infl * STATIC_FACTOR) / ONE_CRC_ATTO;
   return {
@@ -57,15 +78,23 @@ function makeEntry({
   };
 }
 
-function plan(args) {
+interface PlanArgs {
+  entry: IssuerEntry | null;
+  amountAtto: bigint | null;
+  targetForm: TargetForm | string;
+  recipient?: Address | null;
+  fromAddress?: Address;
+}
+
+function plan(args: PlanArgs) {
   // Use `in` checks so callers can pass `recipient: null` explicitly to test
   // the "missing recipient" branch — `??` would silently replace it.
   return computeRoute({
     entry: args.entry,
     amountAtto: args.amountAtto,
-    targetForm: args.targetForm,
-    recipient: 'recipient' in args ? args.recipient : RECIPIENT,
-    fromAddress: 'fromAddress' in args ? args.fromAddress : FROM,
+    targetForm: args.targetForm as TargetForm,
+    recipient: 'recipient' in args ? (args.recipient ?? null) : RECIPIENT,
+    fromAddress: 'fromAddress' in args ? args.fromAddress! : FROM,
   });
 }
 
