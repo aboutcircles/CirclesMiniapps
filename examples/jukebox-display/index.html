@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Circles Jukebox · Display</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://w.soundcloud.com/player/api.js"></script>
+</head>
+<body>
+  <div class="stage">
+    <header class="stage-header">
+      <div class="brand">
+        <span class="brand-mark">🎶</span>
+        <span class="brand-text">Circles Jukebox</span>
+      </div>
+      <div class="status">
+        <span id="status-dot" class="status-dot"></span>
+        <span id="status-text">Connecting…</span>
+      </div>
+    </header>
+
+    <main class="stage-main">
+      <section class="now-playing-card" id="now-playing-card">
+        <div class="now-playing-art-wrap">
+          <img id="now-playing-art" class="now-playing-art" alt="" src="" />
+        </div>
+        <div class="now-playing-meta">
+          <div class="now-playing-label">Now playing</div>
+          <h2 id="now-playing-title" class="now-playing-title">Waiting for a request…</h2>
+          <div id="now-playing-artist" class="now-playing-artist"></div>
+          <div id="now-playing-attribution" class="now-playing-attribution"></div>
+        </div>
+      </section>
+
+      <aside class="up-next">
+        <h3>Up next</h3>
+        <div id="up-next-list" class="up-next-list">
+          <div class="up-next-empty">Pay 10 CRC in the Circles Jukebox miniapp to queue a song.</div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="stage-footer">
+      <span>Powered by Circles · Pay 10 CRC in the Jukebox miniapp to add a song</span>
+    </footer>
+  </div>
+
+  <!-- Hidden SoundCloud widget; this is the audio source for the room. -->
+  <iframe
+    id="sc-widget"
+    width="100%"
+    height="166"
+    scrolling="no"
+    frameborder="no"
+    allow="autoplay"
+    src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/&color=%230e00a8&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false">
+  </iframe>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>

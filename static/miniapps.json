@@ -177,5 +177,18 @@
       "tools"
     ],
     "category": "miniapp"
+  },
+  {
+    "slug": "jukebox",
+    "name": "Circles Jukebox",
+    "logo": "/app-logos/jukebox.png",
+    "url": "https://jukebox.vercel.app",
+    "description": "Pick a song from a curated SoundCloud catalog and pay 10 CRC to add it to the room's jukebox queue. The big screen plays it for everyone.",
+    "tags": [
+      "social",
+      "music",
+      "events"
+    ],
+    "category": "miniapp"
   }
 ]

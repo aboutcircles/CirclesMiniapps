@@ -1,0 +1,98 @@
+[
+  {
+    "id": 1,
+    "title": "Resonance",
+    "artist": "HOME",
+    "soundcloudUrl": "https://soundcloud.com/officialhome/resonance",
+    "durationSec": 213,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-000209252356-9eq8ds-t500x500.jpg"
+  },
+  {
+    "id": 2,
+    "title": "Nightcall",
+    "artist": "Kavinsky",
+    "soundcloudUrl": "https://soundcloud.com/kavinsky/nightcall",
+    "durationSec": 258,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-000089474317-vhbf8x-t500x500.jpg"
+  },
+  {
+    "id": 3,
+    "title": "Around the World",
+    "artist": "Daft Punk",
+    "soundcloudUrl": "https://soundcloud.com/daftpunkofficial/around-the-world",
+    "durationSec": 429,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-000028273014-cn1jp4-t500x500.jpg"
+  },
+  {
+    "id": 4,
+    "title": "Borderline",
+    "artist": "Tame Impala",
+    "soundcloudUrl": "https://soundcloud.com/tameimpala/borderline",
+    "durationSec": 237,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-FYpKEcZBqx7Y-0-t500x500.jpg"
+  },
+  {
+    "id": 5,
+    "title": "Strobe",
+    "artist": "deadmau5",
+    "soundcloudUrl": "https://soundcloud.com/deadmau5/strobe",
+    "durationSec": 631,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-000007078655-xt8pm0-t500x500.jpg"
+  },
+  {
+    "id": 6,
+    "title": "Avril 14th",
+    "artist": "Aphex Twin",
+    "soundcloudUrl": "https://soundcloud.com/aphextwin/avril-14th",
+    "durationSec": 124,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-000034706789-vbfki4-t500x500.jpg"
+  },
+  {
+    "id": 7,
+    "title": "Archangel",
+    "artist": "Burial",
+    "soundcloudUrl": "https://soundcloud.com/hyperdub/burial-archangel",
+    "durationSec": 234,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-000011538015-r4tn8d-t500x500.jpg"
+  },
+  {
+    "id": 8,
+    "title": "Pyramids",
+    "artist": "Frank Ocean",
+    "soundcloudUrl": "https://soundcloud.com/frankocean/pyramids",
+    "durationSec": 599,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-000026796927-3blzfp-t500x500.jpg"
+  },
+  {
+    "id": 9,
+    "title": "Midnight City",
+    "artist": "M83",
+    "soundcloudUrl": "https://soundcloud.com/m83/midnight-city",
+    "durationSec": 244,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-000010935013-w1xtfz-t500x500.jpg"
+  },
+  {
+    "id": 10,
+    "title": "One More Time",
+    "artist": "Daft Punk",
+    "soundcloudUrl": "https://soundcloud.com/daftpunkofficial/one-more-time",
+    "durationSec": 320,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-000028273015-cn1jp4-t500x500.jpg"
+  },
+  {
+    "id": 11,
+    "title": "Teardrop",
+    "artist": "Massive Attack",
+    "soundcloudUrl": "https://soundcloud.com/massiveattackofficial/teardrop",
+    "durationSec": 332,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-000123456789-abcdef-t500x500.jpg"
+  },
+  {
+    "id": 12,
+    "title": "Weird Fishes / Arpeggi",
+    "artist": "Radiohead",
+    "soundcloudUrl": "https://soundcloud.com/radiohead/weird-fishes-arpeggi",
+    "durationSec": 318,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-000111223344-aaaaaa-t500x500.jpg"
+  }
+]
