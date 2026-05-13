@@ -176,7 +176,6 @@
       "transfers",
       "tools"
     ],
-    "category": "miniapp",
-    "isHidden": true
+    "category": "miniapp"
   }
 ]
