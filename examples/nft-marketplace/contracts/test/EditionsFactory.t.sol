@@ -4,12 +4,7 @@ pragma solidity 0.8.24;
 import "forge-std/Test.sol";
 import {Edition} from "../src/Edition.sol";
 import {EditionsFactory} from "../src/EditionsFactory.sol";
-
-contract MockERC20 {
-    string public name = "MockCRC";
-    string public symbol = "mCRC";
-    uint8 public decimals = 18;
-}
+import {MockERC20} from "../src/MockERC20.sol";
 
 contract EditionsFactoryTest is Test {
     Edition impl;
@@ -17,13 +12,35 @@ contract EditionsFactoryTest is Test {
     MockERC20 crc;
 
     address operator = makeAddr("operator");
+    address treasury = makeAddr("treasury");
     address alice = makeAddr("alice");
     address bob = makeAddr("bob");
+
+    uint16 constant LIST_FEE_BPS = 250;
+    uint16 constant BUY_FEE_BPS = 250;
 
     function setUp() public {
         impl = new Edition();
         crc = new MockERC20();
-        factory = new EditionsFactory(address(impl), address(crc), operator);
+        factory = new EditionsFactory(
+            address(impl), address(crc), operator, treasury, LIST_FEE_BPS, BUY_FEE_BPS
+        );
+    }
+
+    function test_factory_storesImmutables() public view {
+        assertEq(factory.IMPLEMENTATION(), address(impl));
+        assertEq(factory.WRAPPED_CRC(), address(crc));
+        assertEq(factory.OPERATOR(), operator);
+        assertEq(factory.TREASURY(), treasury);
+        assertEq(factory.LIST_FEE_BPS(), LIST_FEE_BPS);
+        assertEq(factory.BUY_FEE_BPS(), BUY_FEE_BPS);
+    }
+
+    function test_factory_revertsOnExcessiveFee() public {
+        vm.expectRevert(EditionsFactory.FeeTooHigh.selector);
+        new EditionsFactory(address(impl), address(crc), operator, treasury, 10_000, 250);
+        vm.expectRevert(EditionsFactory.FeeTooHigh.selector);
+        new EditionsFactory(address(impl), address(crc), operator, treasury, 250, 10_000);
     }
 
     function test_createCollection_setsAllFields() public {
@@ -38,16 +55,14 @@ contract EditionsFactoryTest is Test {
         assertEq(ed.creator(), alice);
         assertEq(address(ed.wrappedCrc()), address(crc));
         assertEq(ed.operator(), operator);
+        assertEq(ed.treasury(), treasury);
+        assertEq(ed.listFeeBps(), LIST_FEE_BPS);
+        assertEq(ed.buyFeeBps(), BUY_FEE_BPS);
         assertEq(ed.name(), "Alice's Editions");
         assertEq(ed.symbol(), "ALICE");
     }
 
-    function test_createCollection_emitsEvent() public {
-        vm.expectEmit(true, false, false, true);
-        // collection address is unknown at expect time, so use indexed only on creator
-        emit EditionsFactory.CollectionCreated(alice, address(0), "Alice", "A");
-        // we won't strictly compare the collection address; expectEmit with checkData=false on indexed 2
-        // simpler: just call and assert the resulting collectionOf changes:
+    function test_createCollection_emitsCollectionCreatedEvent() public {
         vm.prank(alice);
         factory.createCollection("Alice", "A");
         assertTrue(factory.collectionOf(alice) != address(0));
@@ -76,6 +91,6 @@ contract EditionsFactoryTest is Test {
 
     function test_implementation_cannotBeInitializedDirectly() public {
         vm.expectRevert();
-        impl.initialize(alice, "X", "X", address(crc), operator);
+        impl.initialize(alice, "X", "X", address(crc), operator, treasury, LIST_FEE_BPS, BUY_FEE_BPS);
     }
 }

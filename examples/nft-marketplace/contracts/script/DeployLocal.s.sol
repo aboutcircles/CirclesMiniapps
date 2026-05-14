@@ -19,18 +19,34 @@ import {MockERC20} from "../src/MockERC20.sol";
 contract DeployLocal is Script {
     function run() external {
         uint256 deployerKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        address deployerAddr = vm.addr(deployerKey);
         address operator = vm.envAddress("OPERATOR_ADDRESS");
+        address treasury = vm.envOr("TREASURY_ADDRESS", deployerAddr);
+        uint16 listFeeBps = uint16(vm.envOr("LIST_FEE_BPS", uint256(250)));
+        uint16 buyFeeBps = uint16(vm.envOr("BUY_FEE_BPS", uint256(250)));
 
         vm.startBroadcast(deployerKey);
         MockERC20 mock = new MockERC20();
         Edition impl = new Edition();
-        EditionsFactory factory = new EditionsFactory(address(impl), address(mock), operator);
+        EditionsFactory factory = new EditionsFactory(
+            address(impl),
+            address(mock),
+            operator,
+            treasury,
+            listFeeBps,
+            buyFeeBps
+        );
+        // Seed the deployer with a healthy bag so local dev can list, buy, etc.
+        mock.mint(deployerAddr, 1_000_000 ether);
         vm.stopBroadcast();
 
         console.log("MockERC20 (s-gCRC stand-in):", address(mock));
         console.log("Edition implementation:     ", address(impl));
         console.log("EditionsFactory:            ", address(factory));
         console.log("Operator:                   ", operator);
+        console.log("Treasury:                   ", treasury);
+        console.log("List fee bps:               ", listFeeBps);
+        console.log("Buy fee bps:                ", buyFeeBps);
         console.log("Block number:               ", block.number);
 
         string memory json = string.concat(
@@ -40,6 +56,9 @@ contract DeployLocal is Script {
             '  "implementation": "', vm.toString(address(impl)), '",\n',
             '  "wrappedCrc": "', vm.toString(address(mock)), '",\n',
             '  "operator": "', vm.toString(operator), '",\n',
+            '  "treasury": "', vm.toString(treasury), '",\n',
+            '  "listFeeBps": ', vm.toString(uint256(listFeeBps)), ',\n',
+            '  "buyFeeBps": ', vm.toString(uint256(buyFeeBps)), ',\n',
             '  "deployBlock": ', vm.toString(block.number), '\n',
             '}\n'
         );

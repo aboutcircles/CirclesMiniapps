@@ -9,6 +9,21 @@ Mint, list, and sell ERC-721 NFTs priced in Gnosis BaseGroup wrapped CRC (`s-gCR
 - Vercel KV (Upstash) for settlement idempotency
 - Foundry contracts under [`contracts/`](contracts/)
 
+## Platform fees
+
+The marketplace takes two fees, both in s-gCRC, both as a percentage of the listing price:
+
+| Fee | Default | Charged | Paid by |
+|---|---|---|---|
+| Listing fee | 2.5% (250 bps) | `Edition.list()` | Seller (non-refundable on delist) |
+| Buy fee | 2.5% (250 bps) | `Edition.settle()` | Buyer (separate ERC-20 allowance) |
+
+Both fees flow to the **treasury** address. Treasury defaults to the factory deployer; pass `TREASURY_ADDRESS` to `Deploy.s.sol` to override. The fee rates are configurable at factory deploy time via `LIST_FEE_BPS` and `BUY_FEE_BPS` env vars, and are immutable thereafter (one factory = one fee schedule).
+
+Frontend automatically bundles the required `approve(collection, fee)` ERC-20 approval into the list and buy transaction bundles so the buyer/seller see one wallet prompt per action.
+
+If the buy-fee transfer fails at settle time (e.g. buyer revoked the allowance between approval and payment), the NFT is **still released to the buyer** and a `BuyFeeSkipped` event is emitted on-chain. The operator can chase the missed fee out-of-band. This prevents stuck listings caused by fee-collection edge cases.
+
 ## Locked addresses (Gnosis Chain, chainId 100)
 
 | Role | Address |

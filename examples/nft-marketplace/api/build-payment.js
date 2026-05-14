@@ -1,8 +1,8 @@
-import { createPublicClient, http, getAddress } from 'viem';
+import { createPublicClient, http, getAddress, encodeFunctionData } from 'viem';
 import { gnosis } from 'viem/chains';
 import { encodeCrcV2TransferData } from '@aboutcircles/sdk-utils';
 import { Sdk } from '@aboutcircles/sdk';
-import { editionAbi } from './_abi.js';
+import { editionAbi, erc20Abi } from './_abi.js';
 import { buildPaymentData, newNonce, INTENT_TTL_SECONDS } from './_intent.js';
 
 let _publicClient;
@@ -50,17 +50,19 @@ export default async function handler(req, res) {
 
   const tokenId = BigInt(tokenIdRaw);
 
-  // Read the on-chain listing to validate price + seller.
-  let seller, price;
+  // Read the on-chain listing + buy fee in parallel.
+  let seller, price, buyFee, wrappedCrc;
   try {
-    const listing = await publicClient().readContract({
-      address: collection,
-      abi: editionAbi,
-      functionName: 'listings',
-      args: [tokenId],
-    });
+    const pc = publicClient();
+    const [listing, buyFeeBps, wrappedCrcAddr] = await Promise.all([
+      pc.readContract({ address: collection, abi: editionAbi, functionName: 'listings', args: [tokenId] }),
+      pc.readContract({ address: collection, abi: editionAbi, functionName: 'buyFeeBps' }),
+      pc.readContract({ address: collection, abi: editionAbi, functionName: 'wrappedCrc' }),
+    ]);
     seller = listing[0];
     price = listing[1];
+    buyFee = (price * BigInt(buyFeeBps)) / 10_000n;
+    wrappedCrc = wrappedCrcAddr;
   } catch (err) {
     return res.status(400).json({ error: 'failed to read listing', detail: err.message });
   }
@@ -109,22 +111,42 @@ export default async function handler(req, res) {
   }
 
   // Serialise BigInt -> string for the JSON wire boundary.
-  const serialisedTxs = (Array.isArray(txs) ? txs : [txs]).map((tx) => ({
+  const sdkTxs = (Array.isArray(txs) ? txs : [txs]).map((tx) => ({
     to: tx.to,
     data: tx.data,
     value: tx.value != null ? tx.value.toString() : '0',
   }));
 
+  // Prepend an ERC-20 approval so `settle()` can pull the buy fee from the
+  // buyer at settlement time. If the buyer has already approved at-or-above
+  // this amount (e.g. infinite approval from a previous purchase), the
+  // approve is a near-no-op.
+  const finalTxs = [];
+  if (buyFee > 0n) {
+    finalTxs.push({
+      to: getAddress(wrappedCrc),
+      data: encodeFunctionData({
+        abi: erc20Abi,
+        functionName: 'approve',
+        args: [collection, buyFee],
+      }),
+      value: '0',
+    });
+  }
+  finalTxs.push(...sdkTxs);
+
   return res.status(200).json({
     paymentData,
     expiresAt: intent.x,
-    txs: serialisedTxs,
+    txs: finalTxs,
     listing: {
       collection,
       tokenId: tokenId.toString(),
       seller: intent.s,
       buyer,
       price: intent.p,
+      buyFee: buyFee.toString(),
+      totalCost: (price + buyFee).toString(),
     },
   });
 }

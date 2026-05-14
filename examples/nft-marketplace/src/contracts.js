@@ -54,6 +54,27 @@ export const factoryAbi = [
     outputs: [{ name: '', type: 'uint256' }],
   },
   {
+    type: 'function',
+    name: 'LIST_FEE_BPS',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint16' }],
+  },
+  {
+    type: 'function',
+    name: 'BUY_FEE_BPS',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint16' }],
+  },
+  {
+    type: 'function',
+    name: 'TREASURY',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
     type: 'event',
     name: 'CollectionCreated',
     inputs: [
@@ -136,12 +157,48 @@ export const editionAbi = [
     outputs: [{ name: '', type: 'uint256' }],
   },
   {
+    type: 'function',
+    name: 'listFeeBps',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint16' }],
+  },
+  {
+    type: 'function',
+    name: 'buyFeeBps',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint16' }],
+  },
+  {
+    type: 'function',
+    name: 'treasury',
+    stateMutability: 'view',
+    inputs: [],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    type: 'function',
+    name: 'quoteListFee',
+    stateMutability: 'view',
+    inputs: [{ name: 'price', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'quoteBuyFee',
+    stateMutability: 'view',
+    inputs: [{ name: 'price', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
     type: 'event',
     name: 'Listed',
     inputs: [
       { name: 'tokenId', type: 'uint256', indexed: true },
       { name: 'seller', type: 'address', indexed: true },
       { name: 'price', type: 'uint256', indexed: false },
+      { name: 'listFee', type: 'uint256', indexed: false },
     ],
   },
   {
@@ -160,6 +217,17 @@ export const editionAbi = [
       { name: 'seller', type: 'address', indexed: true },
       { name: 'buyer', type: 'address', indexed: true },
       { name: 'price', type: 'uint256', indexed: false },
+      { name: 'buyFee', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    type: 'event',
+    name: 'BuyFeeSkipped',
+    inputs: [
+      { name: 'tokenId', type: 'uint256', indexed: true },
+      { name: 'buyer', type: 'address', indexed: true },
+      { name: 'expectedFee', type: 'uint256', indexed: false },
+      { name: 'reason', type: 'string', indexed: false },
     ],
   },
   {
@@ -170,6 +238,36 @@ export const editionAbi = [
       { name: 'to', type: 'address', indexed: true },
       { name: 'tokenId', type: 'uint256', indexed: true },
     ],
+  },
+];
+
+export const erc20Abi = [
+  {
+    type: 'function',
+    name: 'approve',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'spender', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+  {
+    type: 'function',
+    name: 'allowance',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'owner', type: 'address' },
+      { name: 'spender', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+  {
+    type: 'function',
+    name: 'balanceOf',
+    stateMutability: 'view',
+    inputs: [{ name: 'owner', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
   },
 ];
 

@@ -7,8 +7,10 @@ import {
 import { encodeFunctionData, getAddress, parseUnits, parseEther } from 'viem';
 import {
   FACTORY_ADDRESS,
+  WRAPPED_CRC_ADDRESS,
   factoryAbi,
   editionAbi,
+  erc20Abi,
   isConfigured,
 } from './src/contracts.js';
 import {
@@ -692,22 +694,44 @@ function listForSaleButton(collection, tokenId, card) {
 }
 
 async function promptList(collection, tokenId, card) {
+  // Pull the live list-fee bps from the collection so the displayed fee
+  // matches what the contract will charge.
+  let listFeeBps = 0;
+  try {
+    listFeeBps = Number(await getPublicClient().readContract({
+      address: collection, abi: editionAbi, functionName: 'listFeeBps',
+    }));
+  } catch {}
+
   const input = el('input', {
     class: 'mono',
     attrs: { type: 'text', placeholder: '5 or 12.5', inputmode: 'decimal' },
   });
-  const errBox = el('div', { class: 'banner error', attrs: { style: 'display:none' } });
+  const feeDisplay = el('p', { class: 'subtitle', attrs: { style: 'margin-top:8px' }, text: '—' });
+  function refreshFeeDisplay() {
+    const v = input.value.trim();
+    if (!v) { feeDisplay.textContent = '—'; return; }
+    try {
+      const priceWei = parseEther(v);
+      const feeWei = (priceWei * BigInt(listFeeBps)) / 10_000n;
+      feeDisplay.innerHTML = `Listing fee (${(listFeeBps / 100).toFixed(2)}%): <strong>${formatCrc(feeWei)} s-gCRC</strong>. You can delist at any time but the listing fee is non-refundable.`;
+    } catch {
+      feeDisplay.textContent = 'Invalid price';
+    }
+  }
+  input.addEventListener('input', refreshFeeDisplay);
+
   const body = el('div', {},
     el('div', { class: 'field' },
       el('label', { text: 'Price in s-gCRC' }),
       input,
     ),
-    errBox,
+    feeDisplay,
   );
   setTimeout(() => input.focus(), 50);
   const result = await modal({
     title: `List #${tokenId} for sale`,
-    subtitle: 'Buyers pay this amount in Gnosis BaseGroup wrapped CRC (s-gCRC). You can delist at any time.',
+    subtitle: 'Buyers pay this amount in Gnosis BaseGroup wrapped CRC (s-gCRC).',
     body,
     actions: [
       { label: 'Cancel', kind: 'secondary', value: null },
@@ -724,13 +748,26 @@ async function promptList(collection, tokenId, card) {
     toast('Invalid price: ' + err.message, 'error');
     return;
   }
-  try {
-    const data = encodeFunctionData({
-      abi: editionAbi,
-      functionName: 'list',
-      args: [tokenId, priceWei],
+
+  // Bundle: approve(collection, listFee) + list(tokenId, priceWei). The host
+  // wallet will batch into a single user op.
+  const listFeeWei = (priceWei * BigInt(listFeeBps)) / 10_000n;
+  const txs = [];
+  if (listFeeWei > 0n) {
+    txs.push({
+      to: WRAPPED_CRC_ADDRESS,
+      data: encodeFunctionData({ abi: erc20Abi, functionName: 'approve', args: [collection, listFeeWei] }),
+      value: '0',
     });
-    await sendTransactions([{ to: collection, data, value: '0' }]);
+  }
+  txs.push({
+    to: collection,
+    data: encodeFunctionData({ abi: editionAbi, functionName: 'list', args: [tokenId, priceWei] }),
+    value: '0',
+  });
+
+  try {
+    await sendTransactions(txs);
     toast('List submitted - refreshing...');
     invalidateIndex();
     setTimeout(() => viewMyCollection(), 4000);
@@ -836,24 +873,28 @@ async function viewNftDetail(collectionRaw, tokenIdRaw) {
 
   render(el('div', { class: 'card' }, el('p', { class: 'subtitle', text: 'Loading...' })));
   const client = getPublicClient();
-  let meta, owner, listing, name;
+  let meta, owner, listing, name, buyFeeBps;
   try {
-    const [uri, ownerAddr, listingTuple, colName] = await Promise.all([
+    const [uri, ownerAddr, listingTuple, colName, fee] = await Promise.all([
       client.readContract({ address: collection, abi: editionAbi, functionName: 'tokenURI', args: [tokenId] }),
       client.readContract({ address: collection, abi: editionAbi, functionName: 'ownerOf', args: [tokenId] }),
       client.readContract({ address: collection, abi: editionAbi, functionName: 'listings', args: [tokenId] }),
       client.readContract({ address: collection, abi: editionAbi, functionName: 'name' }),
+      client.readContract({ address: collection, abi: editionAbi, functionName: 'buyFeeBps' }),
     ]);
     meta = await fetchMetadata(uri);
     owner = getAddress(ownerAddr);
     listing = { seller: listingTuple[0], price: listingTuple[1] };
     name = colName;
+    buyFeeBps = Number(fee);
   } catch (err) {
     render(emptyState('Token not found', err.message));
     return;
   }
 
   const listed = listing.seller !== '0x0000000000000000000000000000000000000000';
+  const buyFeeWei = listed ? (listing.price * BigInt(buyFeeBps)) / 10_000n : 0n;
+  const totalCost = listing.price + buyFeeWei;
   const isViewerSeller = state.wallet && listed && getAddress(listing.seller) === state.wallet;
   const canBuy = listed && state.wallet && !isViewerSeller;
 
@@ -880,6 +921,18 @@ async function viewNftDetail(collectionRaw, tokenIdRaw) {
           ? el('div', { class: 'kv-row' },
               el('span', { class: 'k', text: 'Price' }),
               el('span', { class: 'v' }, el('strong', { text: formatCrc(listing.price) }), ' s-gCRC'),
+            )
+          : null,
+        listed && buyFeeWei > 0n
+          ? el('div', { class: 'kv-row' },
+              el('span', { class: 'k', text: `Buy fee (${(buyFeeBps / 100).toFixed(2)}%)` }),
+              el('span', { class: 'v' }, el('strong', { text: formatCrc(buyFeeWei) }), ' s-gCRC'),
+            )
+          : null,
+        listed && buyFeeWei > 0n
+          ? el('div', { class: 'kv-row' },
+              el('span', { class: 'k', text: 'You pay' }),
+              el('span', { class: 'v' }, el('strong', { text: formatCrc(totalCost) }), ' s-gCRC'),
             )
           : null,
         el('div', { class: 'actions' },
