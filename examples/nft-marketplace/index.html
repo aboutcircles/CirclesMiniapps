@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NFT Marketplace · Circles</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <div class="topbar">
+        <div class="brand"><span class="dot"></span>NFT Marketplace</div>
+        <div id="walletChip" class="wallet-chip disconnected">Not connected</div>
+      </div>
+
+      <nav class="nav" id="nav">
+        <a href="#/" data-route="/">Gallery</a>
+        <a href="#/mint" data-route="/mint">Mint</a>
+        <a href="#/me" data-route="/me">My collection</a>
+        <a href="#/wall" data-route="/wall">My wall</a>
+      </nav>
+
+      <main id="view"></main>
+      <div id="toast" class="toast hidden"></div>
+    </div>
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

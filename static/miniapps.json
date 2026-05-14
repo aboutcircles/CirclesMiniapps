@@ -151,5 +151,18 @@
     ],
     "category": "miniapp",
     "isHidden": true
+  },
+  {
+    "slug": "nft-marketplace",
+    "name": "NFT Marketplace",
+    "logo": "https://example.com/logo.svg",
+    "url": "https://nft-marketplace-miniapp.vercel.app/",
+    "description": "Mint and sell NFTs paid for in Gnosis group CRC",
+    "tags": [
+      "marketplace",
+      "nft"
+    ],
+    "category": "miniapp",
+    "isHidden": true
   }
 ]
