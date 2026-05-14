@@ -59,7 +59,7 @@ const profileCache = new Map();
 // ─── SDK (lazy) ─────────────────────────────────────────────
 let _readSdk = null;
 function getReadSdk() {
-  if (!_readSdk) _readSdk = new Sdk(RPC_URL, null);
+  if (!_readSdk) _readSdk = new Sdk();
   return _readSdk;
 }
 

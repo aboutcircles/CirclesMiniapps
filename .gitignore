@@ -25,6 +25,4 @@ Thumbs.db
 
 # llm files
 .claude/
-.context/
-AGENT.md
-CLAUDE.md
+.agents/

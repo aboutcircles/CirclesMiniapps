@@ -52,7 +52,11 @@ let widgetReady = false;
 const profileCache = new Map();
 
 // ─── SDK + RPC ──────────────────────────────────────────────
-const readSdk = new Sdk(RPC_URL, null);
+let _readSdk = null;
+function getReadSdk() {
+  if (!_readSdk) _readSdk = new Sdk();
+  return _readSdk;
+}
 const rpcClients = RPC_FALLBACKS.map(url =>
   createPublicClient({ chain: gnosis, transport: http(url) })
 );
@@ -183,10 +187,10 @@ async function getProfile(address) {
   if (profileCache.has(key)) return profileCache.get(key);
   let profile = null;
   try {
-    profile = await readSdk.rpc.profile.getProfileByAddress(address);
+    profile = await getReadSdk().rpc.profile.getProfileByAddress(address);
   } catch {
     try {
-      profile = await readSdk.rpc.profile.getProfileByAddress(address.toLowerCase());
+      profile = await getReadSdk().rpc.profile.getProfileByAddress(address.toLowerCase());
     } catch { /* still null */ }
   }
   profileCache.set(key, profile);
@@ -267,7 +271,7 @@ async function renderNowPlaying(entry) {
 }
 
 function renderIdle() {
-  nowArt.src = '';
+  nowArt.src = '/idle-art.jpg';
   nowTitle.textContent = 'Waiting for a request…';
   nowArtist.textContent = '';
   nowAttribution.innerHTML = '<span>Be the first to pay 10 CRC in the Jukebox miniapp</span>';
