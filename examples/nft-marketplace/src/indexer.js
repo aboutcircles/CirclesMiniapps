@@ -1,4 +1,4 @@
-import { getAddress, parseAbiItem } from 'viem';
+import { getAddress } from 'viem';
 import { getPublicClient } from './clients.js';
 import {
   FACTORY_ADDRESS,
@@ -6,6 +6,7 @@ import {
   factoryAbi,
   editionAbi,
 } from './contracts.js';
+import { foldListingEvents } from './listing-state.js';
 
 const CHUNK = 9_500n;
 
@@ -87,30 +88,19 @@ export async function getActiveListings(collections) {
         getLogsChunked({ address: col.address, event: delistedEvent, fromBlock, toBlock: head }),
         getLogsChunked({ address: col.address, event: soldEvent, fromBlock, toBlock: head }),
       ]);
-      const flat = [
-        ...listed.map((l) => ({ kind: 'list', log: l })),
-        ...delisted.map((l) => ({ kind: 'delist', log: l })),
-        ...sold.map((l) => ({ kind: 'sold', log: l })),
-      ];
-      flat.sort((a, b) => {
-        const db = Number(a.log.blockNumber - b.log.blockNumber);
-        if (db !== 0) return db;
-        return Number(a.log.logIndex - b.log.logIndex);
+      // Re-fold every event from the collection's start each time we extend the
+      // tracked range. Cheaper than maintaining the partial state across calls
+      // and removes the risk of drift if a state entry is mutated elsewhere.
+      const fresh = foldListingEvents({
+        listed: [...(state.eventsListed ?? []), ...listed],
+        delisted: [...(state.eventsDelisted ?? []), ...delisted],
+        sold: [...(state.eventsSold ?? []), ...sold],
+        collection: col.address,
       });
-      for (const e of flat) {
-        const id = e.log.args.tokenId.toString();
-        if (e.kind === 'list') {
-          state.active.set(id, {
-            collection: col.address,
-            tokenId: e.log.args.tokenId,
-            seller: getAddress(e.log.args.seller),
-            price: e.log.args.price,
-            blockNumber: e.log.blockNumber,
-          });
-        } else {
-          state.active.delete(id);
-        }
-      }
+      state.active = fresh;
+      state.eventsListed = [...(state.eventsListed ?? []), ...listed];
+      state.eventsDelisted = [...(state.eventsDelisted ?? []), ...delisted];
+      state.eventsSold = [...(state.eventsSold ?? []), ...sold];
       state.upToBlock = head;
     }
     for (const v of state.active.values()) {

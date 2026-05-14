@@ -344,6 +344,60 @@ button.danger { background: linear-gradient(130deg, #c81e1e, #f43f5e); }
 
 .hidden { display: none !important; }
 
+/* Modal */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 6, 26, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9000;
+  padding: 18px;
+}
+.modal {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  padding: 22px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 20px 60px rgba(5, 6, 26, 0.25), inset 0 1px 0 #fff;
+}
+.modal h3 { font-size: 18px; margin-bottom: 6px; }
+.modal p.subtitle { margin-bottom: 14px; }
+.modal .actions { margin-top: 16px; justify-content: flex-end; }
+.modal .actions button { padding: 9px 18px; }
+
+/* Image preview */
+.image-preview {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: var(--line-soft) center/cover;
+  border-radius: 14px;
+  margin-top: 6px;
+  border: 1px dashed var(--line);
+}
+.image-preview.has-image { border-style: solid; }
+
+/* Copy button */
+.copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+.copy-btn:hover:not(:disabled) { background: var(--line-soft); transform: none; box-shadow: none; }
+.copy-btn.copied { background: var(--success-bg); color: var(--success-ink); border-color: transparent; }
+
 .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .row.between { justify-content: space-between; }
 .spacer { flex: 1; }

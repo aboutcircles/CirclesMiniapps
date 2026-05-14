@@ -2,7 +2,8 @@ import {
   onWalletChange,
   sendTransactions,
   isMiniappMode,
-} from '@aboutcircles/miniapp-sdk';
+  isDevMode,
+} from './src/wallet.js';
 import { encodeFunctionData, getAddress, parseUnits, parseEther } from 'viem';
 import {
   FACTORY_ADDRESS,
@@ -77,6 +78,62 @@ function toast(message, kind = 'success') {
   toastTimer = setTimeout(() => $toast.classList.add('hidden'), 4500);
 }
 
+/**
+ * Show a modal and resolve with the user's choice. Pass a `body` node and an
+ * array of `actions: [{ label, kind?, value }]`. `kind` accepts the same class
+ * suffix as buttons (default primary, `secondary`, `danger`). Closing via the
+ * backdrop resolves with `null`.
+ */
+function modal({ title, subtitle, body, actions }) {
+  return new Promise((resolve) => {
+    const backdrop = el('div', { class: 'modal-backdrop' });
+    const dialog = el('div', { class: 'modal' });
+    if (title) dialog.append(el('h3', { text: title }));
+    if (subtitle) dialog.append(el('p', { class: 'subtitle', text: subtitle }));
+    if (body) dialog.append(body);
+    const actionsRow = el('div', { class: 'actions' });
+    for (const a of actions) {
+      const btn = el('button', {
+        class: a.kind === 'secondary' ? 'btn-secondary' : a.kind === 'danger' ? 'danger' : '',
+        text: a.label,
+        on: {
+          click: () => {
+            document.body.removeChild(backdrop);
+            resolve(a.value);
+          },
+        },
+      });
+      actionsRow.append(btn);
+    }
+    dialog.append(actionsRow);
+    backdrop.append(dialog);
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) {
+        document.body.removeChild(backdrop);
+        resolve(null);
+      }
+    });
+    document.body.append(backdrop);
+  });
+}
+
+async function copyToClipboard(text, btn) {
+  try {
+    await navigator.clipboard.writeText(text);
+    if (btn) {
+      btn.classList.add('copied');
+      const original = btn.textContent;
+      btn.textContent = 'Copied';
+      setTimeout(() => {
+        btn.classList.remove('copied');
+        btn.textContent = original;
+      }, 1500);
+    }
+  } catch {
+    toast('Failed to copy', 'error');
+  }
+}
+
 function explorerTx(hash) {
   return `https://gnosisscan.io/tx/${hash}`;
 }
@@ -111,9 +168,11 @@ onWalletChange(async (address) => {
   route();
 });
 
-if (!isMiniappMode()) {
-  // Dev mode: show a hint chip
-  $walletChip.title = 'Standalone mode - wallet bridge not active';
+if (isDevMode()) {
+  document.querySelector('.brand').insertAdjacentHTML(
+    'beforeend',
+    ' <span class="pill pill-warn" style="margin-left:8px;font-size:10px;">DEV</span>',
+  );
 }
 
 // ============================================================================
@@ -195,6 +254,26 @@ function skeletonGrid(n = 6) {
     ));
   }
   return el('div', { class: 'grid' }, ...items);
+}
+
+function addressKvRow(label, address) {
+  const copyBtn = el('button', {
+    class: 'copy-btn',
+    text: 'Copy',
+    attrs: { title: address },
+  });
+  copyBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    copyToClipboard(address, copyBtn);
+  });
+  return el('div', { class: 'kv-row' },
+    el('span', { class: 'k', text: label }),
+    el('span', { class: 'v' },
+      el('span', { class: 'address', text: shortAddr(address) }),
+      ' ',
+      copyBtn,
+    ),
+  );
 }
 
 function nftCard({ collection, tokenId, image, title, priceLabel, href }) {
@@ -404,6 +483,7 @@ function viewMint() {
     el('div', { class: 'field' },
       el('label', { text: 'Image (PNG, JPG, WebP or GIF · max 5 MB)' }),
       el('input', { id: 'mintFile', attrs: { type: 'file', accept: 'image/png,image/jpeg,image/webp,image/gif' } }),
+      el('div', { class: 'image-preview', id: 'mintPreview' }),
     ),
     el('div', { class: 'field' },
       el('label', { text: 'Title' }),
@@ -423,6 +503,22 @@ function viewMint() {
   const $desc = document.getElementById('mintDesc');
   const $btn = document.getElementById('mintBtn');
   const $status = document.getElementById('mintStatus');
+  const $preview = document.getElementById('mintPreview');
+
+  let previewUrl = null;
+  $file.addEventListener('change', () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    const file = $file.files?.[0];
+    if (!file) {
+      $preview.style.backgroundImage = '';
+      $preview.classList.remove('has-image');
+      previewUrl = null;
+      return;
+    }
+    previewUrl = URL.createObjectURL(file);
+    $preview.style.backgroundImage = `url('${previewUrl}')`;
+    $preview.classList.add('has-image');
+  });
 
   $btn.addEventListener('click', async () => {
     const file = $file.files?.[0];
@@ -472,6 +568,9 @@ function viewMint() {
       $status.innerHTML = `Mint submitted. Tx: <a href="${explorerTx(hashes[0])}" target="_blank">${hashes[0]}</a>`;
       invalidateIndex();
       $title.value = ''; $desc.value = ''; $file.value = '';
+      if (previewUrl) { URL.revokeObjectURL(previewUrl); previewUrl = null; }
+      $preview.style.backgroundImage = '';
+      $preview.classList.remove('has-image');
     } catch (err) {
       $status.className = 'banner error';
       $status.textContent = 'Failed: ' + err.message;
@@ -593,11 +692,33 @@ function listForSaleButton(collection, tokenId, card) {
 }
 
 async function promptList(collection, tokenId, card) {
-  const input = prompt('Sale price in s-gCRC (e.g. 5 or 12.5):');
-  if (!input) return;
+  const input = el('input', {
+    class: 'mono',
+    attrs: { type: 'text', placeholder: '5 or 12.5', inputmode: 'decimal' },
+  });
+  const errBox = el('div', { class: 'banner error', attrs: { style: 'display:none' } });
+  const body = el('div', {},
+    el('div', { class: 'field' },
+      el('label', { text: 'Price in s-gCRC' }),
+      input,
+    ),
+    errBox,
+  );
+  setTimeout(() => input.focus(), 50);
+  const result = await modal({
+    title: `List #${tokenId} for sale`,
+    subtitle: 'Buyers pay this amount in Gnosis BaseGroup wrapped CRC (s-gCRC). You can delist at any time.',
+    body,
+    actions: [
+      { label: 'Cancel', kind: 'secondary', value: null },
+      { label: 'List', value: () => input.value.trim() },
+    ],
+  });
+  if (typeof result !== 'function') return;
+  const price = result();
   let priceWei;
   try {
-    priceWei = parseEther(input);
+    priceWei = parseEther(price);
     if (priceWei <= 0n) throw new Error('price must be positive');
   } catch (err) {
     toast('Invalid price: ' + err.message, 'error');
@@ -612,7 +733,6 @@ async function promptList(collection, tokenId, card) {
     await sendTransactions([{ to: collection, data, value: '0' }]);
     toast('List submitted - refreshing...');
     invalidateIndex();
-    // Optimistic: re-render the card after a short delay.
     setTimeout(() => viewMyCollection(), 4000);
   } catch (err) {
     toast('Failed: ' + err.message, 'error');
@@ -620,7 +740,15 @@ async function promptList(collection, tokenId, card) {
 }
 
 async function delistToken(collection, tokenId, card) {
-  if (!confirm('Delist this NFT? You will retrieve custody.')) return;
+  const ok = await modal({
+    title: 'Delist this NFT?',
+    subtitle: 'The NFT will be transferred back to your wallet from the escrow contract.',
+    actions: [
+      { label: 'Cancel', kind: 'secondary', value: false },
+      { label: 'Delist', kind: 'danger', value: true },
+    ],
+  });
+  if (!ok) return;
   try {
     const data = encodeFunctionData({
       abi: editionAbi,
@@ -746,10 +874,8 @@ async function viewNftDetail(collectionRaw, tokenIdRaw) {
           el('span', { class: 'k', text: 'Token ID' }),
           el('span', { class: 'v address', text: tokenId.toString() }),
         ),
-        el('div', { class: 'kv-row' },
-          el('span', { class: 'k', text: listed ? 'Listed by' : 'Owner' }),
-          el('span', { class: 'v address', text: shortAddr(listed ? listing.seller : owner) }),
-        ),
+        addressKvRow(listed ? 'Listed by' : 'Owner', listed ? listing.seller : owner),
+        addressKvRow('Contract', collection),
         listed
           ? el('div', { class: 'kv-row' },
               el('span', { class: 'k', text: 'Price' }),

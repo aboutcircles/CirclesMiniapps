@@ -39,12 +39,39 @@ Set these in the Vercel project (Production + Preview):
 
 ## Local development
 
+### Option A: standalone vite dev (UI-only)
+
 ```bash
-pnpm install      # or npm install
-pnpm dev          # vite on :5184
+npm install
+npm run dev          # vite on :5184
 ```
 
-Test in the Gnosis playground: <https://circles.gnosis.io/playground> and paste `http://localhost:5184` as the miniapp URL.
+Test in the Gnosis playground: <https://circles.gnosis.io/playground> and paste `http://localhost:5184` as the miniapp URL. Reads work without contracts deployed but every write will fail because the host wallet bridge isn't there.
+
+### Option B: full local Anvil environment (click-through testing without deploy)
+
+```bash
+npm run dev:local
+```
+
+What this does:
+
+1. Spawns anvil on `:8545` with chain id 31337.
+2. Runs `forge script DeployLocal.s.sol` to deploy a `MockERC20` (stand-in for s-gCRC), the Edition implementation, and the EditionsFactory.
+3. Writes `.env.local` pointing the miniapp at the local addresses + a dev wallet private key.
+4. Starts vite dev on `:5184`.
+
+A **DEV** pill appears in the top-left of the UI when the dev wallet is active. The wallet abstraction in [`src/wallet.js`](src/wallet.js) intercepts `sendTransactions` calls and submits directly via a viem wallet client against anvil, so you can click through every UI flow without the Gnosis host wallet.
+
+**What works locally**: onboarding (create collection), mint, list, delist, my-collection, gallery, NFT detail, my-wall.
+**What does NOT work locally**: the buy flow. It depends on `/api/build-payment` calling the Circles SDK + `/api/settle` matching `CrcV2_TransferData` events on the real Circles indexer. Test the buy flow against a real Vercel preview deploy with the real contracts on Gnosis.
+
+### Tests
+
+```bash
+npm test            # vitest run - 27 tests covering format helpers, listing-state fold, HMAC round-trip
+cd contracts && forge test   # 23 contract tests
+```
 
 ## Contracts
 

@@ -3,3 +3,6 @@ cache/
 broadcast/
 lib/
 .env
+# Local-only deployment artifact (anvil dev). gnosis.json IS committed once the
+# real deploy lands.
+deployments/local.json

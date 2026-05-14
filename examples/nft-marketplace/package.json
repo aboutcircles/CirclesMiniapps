@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "vite --port 5184",
     "build": "vite build",
-    "preview": "vite preview --port 5184"
+    "preview": "vite preview --port 5184",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "dev:local": "bash scripts/dev-local.sh"
   },
   "dependencies": {
     "@aboutcircles/miniapp-sdk": "^0.1.30",
@@ -18,6 +21,7 @@
     "viem": "^2.41.2"
   },
   "devDependencies": {
-    "vite": "^6.4.1"
+    "vite": "^6.4.1",
+    "vitest": "^2.1.0"
   }
 }

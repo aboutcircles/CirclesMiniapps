@@ -1,29 +1,9 @@
-import { createHmac, randomBytes } from 'node:crypto';
 import { createPublicClient, http, getAddress } from 'viem';
 import { gnosis } from 'viem/chains';
 import { encodeCrcV2TransferData } from '@aboutcircles/sdk-utils';
 import { Sdk } from '@aboutcircles/sdk';
 import { editionAbi } from './_abi.js';
-
-const INTENT_TTL_SECONDS = 15 * 60;
-
-function hmac(secret, body) {
-  return createHmac('sha256', secret).update(body).digest('base64url');
-}
-
-function b64url(buf) {
-  return Buffer.from(buf).toString('base64url');
-}
-
-function packIntent(intent) {
-  return b64url(JSON.stringify(intent));
-}
-
-function buildPaymentData(intent, secret) {
-  const payload = packIntent(intent);
-  const sig = hmac(secret, payload);
-  return `crc-nft.${payload}.${sig}`;
-}
+import { buildPaymentData, newNonce, INTENT_TTL_SECONDS } from './_intent.js';
 
 let _publicClient;
 function publicClient() {
@@ -104,7 +84,7 @@ export default async function handler(req, res) {
     s: getAddress(seller),
     p: price.toString(),
     x: now + INTENT_TTL_SECONDS,
-    n: b64url(randomBytes(12)),
+    n: newNonce(),
   };
   const paymentData = buildPaymentData(intent, secret);
 

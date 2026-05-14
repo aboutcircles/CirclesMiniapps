@@ -1,4 +1,3 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
 import { kv } from '@vercel/kv';
 import {
   createPublicClient,
@@ -11,33 +10,11 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { gnosis } from 'viem/chains';
 import { decodeCrcV2TransferData } from '@aboutcircles/sdk-utils';
 import { editionAbi } from './_abi.js';
+import { parsePaymentData } from './_intent.js';
 
 const STATE_PENDING = 'pending';
 const STATE_SETTLED = 'settled';
 const STATE_EXPIRED = 'expired';
-
-function hmac(secret, body) {
-  return createHmac('sha256', secret).update(body).digest('base64url');
-}
-
-function parsePaymentData(paymentData, secret) {
-  if (typeof paymentData !== 'string') throw new Error('paymentData must be a string');
-  const parts = paymentData.split('.');
-  if (parts.length !== 3 || parts[0] !== 'crc-nft') throw new Error('malformed paymentData');
-  const [, payload, sig] = parts;
-  const expected = hmac(secret, payload);
-  const a = Buffer.from(sig);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) throw new Error('bad HMAC');
-  let intent;
-  try {
-    intent = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-  } catch {
-    throw new Error('invalid intent payload');
-  }
-  if (intent.v !== 1) throw new Error('unsupported intent version');
-  return intent;
-}
 
 let _publicClient;
 function publicClient() {
