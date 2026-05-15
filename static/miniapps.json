@@ -177,5 +177,18 @@
       "tools"
     ],
     "category": "miniapp"
+  },
+  {
+    "slug": "bpm",
+    "name": "BPM · Bet · Play · Move",
+    "logo": "https://adamopouloscarolina.github.io/pulse-fitness/logo.svg",
+    "url": "https://adamopouloscarolina.github.io/pulse-fitness/",
+    "description": "Earn the beat. Bet CRCs on group fitness challenges with friends — most steps takes the pool, last place drops anchor. Built around the Circles trust graph.",
+    "tags": [
+      "fitness",
+      "social",
+      "games"
+    ],
+    "category": "miniapp"
   }
 ]
