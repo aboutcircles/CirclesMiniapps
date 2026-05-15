@@ -179,11 +179,11 @@
     "category": "miniapp"
   },
   {
-    "slug": "pulse",
-    "name": "Pulse · Circles Fitness Club",
+    "slug": "bpm",
+    "name": "BPM · Bet · Play · Move",
     "logo": "https://adamopouloscarolina.github.io/pulse-fitness/logo.svg",
     "url": "https://adamopouloscarolina.github.io/pulse-fitness/",
-    "description": "Bet CRCs on group fitness challenges. Most steps takes the pool; last place pays an anchor penalty. Built around the Circles trust graph.",
+    "description": "Earn the beat. Bet CRCs on group fitness challenges with friends — most steps takes the pool, last place drops anchor. Built around the Circles trust graph.",
     "tags": [
       "fitness",
       "social",
