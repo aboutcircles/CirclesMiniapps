@@ -26,6 +26,7 @@ import {
   RPC_URL,
   RPC_FALLBACKS,
   JUKEBOX_ADDRESS,
+  ACCEPTED_TOKEN_ADDRESS,
   BASE_AMOUNT_WEI,
   SONG_ID_MOD,
   TRANSFER_EVENT_TOPIC,
@@ -140,6 +141,7 @@ async function fetchQueueEntries() {
     try {
       const latest = await client.getBlockNumber();
       const logs = await client.getLogs({
+        address: ACCEPTED_TOKEN_ADDRESS,
         fromBlock: START_BLOCK,
         toBlock: latest,
         topics: [TRANSFER_EVENT_TOPIC, null, toTopic],

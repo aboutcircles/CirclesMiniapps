@@ -26,6 +26,7 @@ import {
   RPC_URL,
   RPC_FALLBACKS,
   JUKEBOX_ADDRESS,
+  ACCEPTED_TOKEN_ADDRESS,
   BASE_AMOUNT_WEI,
   SONG_ID_MOD,
   TRANSFER_EVENT_TOPIC,
@@ -223,24 +224,24 @@ confirmProceed.addEventListener('click', async () => {
 async function payForSong(song) {
   if (!connectedAddress) throw new Error('Wallet not connected');
 
-  // 1. Find a wrapped CRC token the user holds.
+  // 1. Find the user's balance of the specific wrapped Gnosis group CRC.
+  //    Only this token is accepted because the treasury org only trusts
+  //    the Gnosis group - any other CRC would revert on transfer.
   const sdk = getReadSdk();
   const balances = await sdk.rpc.balance.getTokenBalances(connectedAddress);
   if (!balances || balances.length === 0) {
     throw new Error('No CRC balance found on this wallet');
   }
-  const wrapped = balances.filter(b => b.isWrapped);
-  if (wrapped.length === 0) {
-    throw new Error('You need wrapped CRC to pay. Wrap some in the Circles wallet first.');
+  const accepted = ACCEPTED_TOKEN_ADDRESS.toLowerCase();
+  const picked = balances.find(b =>
+    b.isWrapped && (b.tokenAddress || '').toLowerCase() === accepted
+  );
+  if (!picked) {
+    throw new Error(
+      'You need wrapped Gnosis group CRC to pay. ' +
+      'Mint group CRC from your personal CRC in the Circles wallet, then wrap it.'
+    );
   }
-
-  // Pick the wrapper with the largest balance — best chance of covering 10 CRC.
-  wrapped.sort((a, b) => {
-    const av = BigInt(a.attoCircles || a.staticAttoCircles || '0');
-    const bv = BigInt(b.attoCircles || b.staticAttoCircles || '0');
-    return bv > av ? 1 : bv < av ? -1 : 0;
-  });
-  const picked = wrapped[0];
   const wrapperAddress = getAddress(picked.tokenAddress);
 
   // 2. Encode amount = 10e18 + songId.
@@ -327,6 +328,7 @@ async function fetchQueueEntries() {
     try {
       const latest = await client.getBlockNumber();
       const logs = await client.getLogs({
+        address: ACCEPTED_TOKEN_ADDRESS,
         fromBlock: START_BLOCK,
         toBlock: latest,
         topics: [TRANSFER_EVENT_TOPIC, null, toTopic],

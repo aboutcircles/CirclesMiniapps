@@ -14,8 +14,23 @@ export const RPC_FALLBACKS = [
 // All clients (miniapp + display) read incoming ERC-20 Transfer events
 // to this address to assemble the global queue.
 //
-// REPLACE before going live with the host's real treasury address.
-export const JUKEBOX_ADDRESS = '0x000000000000000000000000000000000000dEaD';
+// This is an org avatar that trusts the Gnosis group, so any Gnosis
+// group member can transfer wrapped group CRC to it.
+export const JUKEBOX_ADDRESS = '0xbe6e5a0bdface700cbe8f0d1c28fcb8404a1622b';
+
+// Only this exact wrapped ERC-20 token is accepted as payment.
+// It's the wrapped Gnosis group CRC token; the org above only trusts
+// the Gnosis group, so this is the one token that can actually
+// transfer to it without reverting.
+export const ACCEPTED_TOKEN_ADDRESS = '0xeeF7B1f06B092625228C835Dd5D5B14641D1e54A';
+
+// The Gnosis group avatar (for reference / future auto-mint flow).
+export const GNOSIS_GROUP_ADDRESS = '0xc19bc204eb1c1d5b3fe500e5e5dfabab625f286c';
+
+// The Gnosis group mint handler. Users send personal CRC here (ERC-1155)
+// and receive wrapped Gnosis group CRC back. Not used yet; see
+// .agents/plans/jukebox-auto-mint/ for the proposed flow.
+export const GNOSIS_GROUP_MINT_HANDLER = '0xf9117e9931E6ab91f025e1afa4e70CAFa5E0AA1E';
 
 // Payment encoding.
 // Each play costs exactly 10 CRC. The chosen songId (0..SONG_ID_MOD-1) is
@@ -31,6 +46,8 @@ export const SONG_ID_MOD = 10000n;
 export const TRANSFER_EVENT_TOPIC =
   '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 
-// Earliest block to scan. Set to the deploy time of the jukebox so the
-// display doesn't waste a full chain scan on first load.
-export const START_BLOCK = 35_000_000n;
+// Earliest block to scan. Roughly the deploy time of the treasury org;
+// keeps the getLogs queries fast on every RPC. Bump if the org existed
+// for a while before this miniapp went live and we want to skip its
+// pre-jukebox transfer history.
+export const START_BLOCK = 41_500_000n;
