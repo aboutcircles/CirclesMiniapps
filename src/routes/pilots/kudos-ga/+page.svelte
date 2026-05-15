@@ -1038,16 +1038,16 @@
 		box-sizing: border-box;
 		text-align: center;
 		padding: calc(var(--qr-size) * 0.045) calc(var(--qr-size) * 0.073);
-		background: #f0faf5;
+		background: color-mix(in srgb, var(--kudos-color, #00af5e) 8%, #ffffff);
 		border-radius: calc(var(--qr-size) * 0.045);
 		font-size: calc(var(--qr-size) * 0.06);
 		font-weight: 600;
-		color: #00874a;
+		color: color-mix(in srgb, var(--kudos-color, #00af5e) 75%, #000000);
 		text-decoration: none;
 		transition: background 0.12s;
 	}
 
 	.qr-link-btn:hover {
-		background: #e0f5eb;
+		background: color-mix(in srgb, var(--kudos-color, #00af5e) 16%, #ffffff);
 	}
 </style>
