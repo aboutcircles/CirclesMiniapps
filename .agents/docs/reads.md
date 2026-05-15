@@ -129,7 +129,7 @@ const transfers = await circlesQuery(
 | `CrcV2_Groups` | Group events |
 | `CrcV2_Organizations` | Organisation events |
 
-For the full method reference and other namespaces, load `@.agents/docs/circles-protocol/rpc-api-reference.md`.
+For the full method reference and other namespaces, load `@.agents/circles-docs/05-rpc-api-reference.md`.
 
 ## Common failure modes
 

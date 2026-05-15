@@ -131,7 +131,7 @@ sse.addEventListener('order_status_update', (e) => {
 });
 ```
 
-For full endpoint reference, load `@.agents/docs/circles-protocol/marketplace-api.md`.
+For full endpoint reference, load `@.agents/circles-docs/08-marketplace-api.md`.
 
 ## Choosing the right pattern
 
@@ -145,6 +145,8 @@ For full endpoint reference, load `@.agents/docs/circles-protocol/marketplace-ap
 | Multi-seller orders with fulfilment | E3 | Marketplace API handles routing |
 
 > **When deciding between E1 and E3**: E3 if the miniapp integrates with the Circles marketplace catalogue (products, sellers, baskets, orders). E1 for simple direct payments where the miniapp manages its own fulfilment (ticket grants, tips, donations).
+
+> **Beyond E1/E2/E3**: for transitive (pathfinder-routed) transfers across the trust graph, or for embedding a signed payment intent into a transfer so a backend can later match and issue a receipt, see `@.agents/docs/advanced-transfers.md`.
 
 ## Common failure modes
 

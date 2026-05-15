@@ -130,11 +130,21 @@ All transaction fields passed to `sendTransactions` must be hex-encoded:
 
 Use the `toHexValue()` helper above for any BigInt-to-hex conversion.
 
+### JSON-boundary rule (backend-built transactions)
+
+If a backend builds the transactions and returns them over HTTP, `BigInt` values cannot survive `JSON.stringify`. The backend must stringify `value` before transit:
+
+```javascript
+return txs.map((tx) => ({ to: tx.to, data: tx.data, value: tx.value.toString() }));
+```
+
+The frontend then still hex-encodes via `toHexValue()` / `formatTxForHost` before calling `sendTransactions`. This pattern (backend builds calldata, host submits) is the basis of the backend-trusted flow - see `@.agents/docs/advanced-transfers.md`.
+
 ## Common failure modes
 
 | Symptom | Cause | Fix |
 |---|---|---|
 | Receipt never returns | Transaction is a UserOp, direct lookup doesn't work | Use the multi-RPC + UserOp fallback above |
-| Transaction throws "passkey" error | Passkey auto-connect failed at the host | Show specific recovery message - see `@.agents/docs/patterns/utilities.md` Pattern M |
+| Transaction throws "passkey" error | Passkey auto-connect failed at the host | Show specific recovery message - see `@.agents/docs/wallet.md` Pattern Q (error model & recovery) |
 | `value` rejected | Passed as number or raw BigInt | Always hex-encode via `toHexValue()` |
 | Receipt has `status: 'reverted'` | On-chain revert | Surface to user; check transaction inputs and contract state |

@@ -53,7 +53,7 @@ Arguments: slug, display name, one-line description, and the Vercel deployment U
 
    ---
 
-   > See `AGENT.md` for the workflow used.
+   > See `AGENTS.md` for the workflow used.
    EOF
    )"
    ```
