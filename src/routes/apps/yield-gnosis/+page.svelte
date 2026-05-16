@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import { isMiniappMode, onWalletChange } from '@aboutcircles/miniapp-sdk';
 	import { fetchAllBalances } from './lib/balances.js';
 	import { fetchAaveApys, type PoolData } from './lib/defilama.js';
@@ -62,9 +62,11 @@
 		phase  = 'table';
 	}
 
+	let unsubscribe: (() => void) | undefined;
+
 	onMount(() => {
 		if (isMiniappMode()) {
-			onWalletChange(async (addr) => {
+			unsubscribe = onWalletChange(async (addr) => {
 				if (!addr) { phase = 'idle'; address = null; return; }
 				address = addr as `0x${string}`;
 				await loadData(address);
@@ -74,6 +76,8 @@
 			loadData(address);
 		}
 	});
+
+	onDestroy(() => unsubscribe?.());
 </script>
 
 <svelte:head>

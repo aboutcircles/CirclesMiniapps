@@ -170,7 +170,7 @@
 					<div style="margin-top:auto;padding:0 12px 12px">
 						<button class="earn-btn"
 							style="width:100%;background:{expandedCardId === asset.id ? 'var(--surface-2)' : 'var(--blue)'};color:{expandedCardId === asset.id ? 'var(--text-muted)' : '#fff'};border:{expandedCardId === asset.id ? '1.5px solid var(--border)' : 'none'}"
-							onclick={() => { expandedCardId = expandedCardId === asset.id ? null : asset.id; }}
+							onclick={() => { expandedCardId = expandedCardId === asset.id ? null : asset.id; expandedWithdrawId = null; }}
 							disabled={asset.balance === 0n}>
 							{expandedCardId === asset.id ? 'Cancel' : '+ Earn'}
 						</button>
