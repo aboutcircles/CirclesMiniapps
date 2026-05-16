@@ -177,5 +177,15 @@
       "tools"
     ],
     "category": "miniapp"
+  },
+  {
+    "slug": "yield-gnosis",
+    "name": "Yield",
+    "logo": "/app-logos/yield-gnosis.png",
+    "url": "/apps/yield-gnosis",
+    "description": "Earn yield on your EURe and USDC.e via Aave v3 on Gnosis Chain.",
+    "tags": ["defi", "yield", "aave"],
+    "category": "miniapp",
+    "isHidden": true
   }
 ]
