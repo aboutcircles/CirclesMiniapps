@@ -51,13 +51,7 @@
 	onDestroy(() => clearInterval(interval));
 
 	function toEur(asset: AssetInfo, n: number): number {
-		if (asset.balance > 0n) {
-			const w = parseFloat(formatUnits(asset.balance, asset.decimals));
-			return w > 0 ? n * (asset.eurValue / w) : 0;
-		}
-		if (asset.id === 'eure') return n;
-		if (asset.id === 'usdc' || asset.id === 'wxdai') return n * 0.92;
-		return n * 2500 * 0.92;
+		return n * asset.eurPerToken;
 	}
 
 	const totalEur = $derived.by(() => {

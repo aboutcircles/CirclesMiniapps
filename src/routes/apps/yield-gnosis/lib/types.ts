@@ -8,8 +8,10 @@ export interface AssetInfo {
 	decimals: number;
 	logoUrl: string;
 	balance: bigint;
+	balanceError: boolean;
 	depositedBalance: bigint;
 	eurValue: number;
+	eurPerToken: number;
 	apy: number | null;
 	tvl: number | null;
 	apyLoading: boolean;

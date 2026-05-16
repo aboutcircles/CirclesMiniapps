@@ -40,9 +40,13 @@
 				</div>
 			</div>
 			<div style="text-align:right">
-				<p style="margin:0;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:{hasBalance(asset) ? 'var(--text)' : 'var(--text-dim)'}">{fmtBalance(asset)}</p>
-				{#if hasBalance(asset) && asset.eurValue >= 0.01}
-					<p style="margin:0;font-size:11px;font-variant-numeric:tabular-nums;color:var(--text-dim)">{fmtEur(asset.eurValue)}</p>
+				{#if asset.balanceError}
+					<p style="margin:0;font-size:13px;font-weight:700;color:#f97316" title="Failed to load balance">?</p>
+				{:else}
+					<p style="margin:0;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;color:{hasBalance(asset) ? 'var(--text)' : 'var(--text-dim)'}">{fmtBalance(asset)}</p>
+					{#if hasBalance(asset) && asset.eurValue >= 0.01}
+						<p style="margin:0;font-size:11px;font-variant-numeric:tabular-nums;color:var(--text-dim)">{fmtEur(asset.eurValue)}</p>
+					{/if}
 				{/if}
 			</div>
 		</div>

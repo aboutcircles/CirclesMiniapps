@@ -23,16 +23,12 @@ export async function getATokenBalance(
 	address: `0x${string}`,
 	aTokenAddress: `0x${string}`
 ): Promise<bigint> {
-	try {
-		return await publicClient.readContract({
-			address: aTokenAddress,
-			abi: ERC20_ABI,
-			functionName: 'balanceOf',
-			args: [address]
-		});
-	} catch {
-		return 0n;
-	}
+	return publicClient.readContract({
+		address: aTokenAddress,
+		abi: ERC20_ABI,
+		functionName: 'balanceOf',
+		args: [address]
+	});
 }
 
 // Legacy alias used by LiveCounter
