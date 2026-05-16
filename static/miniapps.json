@@ -166,14 +166,15 @@
     "category": "admin"
   },
   {
-    "slug": "circles-trivia",
-    "name": "Circles Trivia",
-    "logo": "/app-logos/trivia.png",
-    "url": "https://trivia-circles.vercel.app/",
-    "description": "Test your Circles and Gnosis knowledge. 10 random questions, speed-based scoring, and a global leaderboard.",
+    "slug": "direct-transfer",
+    "name": "Direct Transfer",
+    "logo": "/app-logos/direct-transfer.png",
+    "url": "/apps/direct-transfer",
+    "description": "Send CRC you hold directly to others, with auto wrap/unwrap routing across ERC1155 and ERC20 forms.",
     "tags": [
-      "game",
-      "education"
+      "payments",
+      "transfers",
+      "tools"
     ],
     "category": "miniapp"
   }

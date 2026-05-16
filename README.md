@@ -231,31 +231,9 @@ const data = btoa(encoded)
 
 ---
 
-## postMessage protocol
+## Intgration with Mini Apps SDK
 
-Mini apps communicate with the host via `window.postMessage`. Use `examples/miniapp-sdk.js` for a ready-made client-side SDK.
-
-**From mini app → host:**
-
-| `type` | Payload | Description |
-|---|---|---|
-| `request_address` | — | Ask for the current wallet address |
-| `send_transactions` | `{ transactions: [{to, value?, data?}], requestId }` | Request transaction approval |
-| `sign_message` | `{ message: string, requestId }` | Request message signing |
-
-**From host → mini app:**
-
-| `type` | Payload | Description |
-|---|---|---|
-| `wallet_connected` | `{ address }` | Wallet is connected |
-| `wallet_disconnected` | — | Wallet is not connected |
-| `app_data` | `{ data: string }` | App-specific data from the `?data=` URL param |
-| `tx_success` | `{ hashes, requestId }` | Transactions sent |
-| `tx_rejected` | `{ reason, requestId }` | Transaction rejected |
-| `sign_success` | `{ signature, verified, requestId }` | Message signed |
-| `sign_rejected` | `{ reason, requestId }` | Signing rejected |
-
----
+Mini apps communicate with the host via `window.postMessage`. Use [Mini App SDK](https://www.npmjs.com/package/@aboutcircles/miniapp-sdk) for a ready-made client-side SDK.
 
 ## Wallet
 

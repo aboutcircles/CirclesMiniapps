@@ -49,6 +49,17 @@
 	// ----- Query params -----
 	const recipientAddress = $derived(page.url.searchParams.get('address') ?? null);
 	const showTrust = $derived(page.url.searchParams.has('trust'));
+	const themeColor = $derived(parseThemeColor(page.url.searchParams.get('theme_color')));
+
+	function parseThemeColor(input: string | null): string | null {
+		if (!input) return null;
+		let s = input.trim();
+		if (s.startsWith('#')) s = s.slice(1);
+		else if (s.startsWith('%23')) s = s.slice(3);
+		if (s.length === 3) s = s.split('').map((c) => c + c).join('');
+		if (!/^[0-9a-fA-F]{6}$/.test(s)) return null;
+		return `#${s.toLowerCase()}`;
+	}
 
 	// ----- Dynamic group / org resolution -----
 	// ?group=<key> is required. The key must match an entry in GROUP_CONFIGS above.
@@ -330,7 +341,7 @@
 	<title>Appreciations</title>
 </svelte:head>
 
-<div class="page">
+<div class="page" style={themeColor ? `--kudos-color: ${themeColor};` : ''}>
 	<div class="card">
 
 
@@ -598,7 +609,7 @@
 		width: 18px;
 		height: 18px;
 		border: 2.5px solid #ddd;
-		border-top-color: #00af5e;
+		border-top-color: var(--kudos-color, #00af5e);
 		border-radius: 50%;
 		animation: spin 0.75s linear infinite;
 		flex-shrink: 0;
@@ -622,7 +633,7 @@
 		flex-direction: column;
 		align-items: stretch;
 		gap: 0;
-		background: #00af5e;
+		background: var(--kudos-color, #00af5e);
 		color: #ffffff;
 		border-radius: 16px;
 		padding: 0;
@@ -1027,16 +1038,16 @@
 		box-sizing: border-box;
 		text-align: center;
 		padding: calc(var(--qr-size) * 0.045) calc(var(--qr-size) * 0.073);
-		background: #f0faf5;
+		background: color-mix(in srgb, var(--kudos-color, #00af5e) 8%, #ffffff);
 		border-radius: calc(var(--qr-size) * 0.045);
 		font-size: calc(var(--qr-size) * 0.06);
 		font-weight: 600;
-		color: #00874a;
+		color: color-mix(in srgb, var(--kudos-color, #00af5e) 75%, #000000);
 		text-decoration: none;
 		transition: background 0.12s;
 	}
 
 	.qr-link-btn:hover {
-		background: #e0f5eb;
+		background: color-mix(in srgb, var(--kudos-color, #00af5e) 16%, #ffffff);
 	}
 </style>
