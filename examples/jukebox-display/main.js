@@ -14,23 +14,14 @@
 
 // @ts-nocheck
 import { Sdk } from '@aboutcircles/sdk';
-import {
-  getAddress,
-  createPublicClient,
-  http,
-  pad,
-} from 'viem';
-import { gnosis } from 'viem/chains';
+import { getAddress } from 'viem';
 import songsCatalog from './songs.json';
 import {
   RPC_URL,
-  RPC_FALLBACKS,
   JUKEBOX_ADDRESS,
   ACCEPTED_TOKEN_ADDRESS,
   BASE_AMOUNT_WEI,
   SONG_ID_MOD,
-  TRANSFER_EVENT_TOPIC,
-  START_BLOCK,
   POLL_INTERVAL_MS,
   PLAYHEAD_KEY,
 } from './constants.js';
@@ -58,9 +49,6 @@ function getReadSdk() {
   if (!_readSdk) _readSdk = new Sdk();
   return _readSdk;
 }
-const rpcClients = RPC_FALLBACKS.map(url =>
-  createPublicClient({ chain: gnosis, transport: http(url) })
-);
 
 // ─── Helpers ────────────────────────────────────────────────
 function songById(id) {
@@ -134,53 +122,79 @@ function savePlayhead(txHash) {
 }
 
 // ─── Queue fetching ─────────────────────────────────────────
+// Reads the Circles indexer (no block-range limit, unlike raw eth_getLogs
+// which every public Gnosis RPC rejects over millions of blocks). The
+// `amount` column is the raw on-chain uint256, so the songId-in-low-bits
+// decode is exact.
+async function circlesQuery(table, columns, filters, order, limit) {
+  const res = await fetch(RPC_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'circles_query',
+      params: [{
+        Namespace: 'CrcV2',
+        Table: table,
+        Columns: columns,
+        Filter: filters.map(f => ({
+          Type: 'FilterPredicate',
+          FilterType: f.op || 'Equals',
+          Column: f.column,
+          Value: f.value,
+        })),
+        Order: order,
+        Limit: limit,
+      }],
+    }),
+  });
+  const json = await res.json();
+  if (json.error) {
+    throw new Error(json.error.message || 'circles_query failed');
+  }
+  const cols = json.result?.columns || [];
+  const rows = json.result?.rows || [];
+  return rows.map(row => Object.fromEntries(cols.map((c, i) => [c, row[i]])));
+}
+
 async function fetchQueueEntries() {
-  const toTopic = pad(getAddress(JUKEBOX_ADDRESS), { size: 32 }).toLowerCase();
+  const rows = await circlesQuery(
+    'Erc20WrapperTransfer',
+    ['blockNumber', 'timestamp', 'transactionHash', 'logIndex', 'tokenAddress', 'from', 'to', 'amount'],
+    [{ column: 'to', value: JUKEBOX_ADDRESS.toLowerCase() }],
+    [{ Column: 'blockNumber', SortOrder: 'ASC' }],
+    1000,
+  );
 
-  for (const client of rpcClients) {
+  const accepted = ACCEPTED_TOKEN_ADDRESS.toLowerCase();
+  const entries = [];
+  for (const row of rows) {
+    if ((row.tokenAddress || '').toLowerCase() !== accepted) continue;
     try {
-      const latest = await client.getBlockNumber();
-      const logs = await client.getLogs({
-        address: ACCEPTED_TOKEN_ADDRESS,
-        fromBlock: START_BLOCK,
-        toBlock: latest,
-        topics: [TRANSFER_EVENT_TOPIC, null, toTopic],
+      const value = BigInt(row.amount);
+      const songId = Number(value % SONG_ID_MOD);
+      const base = value - (value % SONG_ID_MOD);
+      if (base !== BASE_AMOUNT_WEI) continue;
+      const song = songById(songId);
+      if (!song) continue;
+      entries.push({
+        song,
+        from: getAddress(row.from),
+        txHash: row.transactionHash,
+        blockNumber: Number(row.blockNumber),
+        logIndex: Number(row.logIndex),
       });
-
-      const entries = [];
-      for (const log of logs) {
-        try {
-          const value = BigInt(log.data);
-          const songId = Number(value % SONG_ID_MOD);
-          const base = value - (value % SONG_ID_MOD);
-          if (base !== BASE_AMOUNT_WEI) continue;
-          const song = songById(songId);
-          if (!song) continue;
-          const fromHex = '0x' + log.topics[1].slice(26);
-          entries.push({
-            song,
-            from: getAddress(fromHex),
-            txHash: log.transactionHash,
-            blockNumber: log.blockNumber,
-            logIndex: log.logIndex,
-          });
-        } catch {
-          /* skip */
-        }
-      }
-
-      entries.sort((a, b) => {
-        if (a.blockNumber !== b.blockNumber) {
-          return a.blockNumber < b.blockNumber ? -1 : 1;
-        }
-        return a.logIndex - b.logIndex;
-      });
-      return entries;
-    } catch (err) {
-      console.warn('[display] getLogs failed, trying next RPC:', err);
+    } catch {
+      /* skip malformed row */
     }
   }
-  throw new Error('All RPCs failed');
+
+  entries.sort((a, b) => {
+    if (a.blockNumber !== b.blockNumber) return a.blockNumber - b.blockNumber;
+    return a.logIndex - b.logIndex;
+  });
+  return entries;
 }
 
 // ─── Profile lookup with caching ────────────────────────────
