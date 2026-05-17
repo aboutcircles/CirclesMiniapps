@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" rx="14" fill="#0b0d11"/>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6c5ce7"/>
+      <stop offset="100%" stop-color="#00cec9"/>
+    </linearGradient>
+  </defs>
+  <!-- Outer ring -->
+  <circle cx="32" cy="32" r="22" fill="none" stroke="url(#g)" stroke-width="3" stroke-linecap="round"
+    stroke-dasharray="138 138" stroke-dashoffset="34" transform="rotate(-90 32 32)"/>
+  <!-- Checkmark -->
+  <path d="M22 32 L29 39 L42 25" stroke="#55efc4" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

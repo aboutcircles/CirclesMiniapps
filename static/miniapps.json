@@ -1,11 +1,27 @@
 [
   {
+    "slug": "grouper",
+    "name": "Grouper",
+    "logo": "https://fav.farm/\ud83c\udf7b",
+    "url": "https://aboutcircles.github.io/CirclesMiniapps/grouper/",
+    "description": "Join a group outing with strangers matched via your Circles trust graph. Pay in CRC, get matched with 5 others, meet IRL at a curated venue.",
+    "tags": [
+      "social",
+      "irl",
+      "community",
+      "circles"
+    ]
+  },
+  {
     "slug": "sign-message-demo",
     "name": "Sign Message Demo",
     "logo": "/app-logos/sign.png",
     "url": "https://aboutcircles.github.io/miniappDemo/demo-sign/",
     "description": "Sign an arbitrary message using the connected Safe wallet.",
-    "tags": ["demo", "signing"]
+    "tags": [
+      "demo",
+      "signing"
+    ]
   },
   {
     "slug": "ps-voting",
@@ -13,7 +29,9 @@
     "logo": "https://example.com/logo.svg",
     "url": "https://pboes.github.io/ps_voting/",
     "description": "Voting app for Parallel Society.",
-    "tags": ["internal"],
+    "tags": [
+      "internal"
+    ],
     "isHidden": true
   },
   {
@@ -22,7 +40,10 @@
     "logo": "https://example.com/logo.svg",
     "url": "https://honey-pot-create.vercel.app/honey-pot/",
     "description": "Grow honey pots for the creators you love",
-    "tags": ["defi", "tokens"]
+    "tags": [
+      "defi",
+      "tokens"
+    ]
   },
   {
     "slug": "erc20-transfer-demo",
@@ -30,7 +51,10 @@
     "logo": "/app-logos/erc20.png",
     "url": "https://aboutcircles.github.io/miniappDemo/demo-tx/",
     "description": "Send an ERC20 token transfer via the connected Safe wallet.",
-    "tags": ["demo", "transactions"]
+    "tags": [
+      "demo",
+      "transactions"
+    ]
   },
   {
     "slug": "xmtp-circles-demo",
@@ -38,7 +62,12 @@
     "logo": "/app-logos/xmtp.png",
     "url": "https://zengzengzenghuy.github.io/xmtp-circles-miniapp/",
     "description": "Enables XMTP messaging for Safe wallets with native Circles support, allowing users to coordinate and message directly within a secure chat.",
-    "tags": ["xmtp", "circles", "messaging", "safe"]
+    "tags": [
+      "xmtp",
+      "circles",
+      "messaging",
+      "safe"
+    ]
   },
   {
     "slug": "coinflip-game",
@@ -46,7 +75,10 @@
     "logo": "/app-logos/coinflip.png",
     "url": "https://coinflip-miniapp-omega.vercel.app/game",
     "description": "A simple coin flip mini app game.",
-    "tags": ["game", "coinflip"]
+    "tags": [
+      "game",
+      "coinflip"
+    ]
   },
   {
     "slug": "vibevote",
@@ -54,7 +86,12 @@
     "logo": "https://vibevote-lovat.vercel.app/logo.svg",
     "url": "https://vibevote-lovat.vercel.app",
     "description": "Onchain applause meter for hackathon demos. Tap to send 1 CRC to the project you like. Live scoreboard, real-time ranking, winner reveal.",
-    "tags": ["voting", "circles", "game", "tools"]
+    "tags": [
+      "voting",
+      "circles",
+      "game",
+      "tools"
+    ]
   },
   {
     "slug": "miniapps-org-manager",
@@ -62,7 +99,12 @@
     "logo": "/app-logos/org-manager.png",
     "url": "https://circles-org-miniapp.vercel.app/",
     "description": "Builder-focused setup tool for miniapp organizations, including org creation, accepted CRC configuration, signer management, and withdrawals.",
-    "tags": ["circles", "organization", "builder", "tools"]
+    "tags": [
+      "circles",
+      "organization",
+      "builder",
+      "tools"
+    ]
   },
   {
     "slug": "circles-daily-quest",
@@ -70,7 +112,12 @@
     "logo": "/app-logos/quests.png",
     "url": "https://circles-quests.vercel.app/game",
     "description": "Daily Circles quests with in-app actions, on-chain tasks, and server-side verification with XP and leaderboard progression.",
-    "tags": ["circles", "quests", "game", "leaderboard"]
+    "tags": [
+      "circles",
+      "quests",
+      "game",
+      "leaderboard"
+    ]
   },
   {
     "slug": "pixelize",
@@ -78,6 +125,22 @@
     "logo": "https://example.com/logo.svg",
     "url": "https://extraordinary-smakager-566785.netlify.app/",
     "description": "Mint pixel and discover your new avatar",
-    "tags": ["defi", "tokens"]
+    "tags": [
+      "defi",
+      "tokens"
+    ]
+  },
+  {
+    "slug": "habitcircles",
+    "name": "HabitCircles",
+    "logo": "/app-logos/habitcircles.svg",
+    "url": "https://habitcircles.vercel.app",
+    "description": "Build 21-day habits and earn CRC rewards. Pick daily rituals, check in each day, and climb the leaderboard. The arb bot distributes rewards to top performers.",
+    "tags": [
+      "health",
+      "rewards",
+      "gamification"
+    ],
+    "category": "miniapp"
   }
 ]
