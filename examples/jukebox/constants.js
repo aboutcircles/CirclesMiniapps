@@ -24,13 +24,12 @@ export const JUKEBOX_ADDRESS = '0xbe6e5a0bdface700cbe8f0d1c28fcb8404a1622b';
 // transfer to it without reverting.
 export const ACCEPTED_TOKEN_ADDRESS = '0xeeF7B1f06B092625228C835Dd5D5B14641D1e54A';
 
-// The Gnosis group avatar (for reference / future auto-mint flow).
+// The Gnosis group avatar. Used as the avatar arg for groupMint + wrap in the
+// auto-mint flow (user has personal CRC but no wrapped group CRC yet).
 export const GNOSIS_GROUP_ADDRESS = '0xc19bc204eb1c1d5b3fe500e5e5dfabab625f286c';
 
-// The Gnosis group mint handler. Users send personal CRC here (ERC-1155)
-// and receive wrapped Gnosis group CRC back. Not used yet; see
-// .agents/plans/jukebox-auto-mint/ for the proposed flow.
-export const GNOSIS_GROUP_MINT_HANDLER = '0xf9117e9931E6ab91f025e1afa4e70CAFa5E0AA1E';
+// Circles Hub V2 (ERC-1155). groupMint + wrap are called here.
+export const HUB_V2_ADDRESS = '0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8';
 
 // Payment encoding.
 // Each play costs exactly 10 CRC. The chosen songId (0..SONG_ID_MOD-1) is

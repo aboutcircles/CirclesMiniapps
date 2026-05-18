@@ -26,6 +26,8 @@ import {
   RPC_FALLBACKS,
   JUKEBOX_ADDRESS,
   ACCEPTED_TOKEN_ADDRESS,
+  GNOSIS_GROUP_ADDRESS,
+  HUB_V2_ADDRESS,
   BASE_AMOUNT_WEI,
   SONG_ID_MOD,
 } from './constants.js';
@@ -85,6 +87,70 @@ const ERC20_TRANSFER_ABI = [
     outputs: [{ name: '', type: 'uint256' }],
   },
 ];
+
+// Hub V2 (ERC-1155) - group mint + wrap, and the ERC-1155 balanceOf for the
+// personal-CRC preflight. Signatures taken verbatim from @aboutcircles/sdk-abis.
+const HUB_V2_ABI = [
+  {
+    type: 'function',
+    name: 'groupMint',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: '_group', type: 'address' },
+      { name: '_collateralAvatars', type: 'address[]' },
+      { name: '_amounts', type: 'uint256[]' },
+      { name: '_data', type: 'bytes' },
+    ],
+    outputs: [],
+  },
+  {
+    type: 'function',
+    name: 'wrap',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: '_avatar', type: 'address' },
+      { name: '_amount', type: 'uint256' },
+      { name: '_type', type: 'uint8' },
+    ],
+    outputs: [{ name: '', type: 'address' }],
+  },
+  {
+    type: 'function',
+    name: 'balanceOf',
+    stateMutability: 'view',
+    inputs: [
+      { name: '_account', type: 'address' },
+      { name: '_id', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+];
+
+// Inflationary ERC-20 wrapper - the demurrage<->inflationary ratio reads used
+// to size the mint so the post-wrap balance covers the exact transfer amount.
+const INFLATIONARY_ABI = [
+  {
+    type: 'function',
+    name: 'day',
+    stateMutability: 'view',
+    inputs: [{ name: '_timestamp', type: 'uint256' }],
+    outputs: [{ name: '', type: 'uint64' }],
+  },
+  {
+    type: 'function',
+    name: 'convertDemurrageToInflationaryValue',
+    stateMutability: 'pure',
+    inputs: [
+      { name: '_demurrageValue', type: 'uint256' },
+      { name: '_dayUpdated', type: 'uint64' },
+    ],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+];
+
+// Hub V2 wrap type enum: 0 = Demurrage, 1 = Inflation. Gnosis group CRC uses
+// the inflationary wrapper (ACCEPTED_TOKEN_ADDRESS).
+const CIRCLES_TYPE_INFLATION = 1;
 
 // ─── Helpers ────────────────────────────────────────────────
 function decodeError(err) {
@@ -227,80 +293,141 @@ confirmProceed.addEventListener('click', async () => {
 });
 
 // ─── Payment flow ───────────────────────────────────────────
+// Read a view/pure function across the RPC fallbacks. Returns null if every
+// RPC fails (callers decide whether that's fatal or "let the chain decide").
+async function readAny(params) {
+  for (const client of rpcClients) {
+    try {
+      return await client.readContract(params);
+    } catch (err) {
+      console.warn('[jukebox] read failed, trying next RPC:', decodeError(err));
+    }
+  }
+  return null;
+}
+
 async function payForSong(song) {
   if (!connectedAddress) throw new Error('Wallet not connected');
 
-  // 1. Find the user's balance of the specific wrapped Gnosis group CRC.
-  //    Only this token is accepted because the treasury org only trusts
-  //    the Gnosis group - any other CRC would revert on transfer.
-  const sdk = getReadSdk();
-  const balances = await sdk.rpc.balance.getTokenBalances(connectedAddress);
-  if (!balances || balances.length === 0) {
-    throw new Error('No CRC balance found on this wallet');
-  }
-  const accepted = ACCEPTED_TOKEN_ADDRESS.toLowerCase();
-  const picked = balances.find(b =>
-    b.isWrapped && (b.tokenAddress || '').toLowerCase() === accepted
-  );
-  if (!picked) {
-    throw new Error(
-      'You need wrapped Gnosis group CRC to pay. ' +
-      'Mint group CRC from your personal CRC in the Circles wallet, then wrap it.'
-    );
-  }
-  const wrapperAddress = getAddress(picked.tokenAddress);
+  const user = getAddress(connectedAddress);
+  // The accepted token is a known, already-deployed inflationary wrapper - we
+  // don't need the user to already hold it, so address it directly.
+  const wrapperAddress = getAddress(ACCEPTED_TOKEN_ADDRESS);
 
-  // 2. Encode amount = 10e18 + songId.
+  // amount = 10·10^18 + songId. The songId rides in the low bits; the display
+  // decodes it as amount % 10000. This is the exact value transferred.
   const amountWei = BASE_AMOUNT_WEI + BigInt(song.id);
 
-  // Check the REAL on-chain ERC-20 balance - that's exactly what `transfer`
-  // enforces. The SDK's `attoCircles` is a demurrage-adjusted figure in a
-  // different denomination (this token is an inflationary wrapper), so
-  // comparing it against a raw wei amount false-fails valid payments. If the
-  // balance read fails on every RPC, proceed anyway and let the wallet/chain
-  // be the final arbiter rather than block a good payment on a flaky read.
-  let onchainBal = null;
-  for (const client of rpcClients) {
-    try {
-      onchainBal = await client.readContract({
-        address: wrapperAddress,
-        abi: ERC20_TRANSFER_ABI,
-        functionName: 'balanceOf',
-        args: [getAddress(connectedAddress)],
-      });
-      break;
-    } catch (err) {
-      console.warn('[jukebox] balanceOf read failed, trying next RPC:', decodeError(err));
-    }
-  }
-  if (onchainBal !== null && onchainBal < amountWei) {
-    const have = (Number(onchainBal) / 1e18).toFixed(2);
-    throw new Error(
-      `Not enough wrapped Gnosis group CRC - you hold ~${have}, need 10. ` +
-      'Mint and wrap more in the Circles wallet first.'
-    );
-  }
-
-  const data = encodeFunctionData({
+  // Real on-chain ERC-20 balance is exactly what `transfer` enforces. The
+  // SDK's attoCircles is a demurrage-adjusted figure in a different
+  // denomination (inflationary wrapper) and false-fails valid payments, so
+  // never compare against it.
+  const wrappedBal = await readAny({
+    address: wrapperAddress,
     abi: ERC20_TRANSFER_ABI,
-    functionName: 'transfer',
-    args: [getAddress(JUKEBOX_ADDRESS), amountWei],
+    functionName: 'balanceOf',
+    args: [user],
   });
 
-  setConfirmStatus('Confirm the transaction in your wallet…', 'info');
+  const txs = [];
 
-  // 3. Send via the host bridge.
-  const hashes = await sendTransactions([{
+  if (wrappedBal !== null && wrappedBal < amountWei) {
+    // Auto-mint path: the user lacks wrapped Gnosis group CRC. Batch
+    //   groupMint (personal CRC -> group CRC, 1:1)
+    //   wrap       (group CRC ERC-1155 -> inflationary ERC-20)
+    //   transfer   (10 CRC -> treasury)
+    // into ONE atomic Safe multisend. All-or-nothing: if the user can't mint
+    // (not a Gnosis-group member, or short on personal CRC) the whole batch
+    // reverts and no funds move.
+    setConfirmStatus('Preparing mint + wrap…', 'info');
+
+    // Inflationary ratio: native wrapper units per 1 CRC (today). Needed to
+    // size the mint so the post-wrap balance covers the exact transfer.
+    const nowTs = BigInt(Math.floor(Date.now() / 1000));
+    const day = await readAny({
+      address: wrapperAddress,
+      abi: INFLATIONARY_ABI,
+      functionName: 'day',
+      args: [nowTs],
+    });
+    const inflPerCrc = day === null ? null : await readAny({
+      address: wrapperAddress,
+      abi: INFLATIONARY_ABI,
+      functionName: 'convertDemurrageToInflationaryValue',
+      args: [10n ** 18n, day],
+    });
+    if (!inflPerCrc || inflPerCrc <= 0n) {
+      throw new Error('Could not load the group-CRC conversion rate. Try again in a moment.');
+    }
+
+    // today-atto of group CRC to mint+wrap so post-wrap native >= shortfall.
+    // ceil division + 0.5% buffer absorbs intra-day ratio drift between this
+    // read and on-chain execution; any surplus stays as wrapped gCRC in the
+    // user's wallet (1:1 redeemable, not lost).
+    const have = wrappedBal ?? 0n;
+    const needNative = amountWei > have ? amountWei - have : 0n;
+    let mintToday = (needNative * (10n ** 18n) + inflPerCrc - 1n) / inflPerCrc;
+    mintToday = mintToday + mintToday / 200n + 1n;
+
+    // Preflight personal CRC (ERC-1155, tokenId == uint256(avatar)) so we can
+    // fail with a clear message instead of an opaque on-chain revert.
+    const personalBal = await readAny({
+      address: getAddress(HUB_V2_ADDRESS),
+      abi: HUB_V2_ABI,
+      functionName: 'balanceOf',
+      args: [user, BigInt(user)],
+    });
+    if (personalBal !== null && personalBal < mintToday) {
+      const haveCrc = (Number(personalBal) / 1e18).toFixed(2);
+      const needCrc = (Number(mintToday) / 1e18).toFixed(2);
+      throw new Error(
+        `Not enough personal CRC to mint - you have ~${haveCrc}, need ~${needCrc}. ` +
+        'Top up CRC in the Circles wallet first.'
+      );
+    }
+
+    setConfirmStatus('Confirm in your wallet: mint + wrap + pay…', 'info');
+    txs.push({
+      to: getAddress(HUB_V2_ADDRESS),
+      data: encodeFunctionData({
+        abi: HUB_V2_ABI,
+        functionName: 'groupMint',
+        args: [getAddress(GNOSIS_GROUP_ADDRESS), [user], [mintToday], '0x'],
+      }),
+      value: '0x0',
+    });
+    txs.push({
+      to: getAddress(HUB_V2_ADDRESS),
+      data: encodeFunctionData({
+        abi: HUB_V2_ABI,
+        functionName: 'wrap',
+        args: [getAddress(GNOSIS_GROUP_ADDRESS), mintToday, CIRCLES_TYPE_INFLATION],
+      }),
+      value: '0x0',
+    });
+  } else {
+    // Either the balance read failed (let the chain be the arbiter) or the
+    // user already holds enough - a single transfer.
+    setConfirmStatus('Confirm the transaction in your wallet…', 'info');
+  }
+
+  // Final leg: transfer exactly amountWei of the wrapped token to the treasury.
+  txs.push({
     to: wrapperAddress,
-    data,
+    data: encodeFunctionData({
+      abi: ERC20_TRANSFER_ABI,
+      functionName: 'transfer',
+      args: [getAddress(JUKEBOX_ADDRESS), amountWei],
+    }),
     value: '0x0',
-  }]);
+  });
 
+  // One sendTransactions call = one atomic Safe multisend (one signature).
+  const hashes = await sendTransactions(txs);
   if (!hashes || hashes.length === 0) {
     throw new Error('Wallet returned no transaction hash');
   }
 
-  // 4. Wait for confirmation.
   setConfirmStatus('Waiting for confirmation…', 'info');
   const receipt = await waitForReceipt(hashes[0]);
   if (receipt.status !== 'success') {
