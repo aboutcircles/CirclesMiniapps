@@ -1,6 +1,13 @@
 <script lang="ts">
 	import { decodeOperation, detectCirclesTransferBatch, type DecodedOp } from './decodeOperation.ts';
-	import { formatAmount, formatToken, formatTokenAmount, shortenAddress } from './tokenMetadata.ts';
+	import {
+		circlesTokenIdToAvatar,
+		formatAmount,
+		formatToken,
+		formatTokenAmount,
+		isCirclesHub,
+		shortenAddress
+	} from './tokenMetadata.ts';
 
 	type Transaction = {
 		to: string;
@@ -196,7 +203,8 @@
 								</div>
 
 							{:else if op.kind === 'erc1155-transfer'}
-								<div class="op-headline">Transfer ERC-1155 token</div>
+								{@const isCrc = isCirclesHub(op.contract)}
+								<div class="op-headline">{isCrc ? 'Send Circles' : 'Transfer ERC-1155 token'}</div>
 								<div class="op-field">
 									<span class="op-key">Contract</span>
 									<span class="mono">{formatToken(op.contract)}</span>
@@ -209,17 +217,26 @@
 									<span class="op-key">To</span>
 									<span class="mono">{shortenAddress(op.to)}</span>
 								</div>
-								<div class="op-field">
-									<span class="op-key">Token ID</span>
-									<span class="mono">{op.tokenId.toString()}</span>
-								</div>
+								{#if isCrc}
+									<div class="op-field">
+										<span class="op-key">Issuer</span>
+										<span class="mono">{shortenAddress(circlesTokenIdToAvatar(op.tokenId))}</span>
+									</div>
+								{:else}
+									<div class="op-field">
+										<span class="op-key">Token ID</span>
+										<span class="mono">{op.tokenId.toString()}</span>
+									</div>
+								{/if}
 								<div class="op-field">
 									<span class="op-key">Amount</span>
-									<span>{op.amount.toString()}</span>
+									<span>{describeAmount(op.amount, op.contract)}</span>
 								</div>
 
 							{:else if op.kind === 'erc1155-batch-transfer'}
-								<div class="op-headline">Batch transfer ERC-1155 tokens</div>
+								{@const isCrcBatch = isCirclesHub(op.contract)}
+								{@const total = op.amounts.reduce((s, a) => s + a, 0n)}
+								<div class="op-headline">{isCrcBatch ? 'Send Circles (batch)' : 'Batch transfer ERC-1155 tokens'}</div>
 								<div class="op-field">
 									<span class="op-key">Contract</span>
 									<span class="mono">{formatToken(op.contract)}</span>
@@ -233,8 +250,12 @@
 									<span class="mono">{shortenAddress(op.to)}</span>
 								</div>
 								<div class="op-field">
-									<span class="op-key">Tokens</span>
-									<span>{op.tokenIds.length} ids</span>
+									<span class="op-key">{isCrcBatch ? 'Issuers' : 'Tokens'}</span>
+									<span>{op.tokenIds.length}</span>
+								</div>
+								<div class="op-field">
+									<span class="op-key">Total</span>
+									<span>{describeAmount(total, op.contract)}</span>
 								</div>
 
 							{:else if op.kind === 'erc1155-approve-all'}

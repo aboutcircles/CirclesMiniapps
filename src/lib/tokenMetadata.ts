@@ -15,6 +15,23 @@ export type TokenMetadata = {
 	label?: string;
 };
 
+// Lowercased. Exported so other modules can compare without rediscovering it.
+export const CIRCLES_HUB_V2_ADDRESS = '0xc12c1e50abb450d6205ea2c3fa861b3b834d13e8';
+
+/** True when the address is the Circles Hub V2 ERC-1155 contract. */
+export function isCirclesHub(addr: string | undefined | null): boolean {
+	return !!addr && addr.toLowerCase() === CIRCLES_HUB_V2_ADDRESS;
+}
+
+/**
+ * In Circles V2 every personal-token ID is the issuer's avatar address cast
+ * to uint256. Recover the avatar by taking the lower 160 bits.
+ */
+export function circlesTokenIdToAvatar(id: bigint): string {
+	const lower160 = id & ((1n << 160n) - 1n);
+	return '0x' + lower160.toString(16).padStart(40, '0');
+}
+
 // Keys must be lowercased addresses. Comparisons go through getTokenMetadata
 // which normalises input, so callers don't need to remember.
 const KNOWN_TOKENS: Readonly<Record<string, TokenMetadata>> = {
@@ -27,7 +44,7 @@ const KNOWN_TOKENS: Readonly<Record<string, TokenMetadata>> = {
 	'0x6a023ccd1ff6f2045c3309768ead9e68f978f6e1': { symbol: 'WETH', decimals: 18 },
 	'0x9c58bacc331c9aa871afd802db6379a98e80cedb': { symbol: 'GNO', decimals: 18 },
 	// Circles Hub V2 — not a token, but worth labelling when it appears as `to`.
-	'0xc12c1e50abb450d6205ea2c3fa861b3b834d13e8': {
+	[CIRCLES_HUB_V2_ADDRESS]: {
 		symbol: 'CRC',
 		decimals: 18,
 		label: 'Circles Hub V2'
