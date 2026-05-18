@@ -67,15 +67,24 @@ const rpcClients = RPC_FALLBACKS.map(url =>
 );
 
 // ─── ABIs ───────────────────────────────────────────────────
-const ERC20_TRANSFER_ABI = [{
-  type: 'function',
-  name: 'transfer',
-  inputs: [
-    { name: 'to', type: 'address' },
-    { name: 'amount', type: 'uint256' },
-  ],
-  outputs: [{ name: '', type: 'bool' }],
-}];
+const ERC20_TRANSFER_ABI = [
+  {
+    type: 'function',
+    name: 'transfer',
+    inputs: [
+      { name: 'to', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+  {
+    type: 'function',
+    name: 'balanceOf',
+    stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+];
 
 // ─── Helpers ────────────────────────────────────────────────
 function decodeError(err) {
@@ -244,9 +253,32 @@ async function payForSong(song) {
   // 2. Encode amount = 10e18 + songId.
   const amountWei = BASE_AMOUNT_WEI + BigInt(song.id);
 
-  const haveWei = BigInt(picked.attoCircles || picked.staticAttoCircles || '0');
-  if (haveWei < amountWei) {
-    throw new Error('Not enough wrapped CRC to cover 10 CRC');
+  // Check the REAL on-chain ERC-20 balance - that's exactly what `transfer`
+  // enforces. The SDK's `attoCircles` is a demurrage-adjusted figure in a
+  // different denomination (this token is an inflationary wrapper), so
+  // comparing it against a raw wei amount false-fails valid payments. If the
+  // balance read fails on every RPC, proceed anyway and let the wallet/chain
+  // be the final arbiter rather than block a good payment on a flaky read.
+  let onchainBal = null;
+  for (const client of rpcClients) {
+    try {
+      onchainBal = await client.readContract({
+        address: wrapperAddress,
+        abi: ERC20_TRANSFER_ABI,
+        functionName: 'balanceOf',
+        args: [getAddress(connectedAddress)],
+      });
+      break;
+    } catch (err) {
+      console.warn('[jukebox] balanceOf read failed, trying next RPC:', decodeError(err));
+    }
+  }
+  if (onchainBal !== null && onchainBal < amountWei) {
+    const have = (Number(onchainBal) / 1e18).toFixed(2);
+    throw new Error(
+      `Not enough wrapped Gnosis group CRC - you hold ~${have}, need 10. ` +
+      'Mint and wrap more in the Circles wallet first.'
+    );
   }
 
   const data = encodeFunctionData({
