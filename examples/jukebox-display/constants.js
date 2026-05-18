@@ -10,9 +10,10 @@ export const RPC_FALLBACKS = [
 
 export const JUKEBOX_ADDRESS = '0xbe6e5a0bdface700cbe8f0d1c28fcb8404a1622b';
 
-// Wrapped Gnosis group CRC. Only Transfer events of this exact token to
-// JUKEBOX_ADDRESS count as a paid song request.
-export const ACCEPTED_TOKEN_ADDRESS = '0xeeF7B1f06B092625228C835Dd5D5B14641D1e54A';
+// Demurraged Gnosis group CRC wrapper (1e18 raw == 1 CRC today). Only
+// Transfer events of this exact token to JUKEBOX_ADDRESS count as a paid
+// song request. Must stay in sync with examples/jukebox/constants.js.
+export const ACCEPTED_TOKEN_ADDRESS = '0x548c20e6c24E4876E20daDbEAb75362e2F5A4bC1';
 
 export const BASE_AMOUNT_WEI = 10n * 10n ** 18n;
 export const SONG_ID_MOD = 10000n;

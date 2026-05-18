@@ -18,11 +18,13 @@ export const RPC_FALLBACKS = [
 // group member can transfer wrapped group CRC to it.
 export const JUKEBOX_ADDRESS = '0xbe6e5a0bdface700cbe8f0d1c28fcb8404a1622b';
 
-// Only this exact wrapped ERC-20 token is accepted as payment.
-// It's the wrapped Gnosis group CRC token; the org above only trusts
-// the Gnosis group, so this is the one token that can actually
-// transfer to it without reverting.
-export const ACCEPTED_TOKEN_ADDRESS = '0xeeF7B1f06B092625228C835Dd5D5B14641D1e54A';
+// Only this exact wrapped ERC-20 token is accepted as payment: the
+// DEMURRAGED Gnosis group CRC wrapper. Demurraged means 1e18 raw == 1 CRC
+// today (1:1), which is exactly what the songId-in-low-bits encoding needs
+// (amount = 10e18 + songId == 10 CRC + songId). The inflationary wrapper
+// (0xeeF7B1f06B092625228C835Dd5D5B14641D1e54A) was wrong here: 10e18 of it
+// is only ~6.67 CRC, so payments underpaid by ~33%.
+export const ACCEPTED_TOKEN_ADDRESS = '0x548c20e6c24E4876E20daDbEAb75362e2F5A4bC1';
 
 // The Gnosis group avatar. Used as the avatar arg for groupMint + wrap in the
 // auto-mint flow (user has personal CRC but no wrapped group CRC yet).

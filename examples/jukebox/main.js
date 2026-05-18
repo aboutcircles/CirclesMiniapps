@@ -126,31 +126,9 @@ const HUB_V2_ABI = [
   },
 ];
 
-// Inflationary ERC-20 wrapper - the demurrage<->inflationary ratio reads used
-// to size the mint so the post-wrap balance covers the exact transfer amount.
-const INFLATIONARY_ABI = [
-  {
-    type: 'function',
-    name: 'day',
-    stateMutability: 'view',
-    inputs: [{ name: '_timestamp', type: 'uint256' }],
-    outputs: [{ name: '', type: 'uint64' }],
-  },
-  {
-    type: 'function',
-    name: 'convertDemurrageToInflationaryValue',
-    stateMutability: 'pure',
-    inputs: [
-      { name: '_demurrageValue', type: 'uint256' },
-      { name: '_dayUpdated', type: 'uint64' },
-    ],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-];
-
-// Hub V2 wrap type enum: 0 = Demurrage, 1 = Inflation. Gnosis group CRC uses
-// the inflationary wrapper (ACCEPTED_TOKEN_ADDRESS).
-const CIRCLES_TYPE_INFLATION = 1;
+// Hub V2 wrap type enum: 0 = Demurrage, 1 = Inflation. The accepted token is
+// the demurraged wrapper (1e18 raw == 1 CRC today), so we wrap as Demurrage.
+const CIRCLES_TYPE_DEMURRAGE = 0;
 
 // ─── Helpers ────────────────────────────────────────────────
 function decodeError(err) {
@@ -334,40 +312,21 @@ async function payForSong(song) {
   if (wrappedBal !== null && wrappedBal < amountWei) {
     // Auto-mint path: the user lacks wrapped Gnosis group CRC. Batch
     //   groupMint (personal CRC -> group CRC, 1:1)
-    //   wrap       (group CRC ERC-1155 -> inflationary ERC-20)
+    //   wrap       (group CRC ERC-1155 -> DEMURRAGED ERC-20, 1:1)
     //   transfer   (10 CRC -> treasury)
     // into ONE atomic Safe multisend. All-or-nothing: if the user can't mint
     // (not a Gnosis-group member, or short on personal CRC) the whole batch
     // reverts and no funds move.
+    //
+    // The accepted token is the DEMURRAGED wrapper: 1e18 raw == 1 CRC today,
+    // so there is no inflationary ratio to apply - mint and wrap exactly the
+    // shortfall (plus a tiny buffer for wrap rounding). Surplus stays as
+    // wrapped gCRC in the user's wallet (1:1 redeemable, not lost).
     setConfirmStatus('Preparing mint + wrap…', 'info');
 
-    // Inflationary ratio: native wrapper units per 1 CRC (today). Needed to
-    // size the mint so the post-wrap balance covers the exact transfer.
-    const nowTs = BigInt(Math.floor(Date.now() / 1000));
-    const day = await readAny({
-      address: wrapperAddress,
-      abi: INFLATIONARY_ABI,
-      functionName: 'day',
-      args: [nowTs],
-    });
-    const inflPerCrc = day === null ? null : await readAny({
-      address: wrapperAddress,
-      abi: INFLATIONARY_ABI,
-      functionName: 'convertDemurrageToInflationaryValue',
-      args: [10n ** 18n, day],
-    });
-    if (!inflPerCrc || inflPerCrc <= 0n) {
-      throw new Error('Could not load the group-CRC conversion rate. Try again in a moment.');
-    }
-
-    // today-atto of group CRC to mint+wrap so post-wrap native >= shortfall.
-    // ceil division + 0.5% buffer absorbs intra-day ratio drift between this
-    // read and on-chain execution; any surplus stays as wrapped gCRC in the
-    // user's wallet (1:1 redeemable, not lost).
     const have = wrappedBal ?? 0n;
-    const needNative = amountWei > have ? amountWei - have : 0n;
-    let mintToday = (needNative * (10n ** 18n) + inflPerCrc - 1n) / inflPerCrc;
-    mintToday = mintToday + mintToday / 200n + 1n;
+    const needToday = amountWei > have ? amountWei - have : 0n;
+    const mintToday = needToday + needToday / 1000n + 1n; // +0.1% wrap-rounding slack
 
     // Preflight personal CRC (ERC-1155, tokenId == uint256(avatar)) so we can
     // fail with a clear message instead of an opaque on-chain revert.
@@ -401,7 +360,7 @@ async function payForSong(song) {
       data: encodeFunctionData({
         abi: HUB_V2_ABI,
         functionName: 'wrap',
-        args: [getAddress(GNOSIS_GROUP_ADDRESS), mintToday, CIRCLES_TYPE_INFLATION],
+        args: [getAddress(GNOSIS_GROUP_ADDRESS), mintToday, CIRCLES_TYPE_DEMURRAGE],
       }),
       value: '0x0',
     });
