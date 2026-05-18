@@ -169,7 +169,7 @@
     "slug": "direct-transfer",
     "name": "Direct Transfer",
     "logo": "/app-logos/direct-transfer.png",
-    "url": "/apps/direct-transfer",
+    "url": "https://circles.gnosis.io/apps/direct-transfer",
     "description": "Send CRC you hold directly to others, with auto wrap/unwrap routing across ERC1155 and ERC20 forms.",
     "tags": [
       "payments",
