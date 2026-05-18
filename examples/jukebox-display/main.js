@@ -35,12 +35,18 @@ const nowArtist = document.getElementById('now-playing-artist');
 const nowAttribution = document.getElementById('now-playing-attribution');
 const upNextList = document.getElementById('up-next-list');
 const widgetIframe = document.getElementById('sc-widget');
+const startOverlay = document.getElementById('start-overlay');
+const startBtn = document.getElementById('start-btn');
 
 // ─── State ──────────────────────────────────────────────────
 let allEntries = []; // chronologically sorted
 let currentIndex = -1;
 let widget = null;
 let widgetReady = false;
+// Browsers block autoplay-with-sound until a user gesture. We stay parked
+// until the operator taps "start" once; after that the page has a gesture
+// and every subsequent track auto-plays.
+let started = false;
 const profileCache = new Map();
 
 // ─── SDK + RPC ──────────────────────────────────────────────
@@ -240,7 +246,7 @@ async function refreshFromChain() {
 }
 
 function advanceIfIdle() {
-  if (!widgetReady) return;
+  if (!widgetReady || !started) return;
   const next = currentIndex + 1;
   if (next < allEntries.length) {
     playEntry(next);
@@ -322,12 +328,26 @@ async function renderUpNext() {
 }
 
 // ─── Boot ───────────────────────────────────────────────────
+function beginPlayback() {
+  if (started) return;
+  started = true;
+  if (startOverlay) startOverlay.classList.add('hidden');
+  // Runs inside the click handler (a user gesture), so the widget's audio
+  // is now allowed to start. Kick off whatever is queued.
+  advanceIfIdle();
+}
+
 function start() {
   setStatus('idle', 'Loading queue…');
   renderIdle();
   initWidget();
   refreshFromChain();
   setInterval(refreshFromChain, POLL_INTERVAL_MS);
+
+  if (startBtn) startBtn.addEventListener('click', beginPlayback);
+  if (startOverlay) startOverlay.addEventListener('click', beginPlayback);
+  // A TV remote / keyboard counts as a gesture too.
+  document.addEventListener('keydown', beginPlayback, { once: true });
 }
 
 if (document.readyState === 'loading') {

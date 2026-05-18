@@ -17,6 +17,18 @@
     <div class="scanlines"></div>
     <div class="vignette"></div>
   </div>
+
+  <!-- Browsers block autoplay-with-sound until a user gesture. This TV
+       overlay captures one tap so the room speakers can start. -->
+  <div id="start-overlay" class="start-overlay">
+    <div class="start-inner">
+      <div class="start-mark">📼</div>
+      <div class="start-title">Circles Jukebox</div>
+      <button id="start-btn" class="start-btn" type="button">▶ Tap to start</button>
+      <div class="start-hint">Then it plays every paid request automatically</div>
+    </div>
+  </div>
+
   <div class="stage">
     <header class="stage-header">
       <div class="brand">
@@ -62,7 +74,7 @@
     height="166"
     scrolling="no"
     frameborder="no"
-    allow="autoplay"
+    allow="autoplay; encrypted-media"
     src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/&color=%230e00a8&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false">
   </iframe>
 

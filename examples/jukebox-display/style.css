@@ -379,6 +379,54 @@ body {
   pointer-events: none;
 }
 
+/* ── Tap-to-start overlay ── */
+.start-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(120% 100% at 50% 40%, rgba(26,5,51,0.86), rgba(5,1,15,0.96));
+  backdrop-filter: blur(4px);
+}
+.start-overlay.hidden { display: none; }
+.start-inner { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.start-mark { font-size: 64px; filter: drop-shadow(0 0 16px var(--cyan)); }
+.start-title {
+  font-family: "Monoton", cursive;
+  font-size: clamp(36px, 6vw, 76px);
+  color: #fff;
+  text-shadow: 0 0 8px #fff, 0 0 22px var(--cyan), 0 0 46px var(--mag), 0 0 90px var(--mag);
+  animation: neonFlicker 4.2s infinite;
+}
+.start-btn {
+  font-family: "Orbitron", sans-serif;
+  font-weight: 900;
+  font-size: clamp(20px, 2.6vw, 32px);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 18px 46px;
+  border-radius: 999px;
+  background: rgba(255,43,209,0.12);
+  border: 2px solid var(--mag);
+  box-shadow: 0 0 22px rgba(255,43,209,0.7), inset 0 0 18px rgba(255,43,209,0.3);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.start-btn:hover {
+  transform: scale(1.04);
+  box-shadow: 0 0 34px rgba(255,43,209,0.95), inset 0 0 24px rgba(255,43,209,0.45);
+}
+.start-hint {
+  font-size: 15px;
+  text-transform: uppercase;
+  letter-spacing: 0.24em;
+  color: var(--cyan);
+  text-shadow: 0 0 12px rgba(5,217,232,0.8);
+}
+
 @media (max-width: 960px) {
   .stage-main { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
   .now-playing-art-wrap { width: min(44vh, 320px); }
