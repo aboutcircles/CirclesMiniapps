@@ -50,6 +50,41 @@
 	const recipientAddress = $derived(page.url.searchParams.get('address') ?? null);
 	const showTrust = $derived(page.url.searchParams.has('trust'));
 
+	// ----- Theme override -----
+	// ?theme_color=<hex> (with or without #, 3 or 6 digits) overrides the
+	// primary accent. Border / hover / 3D shadow shades are derived from it.
+	function parseHex(input: string | null): { r: number; g: number; b: number } | null {
+		if (!input) return null;
+		let h = input.trim().replace(/^#/, '');
+		if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+		if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+		return {
+			r: parseInt(h.slice(0, 2), 16),
+			g: parseInt(h.slice(2, 4), 16),
+			b: parseInt(h.slice(4, 6), 16)
+		};
+	}
+	function shade({ r, g, b }: { r: number; g: number; b: number }, factor: number): string {
+		const adj = (c: number) => Math.max(0, Math.min(255, Math.round(c * factor)));
+		const toHex = (c: number) => c.toString(16).padStart(2, '0');
+		return `#${toHex(adj(r))}${toHex(adj(g))}${toHex(adj(b))}`;
+	}
+	const themeRgb = $derived(parseHex(page.url.searchParams.get('theme_color')));
+	const themeVars = $derived.by(() => {
+		if (!themeRgb) return '';
+		const primary = shade(themeRgb, 1);
+		const hover = shade(themeRgb, 1.08);
+		const border = shade(themeRgb, 0.88);
+		const shadow = shade(themeRgb, 0.7);
+		return [
+			`--theme-primary:${primary}`,
+			`--theme-primary-hover:${hover}`,
+			`--theme-border:${border}`,
+			`--theme-shadow:${shadow}`,
+			`--theme-shadow-rgba:${themeRgb.r},${themeRgb.g},${themeRgb.b}`
+		].join(';');
+	});
+
 	// ----- Dynamic group / org resolution -----
 	// ?group=<key> is required. The key must match an entry in GROUP_CONFIGS above.
 	const activeConfig = $derived(
@@ -330,26 +365,32 @@
 	<title>Appreciations</title>
 </svelte:head>
 
-<div class="page">
+<div class="page" style={themeVars}>
 	<div class="card">
 
 
 		<!-- ===== KUDOS ===== -->
 			{#if recipientAddress}
 				{@const recipientProfile = getProfile(recipientAddress)}
+				<div class="kudos-msg-wrap">
+					<input
+						class="kudos-msg-input"
+						type="text"
+						maxlength="120"
+						placeholder="Add a message… (optional)"
+						bind:value={kudosMessage}
+						onkeydown={(e) => { if (e.key === 'Enter') openKudos(e as unknown as MouseEvent); }}
+					/>
+				</div>
 				<a
 					class="kudos-btn"
 					href={kudosHref}
 					target="_blank"
 					rel="noopener noreferrer"
+					onclick={openKudos}
 				>
-					<div class="kudos-top-row" role="button" tabindex="0" onclick={openKudos} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') openKudos(e as unknown as MouseEvent); }}>
-						<span class="kudos-arrow">
-							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-								<path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
-							</svg>
-						</span>
-						<span class="kudos-label">Send CRC to</span>
+					<div class="kudos-top-row">
+						<span class="kudos-label">Donate CRC to</span>
 						<div class="kudos-avatar">
 							{#if recipientProfile.imageUrl}
 								<img
@@ -368,25 +409,11 @@
 							{/if}
 						</div>
 						<strong class="kudos-name">{recipientProfile.name ?? recipientAddress.slice(0, 8) + '…' + recipientAddress.slice(-6)}</strong>
-					</div>
-					<div class="kudos-input-row">
-						<input
-							class="kudos-msg-input"
-							type="text"
-							maxlength="120"
-							placeholder="Add a message… (optional)"
-							bind:value={kudosMessage}
-							onclick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-							onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); openKudos(e as unknown as MouseEvent); } }}
-						/>
-						<!--<div class="kudos-suggestions">
-							{#each ['🙏', '🌟', '💪', '❤️'] as emoji}
-								<button
-									class="kudos-suggestion"
-									onclick={(e) => { e.preventDefault(); e.stopPropagation(); kudosMessage = (kudosMessage + emoji).slice(0, 120); }}
-								>{emoji}</button>
-							{/each}
-						</div>-->
+						<span class="kudos-arrow">
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+								<path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+							</svg>
+						</span>
 					</div>
 				</a>
 
@@ -398,7 +425,7 @@
 							<button class="qr-close" onclick={() => { showQr = false; }}>✕</button>
 							<div class="qr-header">
 								<span class="qr-icon">📱</span>
-								<p class="qr-title">Scan to send CRC</p>
+								<p class="qr-title">Scan to Donate CRC</p>
 								<p class="qr-subtitle">Point your phone camera at the code</p>
 							</div>
 							<div class="qr-frame">
@@ -560,7 +587,7 @@
 
 	.card {
 		background: #ffffff;
-		border-radius: 24px;
+		border-radius: 0.25rem;
 		box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
 		max-width: 480px;
 		width: 100%;
@@ -598,7 +625,7 @@
 		width: 18px;
 		height: 18px;
 		border: 2.5px solid #ddd;
-		border-top-color: #00af5e;
+		border-top-color: var(--theme-primary, #00af5e);
 		border-radius: 50%;
 		animation: spin 0.75s linear infinite;
 		flex-shrink: 0;
@@ -616,24 +643,56 @@
 	.row-even { background: #ffffff; }
 	.row-odd  { background: #f9f9f9; }
 
-	/* ----- Kudos button ----- */
+	/* ----- Kudos message input (above the button) ----- */
+	.kudos-msg-wrap {
+		margin-bottom: 14px;
+	}
+
+	.kudos-msg-input {
+		width: 100%;
+		box-sizing: border-box;
+		padding: 12px 14px;
+		border: 1.5px solid #ddd;
+		border-radius: 0.25rem;
+		font-size: 0.95rem;
+		color: #1a1a1a;
+		background: #ffffff;
+		outline: none;
+		transition: border-color 0.15s, box-shadow 0.15s;
+	}
+
+	.kudos-msg-input:focus {
+		border-color: var(--theme-primary, #00af5e);
+		box-shadow: 0 0 0 3px rgba(0, 175, 94, 0.15);
+	}
+
+	.kudos-msg-input::placeholder {
+		color: #999;
+	}
+
+	/* ----- Kudos donate button ----- */
 	.kudos-btn {
-		display: flex;
-		flex-direction: column;
-		align-items: stretch;
-		gap: 0;
-		background: #00af5e;
+		display: block;
+		background: var(--theme-primary, #00af5e);
 		color: #ffffff;
-		border-radius: 16px;
+		border-radius: 0.25rem;
 		padding: 0;
 		text-decoration: none;
 		margin-bottom: 20px;
-		transition: opacity 0.15s;
 		cursor: pointer;
-		overflow: hidden;
+		border: 1px solid var(--theme-border, #009a52);
+		box-shadow: 0 4px 0 var(--theme-shadow, #007a41), 0 6px 14px rgba(var(--theme-shadow-rgba, 0, 122, 65), 0.25);
+		transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s;
 	}
 
-	.kudos-btn:hover { opacity: 0.88; }
+	.kudos-btn:hover {
+		background: var(--theme-primary-hover, #00bb66);
+	}
+
+	.kudos-btn:active {
+		transform: translateY(2px);
+		box-shadow: 0 2px 0 var(--theme-shadow, #007a41), 0 3px 8px rgba(var(--theme-shadow-rgba, 0, 122, 65), 0.25);
+	}
 
 	.kudos-top-row {
 		display: flex;
@@ -641,17 +700,9 @@
 		align-items: center;
 		justify-content: center;
 		flex-wrap: nowrap;
-		gap: 8px;
-		padding: 14px 16px;
+		gap: 10px;
+		padding: 16px 20px;
 		min-width: 0;
-	}
-
-	.kudos-input-row {
-		border-top: 1px solid rgba(255, 255, 255, 0.25);
-		padding: 10px 14px;
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
 	}
 
 	.kudos-arrow {
@@ -659,6 +710,7 @@
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
+		margin-left: 2px;
 	}
 
 	.kudos-label {
@@ -728,33 +780,10 @@
 		flex-shrink: 0;
 	}
 
-	/* ----- Kudos message input (inside button) ----- */
-	.kudos-msg-input {
-		width: 100%;
-		box-sizing: border-box;
-		padding: 8px 12px;
-		border: none;
-		border-radius: 8px;
-		font-size: 0.88rem;
-		color: #1a1a1a;
-		background: rgba(255, 255, 255, 0.92);
-		outline: none;
-		transition: background 0.15s, box-shadow 0.15s;
-	}
-
-	.kudos-msg-input:focus {
-		background: #ffffff;
-		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8);
-	}
-
-	.kudos-msg-input::placeholder {
-		color: #888;
-	}
-
 	/* ----- Appreciations ----- */
 	.tx-list {
 		border: 1.5px solid #ddd;
-		border-radius: 14px;
+		border-radius: 0.25rem;
 		overflow: hidden;
 		margin-bottom: 4px;
 	}
@@ -939,7 +968,7 @@
 
 	.qr-card {
 		background: #ffffff;
-		border-radius: calc(var(--qr-size) * 0.11);
+		border-radius: 0.25rem;
 		padding: var(--card-pad);
 		display: flex;
 		flex-direction: column;
@@ -973,8 +1002,8 @@
 	}
 
 	.qr-close:hover {
-		background: #e0e0e0;
-		color: #101010;
+		background: var(--theme-primary, #00af5e);
+		color: #ffffff;
 	}
 
 	.qr-header {
@@ -996,6 +1025,7 @@
 		margin: 0;
 		font-size: calc(var(--qr-size) * 0.075);
 		font-weight: 700;
+		letter-spacing: -0.01em;
 		color: #101010;
 		text-align: center;
 	}
@@ -1009,7 +1039,7 @@
 
 	.qr-frame {
 		background: #f5f5f5;
-		border-radius: calc(var(--qr-size) * 0.073);
+		border-radius: 0.25rem;
 		padding: var(--qr-pad);
 		margin-bottom: var(--gap-md);
 	}
@@ -1017,7 +1047,7 @@
 	.qr-img {
 		width: var(--qr-size);
 		height: var(--qr-size);
-		border-radius: calc(var(--qr-size) * 0.027);
+		border-radius: 0;
 		display: block;
 	}
 
@@ -1027,16 +1057,23 @@
 		box-sizing: border-box;
 		text-align: center;
 		padding: calc(var(--qr-size) * 0.045) calc(var(--qr-size) * 0.073);
-		background: #f0faf5;
-		border-radius: calc(var(--qr-size) * 0.045);
+		background: var(--theme-primary, #00af5e);
+		border: 1px solid var(--theme-border, #009a52);
+		border-radius: 0.25rem;
+		box-shadow: 0 4px 0 var(--theme-shadow, #007a41), 0 6px 14px rgba(var(--theme-shadow-rgba, 0, 122, 65), 0.25);
 		font-size: calc(var(--qr-size) * 0.06);
 		font-weight: 600;
-		color: #00874a;
+		color: #ffffff;
 		text-decoration: none;
-		transition: background 0.12s;
+		transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s;
 	}
 
 	.qr-link-btn:hover {
-		background: #e0f5eb;
+		background: var(--theme-primary-hover, #00bb66);
+	}
+
+	.qr-link-btn:active {
+		transform: translateY(2px);
+		box-shadow: 0 2px 0 var(--theme-shadow, #007a41), 0 3px 8px rgba(var(--theme-shadow-rgba, 0, 122, 65), 0.25);
 	}
 </style>
