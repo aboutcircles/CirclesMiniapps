@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Personal CRC Mint</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="app-header">
+      <h1>Personal CRC Mint</h1>
+      <div id="wallet-status" class="wallet-status">Not connected</div>
+    </header>
+
+    <main id="main-content">
+      <div id="disconnected-view" class="view">
+        <div class="card">
+          <p class="lead">Connect your wallet to mint the personal Circles you have accrued.</p>
+          <p class="muted">Every registered human avatar accrues 1 CRC per hour. This app lets you claim the amount that has built up since your last mint.</p>
+        </div>
+      </div>
+
+      <div id="connected-view" class="view hidden">
+        <div class="card">
+          <div class="row">
+            <span class="muted">Avatar</span>
+            <span id="profile-name" class="strong">&mdash;</span>
+          </div>
+          <div class="row">
+            <span class="muted">Address</span>
+            <span id="account-address" class="address">&mdash;</span>
+          </div>
+          <div class="row">
+            <span class="muted">Personal CRC balance</span>
+            <span id="balance" class="mono">&mdash;</span>
+          </div>
+        </div>
+
+        <div class="card mint-card">
+          <div class="mint-label muted">Available to mint now</div>
+          <div id="mintable-amount" class="mint-amount">&mdash;</div>
+          <div id="mint-meta" class="muted small"></div>
+
+          <button id="mint-btn" disabled>Mint personal CRC</button>
+          <button id="refresh-btn" class="btn-secondary" disabled>Refresh</button>
+
+          <div id="result" class="result"></div>
+        </div>
+
+        <div id="not-human" class="card warn-card hidden">
+          <span class="pill pill-warn">Not eligible</span>
+          <p>This address is not a registered Circles human avatar, so personal CRC minting is unavailable. Only human avatars accrue personal Circles.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
