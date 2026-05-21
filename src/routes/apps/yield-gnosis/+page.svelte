@@ -1,16 +1,46 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import { isMiniappMode, onWalletChange } from '@aboutcircles/miniapp-sdk';
+	import { Sdk } from '@aboutcircles/sdk';
 	import { fetchAllBalances } from './lib/balances.js';
 	import { fetchAaveApys, type PoolData } from './lib/defilama.js';
 	import { getATokenAddress, getATokenBalance } from './lib/aave.js';
 	import type { AssetInfo } from './lib/types.js';
 	import DepositedTable from './components/DepositedTable.svelte';
 	import AssetTable from './components/AssetTable.svelte';
+	import CirclesProfile from './components/CirclesProfile.svelte';
+	import InviteButton from './components/InviteButton.svelte';
 
 	let phase   = $state<'idle' | 'loading' | 'table'>('idle');
 	let address = $state<`0x${string}` | null>(null);
 	let assets  = $state<AssetInfo[]>([]);
+
+	// Circles identity
+	let profileName     = $state<string | undefined>(undefined);
+	let profileImageUrl = $state<string | undefined>(undefined);
+	let trustCount      = $state(0);
+	let crcBalance      = $state(0);
+
+	let _sdk: Sdk | null = null;
+	function getSdk(): Sdk {
+		if (!_sdk) _sdk = new Sdk();
+		return _sdk;
+	}
+
+	async function loadProfile(addr: `0x${string}`) {
+		const sdk = getSdk();
+		const [prof, trusted, bal] = await Promise.allSettled([
+			sdk.rpc.profile.getProfileByAddress(addr),
+			sdk.rpc.trust.getTrustedBy(addr),
+			sdk.rpc.balance.getTotalBalance(addr)
+		]);
+		if (prof.status === 'fulfilled' && prof.value) {
+			profileName     = prof.value.name      ?? undefined;
+			profileImageUrl = prof.value.imageUrl  ?? undefined;
+		}
+		if (trusted.status === 'fulfilled') trustCount = trusted.value.length;
+		if (bal.status === 'fulfilled')     crcBalance = Number(bal.value) / 1e18;
+	}
 
 	let _loadId = 0;
 
@@ -69,10 +99,12 @@
 			unsubscribe = onWalletChange(async (addr) => {
 				if (!addr) { phase = 'idle'; address = null; return; }
 				address = addr as `0x${string}`;
+				loadProfile(address);
 				await loadData(address);
 			});
 		} else {
 			address = '0x0000000000000000000000000000000000000001' as `0x${string}`;
+			loadProfile(address);
 			loadData(address);
 		}
 	});
@@ -96,10 +128,13 @@
 				</p>
 			</div>
 			{#if address}
-				<div class="addr-pill">
-					<div class="addr-dot"></div>
-					<span class="addr-text">{address.slice(0,6)}…{address.slice(-4)}</span>
-				</div>
+				<CirclesProfile
+					{address}
+					name={profileName}
+					imageUrl={profileImageUrl}
+					{trustCount}
+					{crcBalance}
+				/>
 			{/if}
 		</header>
 
@@ -119,6 +154,7 @@
 			/>
 			<div class="divider"></div>
 			<AssetTable {assets} />
+			<InviteButton address={address!} />
 		{/if}
 
 	</div>
@@ -150,10 +186,7 @@
 	.title     { font-size:20px; font-weight:900; color:var(--text); }
 	.subtitle  { display:flex; align-items:center; gap:4px; font-size:12px; color:var(--text-muted); margin-top:2px; }
 	.aave-icon { height:12px; width:12px; }
-	.addr-pill { display:flex; align-items:center; gap:8px; padding:6px 12px; border-radius:999px; background:var(--surface); border:1px solid var(--border); }
-	.addr-dot  { width:8px; height:8px; border-radius:50%; background:var(--green); }
-	.addr-text { font-family:monospace; font-size:12px; font-weight:600; color:var(--text-muted); }
-	.spinner-wrap  { display:flex; flex-direction:column; align-items:center; gap:16px; padding:96px 0; text-align:center; }
+.spinner-wrap  { display:flex; flex-direction:column; align-items:center; gap:16px; padding:96px 0; text-align:center; }
 	.spinner       { width:48px; height:48px; border-radius:50%; border:2px solid transparent; border-top-color:var(--blue); border-right-color:var(--blue); animation:spin .8s linear infinite; }
 	.spinner-label { font-size:14px; color:var(--text-muted); }
 	.divider { margin:16px 0; border-top:1px solid var(--border); }
