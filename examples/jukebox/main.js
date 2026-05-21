@@ -328,23 +328,6 @@ async function payForSong(song) {
     const needToday = amountWei > have ? amountWei - have : 0n;
     const mintToday = needToday + needToday / 1000n + 1n; // +0.1% wrap-rounding slack
 
-    // Preflight personal CRC (ERC-1155, tokenId == uint256(avatar)) so we can
-    // fail with a clear message instead of an opaque on-chain revert.
-    const personalBal = await readAny({
-      address: getAddress(HUB_V2_ADDRESS),
-      abi: HUB_V2_ABI,
-      functionName: 'balanceOf',
-      args: [user, BigInt(user)],
-    });
-    if (personalBal !== null && personalBal < mintToday) {
-      const haveCrc = (Number(personalBal) / 1e18).toFixed(2);
-      const needCrc = (Number(mintToday) / 1e18).toFixed(2);
-      throw new Error(
-        `Not enough personal CRC to mint - you have ~${haveCrc}, need ~${needCrc}. ` +
-        'Top up CRC in the Circles wallet first.'
-      );
-    }
-
     setConfirmStatus('Confirm in your wallet: mint + wrap + pay…', 'info');
     txs.push({
       to: getAddress(HUB_V2_ADDRESS),

@@ -218,7 +218,9 @@ async function refreshFromChain() {
   try {
     const entries = await fetchQueueEntries();
     allEntries = entries;
-    setStatus('live', `${entries.length} requests on-chain`);
+        const played = currentIndex + 1;
+        const remaining = entries.length - played;
+        setStatus('live', remaining > 0 ? `${remaining} queued` : 'Queue empty');
 
     // On first load, align currentIndex with the saved playhead.
     if (currentIndex === -1) {
