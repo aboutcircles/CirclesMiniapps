@@ -9,7 +9,6 @@
 	import DepositedTable from './components/DepositedTable.svelte';
 	import AssetTable from './components/AssetTable.svelte';
 	import CirclesProfile from './components/CirclesProfile.svelte';
-	import InviteButton from './components/InviteButton.svelte';
 
 	let phase   = $state<'idle' | 'loading' | 'table'>('idle');
 	let address = $state<`0x${string}` | null>(null);
@@ -158,7 +157,6 @@
 			/>
 			<div class="divider"></div>
 			<AssetTable {assets} />
-			<InviteButton address={address!} />
 		{/if}
 
 	</div>
