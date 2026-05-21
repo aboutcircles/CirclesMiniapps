@@ -35,8 +35,12 @@
 			sdk.rpc.balance.getTotalBalance(addr)
 		]);
 		if (prof.status === 'fulfilled' && prof.value) {
-			profileName     = prof.value.name      ?? undefined;
-			profileImageUrl = prof.value.imageUrl  ?? undefined;
+			profileName = prof.value.name ?? undefined;
+			const p = prof.value as Record<string, unknown>;
+			const raw = (p.picture ?? p.imageUrl ?? null) as string | null;
+			profileImageUrl = raw?.startsWith('ipfs://')
+				? raw.replace('ipfs://', 'https://ipfs.io/ipfs/')
+				: raw ?? undefined;
 		}
 		if (trusted.status === 'fulfilled') trustCount = trusted.value.length;
 		if (bal.status === 'fulfilled')     crcBalance = Number(bal.value) / 1e18;
