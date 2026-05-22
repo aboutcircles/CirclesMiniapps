@@ -83,11 +83,12 @@ function toast(message, kind = '') {
 function copyToClipboard(text, btn) {
   navigator.clipboard.writeText(text).then(() => {
     if (btn) {
+      const orig = btn.textContent;
       btn.classList.add('copied');
       btn.textContent = 'Copied!';
       setTimeout(() => {
         btn.classList.remove('copied');
-        btn.textContent = 'Copy';
+        btn.textContent = orig;
       }, 1500);
     }
     toast('Copied to clipboard', 'success');
@@ -498,16 +499,16 @@ function renderDetail(nft) {
   idRow.appendChild(el('span', 'meta-value', tokenId));
   info.appendChild(idRow);
 
-  // Blockscout link
+  // Blockscout link (copy-only, no external navigation in miniapp iframe)
   if (contractAddr && tokenId) {
     const linkRow = el('div', 'meta-row');
     linkRow.appendChild(el('span', 'meta-label', 'Explorer'));
     const blockscoutUrl = `${BLOCKSCOUT}/token/${contractAddr}/instance/${tokenId}`;
-    linkRow.appendChild(el('a', {
-      class: 'meta-value',
-      html: `${BLOCKSCOUT}/token/…/${tokenId}`,
-      attrs: { href: blockscoutUrl, target: '_blank', rel: 'noopener' },
-    }));
+    const urlText = el('span', 'meta-value', `${BLOCKSCOUT}/token/…/${tokenId}`);
+    linkRow.appendChild(urlText);
+    const copyBtn = el('button', { class: 'copy-btn', text: '📋' });
+    copyBtn.addEventListener('click', () => copyToClipboard(blockscoutUrl, copyBtn));
+    linkRow.appendChild(copyBtn);
     info.appendChild(linkRow);
   }
 
