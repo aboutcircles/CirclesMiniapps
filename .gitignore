@@ -24,7 +24,10 @@ Thumbs.db
 *.swp
 
 # llm files
-.claude/
+.claude/*
+.agents/*
+!.claude/commands
 .context/
 AGENT.md
 CLAUDE.md
+.vercel
