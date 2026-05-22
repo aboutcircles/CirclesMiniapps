@@ -3,3 +3,8 @@ dist
 .env
 .env.local
 .vercel
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
