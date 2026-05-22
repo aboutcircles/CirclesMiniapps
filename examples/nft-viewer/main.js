@@ -11,7 +11,7 @@ import { getAddress } from 'viem';
 // Constants
 // ============================================================================
 
-const SAFE_API_BASE = 'https://safe-transaction-gnosis.safe.global';
+const SAFE_API_BASE = 'https://safe-transaction-gnosis-chain.safe.global';
 const IPFS_GATEWAY = 'https://ipfs.io/ipfs';
 const BLOCKSCOUT = 'https://gnosis.blockscout.com';
 
@@ -43,8 +43,11 @@ const state = {
 
 function el(tag, opts, ...children) {
   const node = document.createElement(tag);
-  if (!opts) return node;
-  if (typeof opts === 'string') { node.className = opts; return node; }
+  if (!opts) {
+    // no opts, just append children
+  } else if (typeof opts === 'string') {
+    node.className = opts;
+  } else {
   if (opts.class) node.className = opts.class;
   if (opts.id) node.id = opts.id;
   if (opts.html) node.innerHTML = opts.html;
@@ -58,6 +61,7 @@ function el(tag, opts, ...children) {
     for (const [ev, fn] of Object.entries(opts.on)) {
       node.addEventListener(ev, fn);
     }
+  }
   }
   for (const c of children.flat(Infinity).filter(Boolean)) {
     node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
@@ -207,16 +211,80 @@ function isGnosisNft(nft) {
 // Safe Transaction Service
 // ============================================================================
 
-async function fetchCollectibles(safeAddress) {
-  const url = `${SAFE_API_BASE}/api/v1/safes/${safeAddress}/collectibles/`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Safe API returned ${res.status}: ${res.statusText}`);
+async function fetchWithRetry(url, opts = {}, retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    const res = await fetch(url, opts);
+    if (res.ok) return res;
+    if (res.status === 429 && i < retries - 1) {
+      const delay = 1000 * Math.pow(2, i); // 1s, 2s, 4s
+      await new Promise(r => setTimeout(r, delay));
+      continue;
+    }
+    return res; // non-429 or exhausted retries
   }
-  const data = await res.json();
-  // API returns an array directly, or may wrap in { results: [...] }
-  const items = Array.isArray(data) ? data : (data.results || []);
-  return items.filter((nft) => nft != null);
+}
+
+async function fetchMetadata(uri) {
+  if (!uri) return null;
+  try {
+    const httpUrl = ipfsToHttp(uri);
+    const res = await fetchWithRetry(httpUrl || uri, { signal: AbortSignal.timeout(8000) }, 2);
+    if (!res || !res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+// Limit concurrency of async tasks
+async function mapConcurrent(items, fn, limit = 3) {
+  const results = [];
+  let index = 0;
+  async function worker() {
+    while (index < items.length) {
+      const i = index++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+  return results;
+}
+
+async function fetchCollectibles(safeAddress) {
+  const allItems = [];
+  let url = `${SAFE_API_BASE}/api/v2/safes/${safeAddress}/collectibles/?limit=100`;
+
+  while (url) {
+    const res = await fetchWithRetry(url);
+    if (!res || !res.ok) {
+      throw new Error(`Safe API returned ${res ? res.status : 'network error'}: ${res ? res.statusText : 'fetch failed'}`);
+    }
+    const data = await res.json();
+    // v2 returns { count, next, previous, results: [...] }
+    const items = Array.isArray(data) ? data : (data.results || []);
+    allItems.push(...items.filter((nft) => nft != null));
+    url = data.next || null;
+  }
+
+  // Fetch metadata for each NFT (max 3 concurrent) to resolve images and names
+  const enriched = await mapConcurrent(allItems, async (nft) => {
+    // Already has image from Safe API
+    if (nft.imageUri || nft.metadata?.image) return nft;
+
+    // Fetch from token URI
+    const meta = await fetchMetadata(nft.uri);
+    if (meta) {
+      nft.name = nft.name || meta.name || null;
+      nft.description = nft.description || meta.description || null;
+      nft.imageUri = nft.imageUri || meta.image || meta.image_url || null;
+      if (!nft.metadata) nft.metadata = {};
+      nft.metadata.image = nft.metadata.image || meta.image || null;
+      nft.metadata.image_url = nft.metadata.image_url || meta.image_url || null;
+    }
+    return nft;
+  }, 3);
+
+  return enriched;
 }
 
 // ============================================================================
@@ -473,10 +541,14 @@ function renderDetail(nft) {
 }
 
 function renderError(message) {
-  render(el('div', 'empty-state',
+  const container = el('div', 'empty-state',
     el('span', { class: 'icon' }, '⚠️'),
     el('p', {}, message),
-  ));
+  );
+  const retryBtn = el('button', { class: 'btn btn-primary', style: 'margin-top:12px;' }, 'Retry');
+  retryBtn.addEventListener('click', () => loadNfts());
+  container.appendChild(retryBtn);
+  render(container);
 }
 
 function renderCurrentView() {
@@ -567,10 +639,19 @@ onWalletChange((address) => {
   if (address) {
     loadNfts();
   } else {
+    // Standalone/dev mode: use ?wallet=0x... param if no miniapp wallet
+    const urlParams = new URLSearchParams(window.location.search);
+    const devWallet = urlParams.get('wallet');
+    if (devWallet) {
+      state.wallet = devWallet;
+      updateWalletChip(devWallet);
+      loadNfts();
+    } else {
     state.nfts = [];
     render(el('div', 'empty-state',
       el('span', { class: 'icon' }, '👛'),
       el('p', {}, 'Connect your wallet to view NFTs'),
     ));
+    }
   }
 });
