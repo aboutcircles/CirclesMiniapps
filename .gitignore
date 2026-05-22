@@ -27,3 +27,4 @@ Thumbs.db
 .agents/*
 !.claude/commands
 !.agents/docs
+.vercel
