@@ -193,7 +193,7 @@
   {
     "slug": "hunch",
     "name": "Hunch",
-    "logo": "",
+    "logo": "/app-logos/hunch.svg",
     "url": "https://hunch-teleshops-projects.vercel.app/",
     "description": "A crowd plays chess against a bot — every move a trust-gated, 1-CRC staked vote among Circles-verified avatars.",
     "tags": [
