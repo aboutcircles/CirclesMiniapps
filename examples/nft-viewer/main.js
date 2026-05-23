@@ -80,8 +80,19 @@ function toast(message, kind = '') {
   setTimeout(() => { t.className = 'toast'; }, 4500);
 }
 
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.cssText = 'position:fixed;opacity:0;left:-9999px';
+  document.body.appendChild(ta);
+  ta.select();
+  const ok = document.execCommand('copy');
+  document.body.removeChild(ta);
+  return ok;
+}
+
 function copyToClipboard(text, btn) {
-  navigator.clipboard.writeText(text).then(() => {
+  const onSuccess = () => {
     if (btn) {
       const orig = btn.textContent;
       btn.classList.add('copied');
@@ -92,7 +103,18 @@ function copyToClipboard(text, btn) {
       }, 1500);
     }
     toast('Copied to clipboard', 'success');
-  }).catch(() => toast('Failed to copy', 'error'));
+  };
+  const onFail = () => toast('Failed to copy', 'error');
+
+  if (navigator.clipboard?.writeText) {
+    navigator.clipboard.writeText(text).then(onSuccess).catch(() => {
+      if (fallbackCopy(text)) onSuccess();
+      else onFail();
+    });
+  } else {
+    if (fallbackCopy(text)) onSuccess();
+    else onFail();
+  }
 }
 
 // ============================================================================
