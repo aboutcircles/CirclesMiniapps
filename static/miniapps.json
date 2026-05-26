@@ -189,5 +189,18 @@
       "template"
     ],
     "category": "garage"
+  },
+  {
+    "slug": "yield-gnosis",
+    "name": "Yield",
+    "logo": "/app-logos/yield-gnosis.png",
+    "url": "https://yield-gnosis-mini-app.vercel.app/",
+    "description": "Earn yield on your stablecoins via Aave v3 on Gnosis Chain. Tip the builder with CRC.",
+    "tags": [
+      "defi",
+      "yield",
+      "tools"
+    ],
+    "category": "garage"
   }
 ]
