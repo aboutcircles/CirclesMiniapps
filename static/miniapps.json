@@ -189,5 +189,14 @@
       "template"
     ],
     "category": "garage"
+  },
+  {
+    "slug": "word-circles",
+    "name": "Word Circles",
+    "logo": "/app-logos/word-circles.png",
+    "url": "https://word-circles.vercel.app/",
+    "description": "A daily Wordle-style game with on-chain leaderboard commitments and PvP escrow on Gnosis chain.",
+    "tags": ["game"],
+    "category": "garage"
   }
 ]
