@@ -1,7 +1,10 @@
 <script lang="ts">
     import { onMount } from "svelte";
+    import { page } from "$app/stores";
 
     let isOffline = $state(false);
+
+    const isHidden = $derived($page.url.pathname.startsWith("/pilots/kudos-ga"));
 
     onMount(() => {
         const sync = () => {
@@ -19,7 +22,7 @@
     });
 </script>
 
-{#if isOffline}
+{#if isOffline && !isHidden}
     <div class="offline-notice" role="status" aria-live="polite">
         You&apos;re offline. Most features won't work offline. Please connect
         back to internet to continue using this as a PWA.

@@ -5,10 +5,17 @@
 	import { wallet } from '$lib/wallet.svelte.ts';
 	import IframeHost from '$lib/IframeHost.svelte';
 	import AppNavigation from '$lib/AppNavigation.svelte';
+	import {
+		startMiniappSession,
+		enrichMiniappSession,
+		pauseMiniappSession,
+		resumeMiniappSession,
+		endMiniappSession
+	} from '$lib/analytics';
 
 	const baseUrl = import.meta.env.VITE_BASE_URL;
 
-	type MiniApp = { slug?: string; name: string; logo: string; url: string; description?: string; tags: string[]; isHidden?: boolean };
+	type MiniApp = { slug?: string; name: string; logo: string; url: string; description?: string; tags: string[]; isHidden?: boolean; category?: string };
 
 	let app: MiniApp | null = $state(null);
 	let notFound = $state(false);
@@ -24,6 +31,15 @@
 		window.addEventListener('online', syncOnlineState);
 		window.addEventListener('offline', syncOnlineState);
 
+		startMiniappSession($page.params.slug as string);
+
+		const onVisibility = () => {
+			if (document.visibilityState === 'hidden') pauseMiniappSession();
+			else resumeMiniappSession();
+		};
+		document.addEventListener('visibilitychange', onVisibility);
+		window.addEventListener('pagehide', endMiniappSession);
+
 		wallet.autoConnectAndPick();
 
 		fetch('/miniapps.json')
@@ -34,6 +50,7 @@
 				if (found) {
 					app = found;
 					iframeSrc = found.url;
+					enrichMiniappSession(found.name, found.category);
 				} else {
 					notFound = true;
 				}
@@ -45,6 +62,9 @@
 		return () => {
 			window.removeEventListener('online', syncOnlineState);
 			window.removeEventListener('offline', syncOnlineState);
+			document.removeEventListener('visibilitychange', onVisibility);
+			window.removeEventListener('pagehide', endMiniappSession);
+			endMiniappSession();
 		};
 	});
 
@@ -75,6 +95,8 @@
 			sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-top-navigation-by-user-activation"
 			onBack={goBack}
 			getAppData={() => $page.url.searchParams.get('data')}
+			enforceTxPolicy={app?.category === 'garage'}
+			analytics={{ slug: $page.params.slug as string, name: app?.name }}
 			{isOffline}
 		>
 			{#snippet offlineState()}

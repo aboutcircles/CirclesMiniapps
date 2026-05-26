@@ -3,6 +3,7 @@
     import { goto } from "$app/navigation";
     import AppNavigation from "$lib/AppNavigation.svelte";
     import { wallet } from "$lib/wallet.svelte";
+    import { trackMiniappClicked } from "$lib/analytics";
 
     const baseUrl = import.meta.env.VITE_BASE_URL;
 
@@ -19,11 +20,14 @@
 
     let apps: MiniApp[] = $state([]);
     let selectedApp: MiniApp | null = $state(null);
+    let selectedAppPosition: number | null = $state(null);
     let showLogout = $state(false);
     let chipEl = $state<HTMLElement>();
 
     function visibleApps(): MiniApp[] {
-        return apps.filter((app) => !app.isHidden && app.category !== "admin");
+        return apps.filter(
+            (app) => !app.isHidden && app.category !== "admin",
+        );
     }
 
     function handleWindowClick(e: MouseEvent) {
@@ -52,6 +56,16 @@
     }
 
     function launchApp(app: MiniApp) {
+        const visible = visibleApps();
+        trackMiniappClicked({
+            slug: app.slug ?? `url:${app.url}`,
+            name: app.name,
+            category: app.category,
+            tags: app.tags,
+            position: selectedAppPosition ?? undefined,
+            total_visible: visible.length,
+            entry_source: app.slug ? "tile_popup" : "playground",
+        });
         if (app.slug) {
             goto(`/miniapps/${app.slug}`);
             return;
@@ -144,8 +158,14 @@
 
     <div class="list-scroll">
         <div class="app-grid">
-            {#each visibleApps() as app (app.url)}
-                <button class="app-tile" onclick={() => (selectedApp = app)}>
+            {#each visibleApps() as app, i (app.url)}
+                <button
+                    class="app-tile"
+                    onclick={() => {
+                        selectedApp = app;
+                        selectedAppPosition = i;
+                    }}
+                >
                     <div class="tile-icon-wrap">
                         {#if app.logo}
                             <img
@@ -312,6 +332,8 @@
         min-width: 0;
         width: 100%;
     }
+
+
 
     .app-tile {
         background: none;

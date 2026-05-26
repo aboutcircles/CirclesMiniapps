@@ -8,6 +8,7 @@
  */
 
 import { wallet } from './wallet.svelte.ts';
+import { checkTransactions } from './txPolicy.ts';
 
 export type PendingRequest = {
 	kind: 'tx' | 'sign';
@@ -44,11 +45,21 @@ export function postTo(source: MessageEventSource | null, data: any) {
  *   (via $page on the route), so it's injected.
  * - `setPending` and `setPendingSource` mutate the page's reactive state for
  *   transaction/signature approvals.
+ * - `enforceTxPolicy` gates the host-side transaction filter. Pages that host
+ *   untrusted iframes (e.g. Circles Garage) pass `true`; pages hosting
+ *   first-party tools leave it at the default `false`.
  */
 export function createMessageHandler(opts: {
 	getAppData: () => string | null;
 	setPending: (req: PendingRequest | null) => void;
 	setPendingSource: (s: MessageEventSource | null) => void;
+	enforceTxPolicy?: boolean;
+	onPolicyRejection?: (info: { reason: string; transactions: any[] }) => void;
+	onAddressRequested?: (info: { hadWallet: boolean }) => void;
+	onTransactionRequested?: (info: { txCount: number; hadWallet: boolean }) => void;
+	onSignatureRequested?: (info: { signatureType: 'erc1271' | 'raw' }) => void;
+	onTxAutoRejected?: (info: { reason: 'no_wallet' | 'invalid_data' }) => void;
+	onSignAutoRejected?: (info: { reason: 'no_wallet' | 'invalid_data' }) => void;
 }) {
 	return function handleMessage(event: MessageEvent) {
 		const { data } = event;
@@ -56,7 +67,9 @@ export function createMessageHandler(opts: {
 
 		switch (data.type) {
 			case 'request_address': {
-				if (wallet.connected) {
+				const hadWallet = wallet.connected;
+				opts.onAddressRequested?.({ hadWallet });
+				if (hadWallet) {
 					postTo(event.source, { type: 'wallet_connected', address: wallet.address });
 				} else {
 					postTo(event.source, { type: 'wallet_disconnected' });
@@ -73,13 +86,29 @@ export function createMessageHandler(opts: {
 			}
 
 			case 'send_transactions': {
-				if (!wallet.connected) {
+				const hadWallet = wallet.connected;
+				const txCount = Array.isArray(data.transactions) ? data.transactions.length : 0;
+				opts.onTransactionRequested?.({ txCount, hadWallet });
+				if (!hadWallet) {
 					postTo(event.source, { type: 'tx_rejected', reason: 'Wallet not connected', requestId: data.requestId });
+					opts.onTxAutoRejected?.({ reason: 'no_wallet' });
 					return;
 				}
 				if (!data.transactions || !Array.isArray(data.transactions)) {
 					postTo(event.source, { type: 'tx_rejected', reason: 'No transactions provided', requestId: data.requestId });
+					opts.onTxAutoRejected?.({ reason: 'invalid_data' });
 					return;
+				}
+				// Reject before showing the approval popup so the user can't accidentally
+				// rubber-stamp a hostile mini-app call. `primaryAddress` matters even in
+				// child-safe mode because the primary is the actual user-op sender.
+				if (opts.enforceTxPolicy) {
+					const policy = checkTransactions(data.transactions, [wallet.address, wallet.primaryAddress]);
+					if (!policy.allowed) {
+						postTo(event.source, { type: 'tx_rejected', reason: policy.reason, requestId: data.requestId });
+						opts.onPolicyRejection?.({ reason: policy.reason, transactions: data.transactions });
+						return;
+					}
 				}
 				opts.setPendingSource(event.source);
 				opts.setPending({ kind: 'tx', transactions: data.transactions, requestId: data.requestId });
@@ -87,19 +116,24 @@ export function createMessageHandler(opts: {
 			}
 
 			case 'sign_message': {
-				if (!wallet.connected) {
+				const hadWallet = wallet.connected;
+				const signatureType: 'erc1271' | 'raw' = data.signatureType === 'raw' ? 'raw' : 'erc1271';
+				opts.onSignatureRequested?.({ signatureType });
+				if (!hadWallet) {
 					postTo(event.source, { type: 'sign_rejected', reason: 'Wallet not connected', requestId: data.requestId });
+					opts.onSignAutoRejected?.({ reason: 'no_wallet' });
 					return;
 				}
 				if (!data.message) {
 					postTo(event.source, { type: 'sign_rejected', reason: 'No message provided', requestId: data.requestId });
+					opts.onSignAutoRejected?.({ reason: 'invalid_data' });
 					return;
 				}
 				opts.setPendingSource(event.source);
 				opts.setPending({
 					kind: 'sign',
 					message: data.message,
-					signatureType: data.signatureType === 'raw' ? 'raw' : 'erc1271',
+					signatureType,
 					requestId: data.requestId
 				});
 				return;

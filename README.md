@@ -4,68 +4,96 @@ A SvelteKit app that hosts mini apps in iframes at `https://<VITE_BASE_URL>/mini
 
 ---
 
-## Submitting Your App to the Marketplace
+## Submitting a Garage Mini App
 
-Apps are listed in [`static/miniapps.json`](static/miniapps.json). To add yours, open a Pull Request against `master` on [aboutcircles/CirclesMiniapps](https://github.com/aboutcircles/CirclesMiniapps).
+This guide is for adding an app to **Circles Garage** — the section of the [Mini Apps marketplace](https://circles.gnosis.io/miniapps) for experimental, community, and hackathon apps, including [Circles Garage competition](https://garage.aboutcircles.com/) entries.
 
-This submission flow is for [**Embedded Mini Apps**](https://docs.aboutcircles.com/miniapps/embedded-mini-apps) that should ship from this repository and appear in the [Mini Apps marketplace](https://circles.gnosis.io/miniapps).
+Garage apps:
 
-For the full contribution guide, see:  
-[https://docs.aboutcircles.com/miniapps/contribute-mini-apps](https://docs.aboutcircles.com/miniapps/contribute-mini-apps)
+- Can be hosted anywhere — your own domain, Vercel, Netlify, GitHub Pages, etc.
+- Run under a stricter host transaction policy (see [Garage transaction policy](#garage-transaction-policy)).
+- Show a "use at your own risk" preview disclaimer to users.
 
-### What should PR contain
+To submit a curated production-grade Embedded Mini App instead, see [docs.aboutcircles.com/miniapps/contribute-mini-apps](https://docs.aboutcircles.com/miniapps/contribute-mini-apps).
 
-Your PR must include the full application code that will run inside Circles Mini Apps.
+### What the PR should contain
 
-At minimum, the PR should include:
+Garage submissions only need a manifest entry — the app itself stays in your repo and deployment.
 
-- The mini app source code in this repository
-- Any local assets required by the app
-- A logo committed to this repository
-- A new entry in `static/miniapps.json`
-- Any setup notes or app-specific dependencies needed to build the repo
+- A new entry in [`static/miniapps.json`](static/miniapps.json) with `"category": "garage"` pointing at your deployed app
+- Optionally a square logo committed under `static/app-logos/`
+- The deployed URL must already be reachable and embeddable in an iframe
 
-If the implementation lives elsewhere and the PR only adds an external URL, it will not be considered.
+Open the PR against `master` on [aboutcircles/CirclesMiniapps](https://github.com/aboutcircles/CirclesMiniapps).
 
-### How the host works
+### How the host loads your app
 
-The marketplace reads app metadata from `static/miniapps.json`.
+The marketplace reads metadata from `static/miniapps.json`. When a user opens `/miniapps/<slug>`, the host loads the `url` from your entry inside an iframe and exposes the wallet bridge via `postMessage` (see [Integration with Mini Apps SDK](#intgration-with-mini-apps-sdk) below).
 
-When a user opens `/miniapps/<slug>`, the host loads the matching app inside an iframe.
-
-For an embedded mini app, the `url` should point to a route served by this same repository, not to an external deployment.
-
-Recommended pattern:
-
-- Host wrapper route: `/miniapps/<slug>`
-- Embedded app route in this repo: `/apps/<slug>`
-- `static/miniapps.json` entry: `"url": "/apps/<slug>"`
-
-### Required file layout
-
-Create the app under:
-
-```text
-src/routes/apps/<slug>/
-```
+### Manifest fields
 
 | Field | Required | Notes |
 |---|---|---|
 | `slug` | yes | URL-safe, unique identifier. Becomes the path `/miniapps/<slug>`. |
 | `name` | yes | Display name shown in the marketplace. |
-| `logo` | yes | HTTPS URL of a square logo (SVG or PNG, min 64×64 px). |
-| `url` | yes | HTTPS URL of your app. Must load in an iframe. |
+| `logo` | yes | HTTPS URL or repo-relative path of a square logo (SVG or PNG, min 64×64 px). Empty string falls back to a first-letter tile. |
+| `url` | yes | Absolute HTTPS URL of your deployed app. Must load in an iframe. |
 | `description` | yes | Short description shown under the app name. |
-| `tags` | yes | At least one category tag, e.g. `["defi"]`. |
-| `isHidden` | no | If `true`, hides the app from the marketplace list. The app is still accessible via its direct URL `/miniapps/<slug>`. Omit or set to `false` to show the app normally. |
+| `tags` | yes | At least one tag, e.g. `["defi"]`. |
+| `category` | yes | Must be `"garage"`. |
+| `isHidden` | no | If `true`, hides the tile from the grid. The app is still reachable at `/miniapps/<slug>`. |
+
+Example entry:
+
+```json
+{
+  "slug": "your-app-slug",
+  "name": "Your App",
+  "logo": "/app-logos/your-app.png",
+  "url": "https://your-app.example.com/",
+  "description": "One-sentence description of what it does.",
+  "tags": ["demo", "tools"],
+  "category": "garage"
+}
+```
+
+### Garage transaction policy
+
+Garage apps post transactions through `@aboutcircles/miniapp-sdk`'s `sendTransactions` (see [Integration with Mini Apps SDK](#intgration-with-mini-apps-sdk) below). Before the approval popup is shown, the host runs the batch through a policy that rejects any tx that:
+
+1. Targets the user's currently-acting Safe address.
+2. Targets the user's primary Safe (when operating in child-safe mode).
+3. Uses any of these Safe-management 4-byte selectors:
+
+| Selector | Function |
+|---|---|
+| `0x0d582f13` | `addOwnerWithThreshold(address,uint256)` |
+| `0xf8dc5dd9` | `removeOwner(address,address,uint256)` |
+| `0xe318b52b` | `swapOwner(address,address,address)` |
+| `0x694e80c3` | `changeThreshold(uint256)` |
+| `0xe19a9dd9` | `setGuard(address)` |
+| `0xf08a0323` | `setFallbackHandler(address)` |
+| `0x610b5925` | `enableModule(address)` |
+| `0xe009cfde` | `disableModule(address,address)` |
+| `0x6a761202` | `execTransaction(...)` |
+
+The whole batch is rejected on the first offender. The user sees a "Restricted action" modal explaining what was blocked; the iframe receives a `tx_rejected` postMessage.
+
+What a Garage app **cannot** do:
+
+- Wrap its own `execTransaction` to act on a Safe the user co-owns. The host already wraps every tx as needed; calling `execTransaction` yourself is treated as a smuggling attempt.
+- Add owners, swap guards, enable modules, or otherwise mutate the user's Safe configuration.
+
+If you need these, the app does not belong in Garage — submit it as a curated Embedded Mini App via the docs site link above.
 
 ### PR checklist
 
-- [ ] Entry added to `static/miniapps.json` with all required fields
-- [ ] App loads over HTTPS and works inside an iframe
-- [ ] Logo URL resolves to a valid image
-- [ ] `slug` is unique (no duplicate in the existing JSON)
-- [ ] PR title: `feat: add <your app name>`
+- [ ] Entry added to `static/miniapps.json` with all required fields and `"category": "garage"`
+- [ ] App loads over HTTPS and renders inside an iframe (no `X-Frame-Options: DENY`, no restrictive `frame-ancestors`)
+- [ ] Logo resolves to a valid image
+- [ ] `slug` is unique
+- [ ] No attempt to call `execTransaction` or any Safe-management selectors from the app
+- [ ] PR title: `feat: add <your app name> (garage)`
 
 The Circles team reviews and merges PRs on a best-effort basis.
 
