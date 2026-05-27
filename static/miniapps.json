@@ -189,5 +189,19 @@
       "template"
     ],
     "category": "garage"
+  },
+  {
+    "slug": "thp-for-good",
+    "name": "THP for Good",
+    "logo": "/app-logos/thp-for-good.png",
+    "url": "https://thp.gnosis.box/",
+    "description": "Book 1:1 expert sessions, pay in CRC, and fund the next THP learner.",
+    "tags": [
+      "education",
+      "mentorship",
+      "booking",
+      "crc"
+    ],
+    "category": "garage"
   }
 ]
