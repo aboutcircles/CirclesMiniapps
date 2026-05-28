@@ -90,7 +90,7 @@
     "slug": "miniapps-org-manager",
     "name": "MiniApps Builders Org Manager",
     "logo": "/app-logos/org.png",
-    "url": "https://circles-org-miniapp.vercel.app/",
+    "url": "https://clever-lolly-55b8ad.netlify.app/",
     "description": "Builder-focused tool to manage miniapp organizations",
     "tags": [],
     "category": "admin"
@@ -121,7 +121,7 @@
     "slug": "circles-groups",
     "name": "Circles Groups",
     "logo": "/app-logos/groups.png",
-    "url": "https://circles-groups-miniapp.vercel.app/",
+    "url": "https://hilarious-brioche-9d81ed.netlify.app/",
     "description": "Manage Circles groups",
     "tags": [],
     "category": "admin"
@@ -196,6 +196,32 @@
     "logo": "/app-logos/word-circles.png",
     "url": "https://word-circles.vercel.app/",
     "description": "A daily Wordle-style game with on-chain leaderboard commitments and PvP escrow on Gnosis chain.",
+    "slug": "thp-for-good",
+    "name": "THP for Good",
+    "logo": "/app-logos/thp-for-good.png",
+    "url": "https://thp.gnosis.box/",
+    "description": "Book 1:1 expert sessions, pay in CRC, and fund the next THP learner.",
+    "tags": [
+      "education",
+      "mentorship",
+      "booking",
+      "crc"
+    ],
+    "slug": "yield-gnosis",
+    "name": "Yield",
+    "logo": "/app-logos/yield-gnosis.png",
+    "url": "https://yield-gnosis-mini-app.vercel.app/",
+    "description": "Earn yield on your stablecoins via Aave v3 on Gnosis Chain. Tip the builder with CRC.",
+    "tags": [
+      "defi",
+      "yield",
+      "tools"
+    ],
+    "slug": "card-circles",
+    "name": "Card Circles",
+    "logo": "/app-logos/card-circles.png",
+    "url": "https://card-circles.vercel.app/",
+    "description": "Card games on Circles network. Play classic card games — Cribbage, Golf Solitaire, Blackjack, Pyramid and more to come — 1 CRC per game with seasonal leader board distributions.",
     "tags": ["game"],
     "category": "garage"
   }

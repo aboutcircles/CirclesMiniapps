@@ -16,6 +16,8 @@
 	interface GroupConfig {
 		groupAddress: string;
 		orgAddress: string;
+		/** Human-readable name shown in the intro text (e.g. "Dandelion"). */
+		displayName: string;
 		/** Invitation slug for this group. Falls back to DEFAULT_INVITE_SLUG if omitted. */
 		inviteSlug?: string;
 	}
@@ -26,24 +28,44 @@
 	const GROUP_CONFIGS: Record<string, GroupConfig> = {
 		'parallel-society': {
 			groupAddress: '0x6F99506cD91560305bD4859DcDdcb422EAA81F02',
-			orgAddress:   '0x62532eeB3779fDA75554e1EeEce552D0a9FF1C56'
+			orgAddress:   '0x62532eeB3779fDA75554e1EeEce552D0a9FF1C56',
+			displayName:  'Parallel Society'
 		},
 		'dandelion': {
 		    groupAddress: '0x1d3663CebF6c7f54bE62B210d68eeA0E38838582',
 			orgAddress: '0x33aa31e1392FFB37b1b3572A1E2cc0651D0BCb7F',
+			displayName: 'Dandelion',
 			inviteSlug: '0Gsv1Xjl'
 		},
 		'bfn': {
 			groupAddress: '0xeb614ef61367687704cd4628a68a02f3b10ce68c',
-			orgAddress:   '0xd4591B6F845C0C496D03A4eAb3a8ca4304EFA60D'
+			orgAddress:   '0xd4591B6F845C0C496D03A4eAb3a8ca4304EFA60D',
+			displayName:  'BFN'
 			// inviteSlug: 'XXXXXXXX'  ← set a group-specific slug here when available
 		}
 		// Add more entries like this:
 		// myevent: {
 		//   groupAddress: '0xAAAA...',
 		//   orgAddress:   '0xBBBB...',
+		//   displayName:  'My Event',
 		//   inviteSlug:   'YYYYYYYY'
 		// }
+	};
+
+	// ----- Intro texts -----
+	// Keyed by the ?text= URL param. `{group}` is replaced with the active group's displayName.
+	// Values are rendered as HTML so you can use <strong>, <em>, etc. for emphasis.
+	// If ?text= is missing or unknown, no intro is shown.
+	const INTRO_TEXTS: Record<string, string> = {
+		v2:
+			'{group} is proud to partner with Circles, a new kind of money that is backed by ' +
+			'the social network of its users. No banks, no permissions required. Every user ' +
+			'can create 1 CRC per hour, unconditionally, which sums up to roughly $100/year. ' +
+			'You can donate your CRC to {group}, along with a message of appreciation. ' +
+			'<strong>Click the button below to get started. No existing account required!</strong>',
+		test:
+			'TEST TEXT — if you see this, the ?text= URL param is working. The active group ' +
+			'is {group}. Swap to ?text=v2 to see the production intro.'
 	};
 
 	// ----- Query params -----
@@ -103,11 +125,32 @@
 	);
 	const GROUP_ADDRESS = $derived(activeConfig?.groupAddress ?? '');
 	const ORG_ADDRESS = $derived(activeConfig?.orgAddress ?? '');
+	const groupDisplayName = $derived(activeConfig?.displayName ?? '');
+
+	// ?text=<key> selects an entry from INTRO_TEXTS. Missing or unknown → no intro.
+	const introTextKey = $derived(page.url.searchParams.get('text'));
+	const introText = $derived(
+		introTextKey && INTRO_TEXTS[introTextKey]
+			? INTRO_TEXTS[introTextKey].replaceAll('{group}', groupDisplayName)
+			: ''
+	);
+
 	const kudosHref = $derived.by(() => {
 		if (!recipientAddress || !ORG_ADDRESS) return '#';
 		const transferPath = `/transfer/${ORG_ADDRESS}/crc?data=${encodeKudosData(recipientAddress, kudosMessage)}&amount=1`;
 		const slug = activeConfig?.inviteSlug ?? DEFAULT_INVITE_SLUG;
-		return `https://circles.gnosis.io/invitation/${slug}?redirect_to=${encodeURIComponent(transferPath)}`;
+		// UTM tags on the outbound invitation URL. Hardcoded for the dandelion pilot for
+		// now — revisit (e.g. derive utm_source from the group key) once other groups go live.
+		const utmParts = [
+			'utm_source=dandelion',
+			'utm_medium=kudos-miniapp',
+			'utm_campaign=kudos-ga'
+		];
+		if (introTextKey && INTRO_TEXTS[introTextKey]) {
+			utmParts.push(`utm_content=${encodeURIComponent(`kudos-intro-${introTextKey}`)}`);
+		}
+		const utm = '&' + utmParts.join('&');
+		return `https://circles.gnosis.io/invitation/${slug}?redirect_to=${encodeURIComponent(transferPath)}${utm}`;
 	});
 
 
@@ -374,9 +417,23 @@
 
 <svelte:head>
 	<title>Appreciations</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+	<link
+		rel="stylesheet"
+		href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap"
+	/>
 </svelte:head>
 
 <div class="page" style={themeVars}>
+	{#if activeConfig && introText}
+		<header class="intro-block">
+			<img class="intro-logo" src="/circles-token.svg" alt="Circles" />
+			<h1 class="intro-cta">Make a donation with a new kind of money!</h1>
+			<!-- INTRO_TEXTS values are hardcoded in this file, so {@html} is safe here. -->
+			<p class="intro">{@html introText}</p>
+		</header>
+	{/if}
 	<div class="card">
 
 
@@ -401,7 +458,7 @@
 					onclick={openKudos}
 				>
 					<div class="kudos-top-row">
-						<span class="kudos-label">Donate CRC to</span>
+						<span class="kudos-label">Donate to</span>
 						<div class="kudos-avatar">
 							{#if recipientProfile.imageUrl}
 								<img
@@ -575,18 +632,20 @@
 		margin: 0;
 		background: #ffffff;
 		color: #101010;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 		-webkit-font-smoothing: antialiased;
 	}
 
 	.page {
 		min-height: 100vh;
 		display: flex;
-		align-items: flex-start;
-		justify-content: center;
+		flex-direction: column;
+		align-items: center;
+		justify-content: flex-start;
 		padding: 48px 16px;
 		box-sizing: border-box;
 		background: #ffffff;
+		gap: 32px;
+		font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 	}
 
 	/* When embedded in an iframe (parent toggles the body class), drop 100vh —
@@ -596,9 +655,39 @@
 		min-height: 0;
 	}
 
+	.intro-block {
+		max-width: 860px;
+		width: 100%;
+		text-align: center;
+		margin: 0;
+	}
+
+	.intro-logo {
+		display: block;
+		width: 56px;
+		height: 56px;
+		margin: 0 auto 16px;
+	}
+
+	.intro-cta {
+		margin: 0 0 14px;
+		font-size: clamp(1.4rem, 2.6vw, 1.85rem);
+		line-height: 1.2;
+		font-weight: 800;
+		letter-spacing: -0.01em;
+		color: var(--theme-primary, #101010);
+	}
+
+	.intro {
+		margin: 0;
+		font-size: clamp(0.95rem, 1.1vw, 1.05rem);
+		line-height: 1.55;
+		color: #2a2a2a;
+	}
+
 	.card {
 		background: #ffffff;
-		border-radius: 0.25rem;
+		border-radius: 0.625rem;
 		box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
 		max-width: 480px;
 		width: 100%;
@@ -608,7 +697,22 @@
 
 	@media (max-width: 450px) {
 		.page {
-			padding: 0;
+			padding: 24px 16px;
+			gap: 24px;
+		}
+
+		.intro-logo {
+			width: 44px;
+			height: 44px;
+			margin-bottom: 12px;
+		}
+
+		.intro-cta {
+			font-size: 1.3rem;
+		}
+
+		.intro {
+			font-size: 0.95rem;
 		}
 
 		.card {
@@ -664,7 +768,7 @@
 		box-sizing: border-box;
 		padding: 12px 14px;
 		border: 1.5px solid #ddd;
-		border-radius: 0.25rem;
+		border-radius: 0.625rem;
 		font-size: 0.95rem;
 		color: #1a1a1a;
 		background: #ffffff;
@@ -686,7 +790,7 @@
 		display: block;
 		background: var(--theme-primary, #00af5e);
 		color: #ffffff;
-		border-radius: 0.25rem;
+		border-radius: 0.625rem;
 		padding: 0;
 		text-decoration: none;
 		margin-bottom: 20px;
@@ -794,7 +898,7 @@
 	/* ----- Appreciations ----- */
 	.tx-list {
 		border: 1.5px solid #ddd;
-		border-radius: 0.25rem;
+		border-radius: 0.625rem;
 		overflow: hidden;
 		margin-bottom: 4px;
 	}
@@ -979,7 +1083,7 @@
 
 	.qr-card {
 		background: #ffffff;
-		border-radius: 0.25rem;
+		border-radius: 0.625rem;
 		padding: var(--card-pad);
 		display: flex;
 		flex-direction: column;
@@ -1050,7 +1154,7 @@
 
 	.qr-frame {
 		background: #f5f5f5;
-		border-radius: 0.25rem;
+		border-radius: 0.625rem;
 		padding: var(--qr-pad);
 		margin-bottom: var(--gap-md);
 	}
@@ -1070,7 +1174,7 @@
 		padding: calc(var(--qr-size) * 0.045) calc(var(--qr-size) * 0.073);
 		background: var(--theme-primary, #00af5e);
 		border: 1px solid var(--theme-border, #009a52);
-		border-radius: 0.25rem;
+		border-radius: 0.625rem;
 		box-shadow: 0 4px 0 var(--theme-shadow, #007a41), 0 6px 14px rgba(var(--theme-shadow-rgba, 0, 122, 65), 0.25);
 		font-size: calc(var(--qr-size) * 0.06);
 		font-weight: 600;

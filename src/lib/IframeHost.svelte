@@ -30,6 +30,7 @@
 		src: string;
 		iframeTitle: string;
 		sandbox?: string;
+		allow?: string;
 		backLabel?: string;
 		onBack: () => void;
 		title?: string;
@@ -47,6 +48,7 @@
 		src,
 		iframeTitle,
 		sandbox = 'allow-scripts allow-forms allow-same-origin',
+		allow = 'clipboard-write; web-share',
 		backLabel = 'back',
 		onBack,
 		title,
@@ -70,6 +72,9 @@
 	let pendingSource: MessageEventSource | null = null;
 
 	let iframeEl: HTMLIFrameElement = $state() as HTMLIFrameElement;
+	let cardEl: HTMLDivElement = $state() as HTMLDivElement;
+	let isFullscreen = $state(false);
+	let pseudoFullscreen = $state(false);
 
 	// Analytics state — kept outside $state, only read inside handlers.
 	const mountedAt = Date.now();
@@ -218,8 +223,34 @@
 		}
 	}
 
+	function syncFullscreenState() {
+		isFullscreen = !!document.fullscreenElement || pseudoFullscreen;
+	}
+
+	async function toggleFullscreen() {
+		const target = cardEl;
+		if (!target) return;
+		try {
+			if (document.fullscreenElement) {
+				await document.exitFullscreen();
+			} else if (pseudoFullscreen) {
+				pseudoFullscreen = false;
+				isFullscreen = false;
+			} else if (target.requestFullscreen) {
+				await target.requestFullscreen();
+			} else {
+				// Fallback (iOS Safari etc.): CSS class fills the viewport.
+				pseudoFullscreen = true;
+				isFullscreen = true;
+			}
+		} catch {
+			// Permission denied or unsupported — silently ignore.
+		}
+	}
+
 	onMount(() => {
 		window.addEventListener('message', handleMessage);
+		document.addEventListener('fullscreenchange', syncFullscreenState);
 
 		if (analytics && src) {
 			loadTimeoutId = setTimeout(() => {
@@ -235,6 +266,7 @@
 
 		return () => {
 			window.removeEventListener('message', handleMessage);
+			document.removeEventListener('fullscreenchange', syncFullscreenState);
 			if (loadTimeoutId !== null) {
 				clearTimeout(loadTimeoutId);
 				loadTimeoutId = null;
@@ -341,13 +373,36 @@
 
 {@render beforeIframe?.()}
 
-<div class="iframe-card">
+<div class="iframe-card" bind:this={cardEl} class:pseudo-fullscreen={pseudoFullscreen}>
 	{#if isOffline && offlineState}
 		{@render offlineState()}
 	{:else if !src && emptyState}
 		{@render emptyState()}
 	{:else if src}
-		<iframe bind:this={iframeEl} {src} {sandbox} title={iframeTitle} onload={handleIframeLoad}></iframe>
+		<iframe bind:this={iframeEl} {src} {sandbox} {allow} title={iframeTitle} onload={handleIframeLoad}></iframe>
+		<button
+			type="button"
+			class="fullscreen-btn"
+			onclick={toggleFullscreen}
+			aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+			title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+		>
+			{#if isFullscreen}
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<path d="M9 3v6H3" />
+					<path d="M15 3v6h6" />
+					<path d="M9 21v-6H3" />
+					<path d="M15 21v-6h6" />
+				</svg>
+			{:else}
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+					<path d="M3 9V3h6" />
+					<path d="M21 9V3h-6" />
+					<path d="M3 15v6h6" />
+					<path d="M21 15v6h-6" />
+				</svg>
+			{/if}
+		</button>
 	{/if}
 </div>
 
@@ -407,6 +462,7 @@
 	}
 
 	.iframe-card {
+		position: relative;
 		flex: 1;
 		display: flex;
 		flex-direction: column;
@@ -418,11 +474,73 @@
 		box-shadow: var(--shadow-card);
 	}
 
+	.iframe-card:fullscreen,
+	.iframe-card.pseudo-fullscreen {
+		position: fixed;
+		inset: 0;
+		width: 100vw;
+		height: 100vh;
+		max-width: none;
+		max-height: none;
+		margin: 0;
+		padding: 0;
+		border-radius: 0;
+		border: none;
+		box-shadow: none;
+		background: var(--card);
+		z-index: 9999;
+	}
+
+	.iframe-card:fullscreen iframe,
+	.iframe-card.pseudo-fullscreen iframe {
+		width: 100vw;
+		height: 100vh;
+		margin: 0;
+		padding: 0;
+	}
+
 	iframe {
 		flex: 1;
 		width: 100%;
 		height: 100%;
 		border: none;
 		display: block;
+	}
+
+	.fullscreen-btn {
+		position: absolute;
+		right: 12px;
+		bottom: 12px;
+		width: 36px;
+		height: 36px;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0;
+		border: 1px solid var(--line);
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.85);
+		backdrop-filter: blur(6px);
+		-webkit-backdrop-filter: blur(6px);
+		color: var(--ink);
+		cursor: pointer;
+		box-shadow: var(--shadow-card, 0 2px 8px rgba(0, 0, 0, 0.08));
+		opacity: 0.75;
+		transition: opacity 0.15s, transform 0.15s, background 0.15s;
+		z-index: 5;
+	}
+
+	.fullscreen-btn:hover {
+		opacity: 1;
+		background: rgba(255, 255, 255, 0.95);
+	}
+
+	.fullscreen-btn:active {
+		transform: scale(0.95);
+	}
+
+	.fullscreen-btn:focus-visible {
+		outline: 2px solid var(--accent, #0e00a8);
+		outline-offset: 2px;
 	}
 </style>
