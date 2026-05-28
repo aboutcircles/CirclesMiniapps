@@ -30,6 +30,7 @@
 		src: string;
 		iframeTitle: string;
 		sandbox?: string;
+		allow?: string;
 		backLabel?: string;
 		onBack: () => void;
 		title?: string;
@@ -47,6 +48,7 @@
 		src,
 		iframeTitle,
 		sandbox = 'allow-scripts allow-forms allow-same-origin',
+		allow = 'clipboard-write; web-share',
 		backLabel = 'back',
 		onBack,
 		title,
@@ -377,7 +379,7 @@
 	{:else if !src && emptyState}
 		{@render emptyState()}
 	{:else if src}
-		<iframe bind:this={iframeEl} {src} {sandbox} title={iframeTitle} onload={handleIframeLoad}></iframe>
+		<iframe bind:this={iframeEl} {src} {sandbox} {allow} title={iframeTitle} onload={handleIframeLoad}></iframe>
 		<button
 			type="button"
 			class="fullscreen-btn"
