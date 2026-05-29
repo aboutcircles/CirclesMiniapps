@@ -196,6 +196,12 @@
     "logo": "/app-logos/word-circles.png",
     "url": "https://word-circles.vercel.app/",
     "description": "A daily Wordle-style game with on-chain leaderboard commitments and PvP escrow on Gnosis chain.",
+    "tags": [
+      "game"
+    ],
+    "category": "garage"
+  },
+  {
     "slug": "thp-for-good",
     "name": "THP for Good",
     "logo": "/app-logos/thp-for-good.png",
@@ -207,6 +213,9 @@
       "booking",
       "crc"
     ],
+    "category": "garage"
+  },
+  {
     "slug": "yield-gnosis",
     "name": "Yield",
     "logo": "/app-logos/yield-gnosis.png",
@@ -217,6 +226,9 @@
       "yield",
       "tools"
     ],
+    "category": "garage"
+  },
+  {
     "slug": "card-circles",
     "name": "Card Circles",
     "logo": "/app-logos/card-circles.png",
