@@ -806,14 +806,14 @@
 	.social-proof {
 		display: inline-flex;
 		align-items: baseline;
-		gap: 6px;
-		color: #1a1a1a;
+		gap: 5px;
+		color: #2a2a2a;
 		font-weight: 600;
-		font-size: 1rem;
+		font-size: 0.92rem;
 	}
 
 	.social-proof-count {
-		font-size: 1.6rem;
+		font-size: 1.25rem;
 		font-weight: 800;
 		line-height: 1;
 		color: var(--theme-primary, #38318b);
@@ -1080,6 +1080,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+		margin-top: 24px;
 		margin-bottom: 12px;
 	}
 
