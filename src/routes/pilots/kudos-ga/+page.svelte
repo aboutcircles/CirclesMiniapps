@@ -54,18 +54,30 @@
 
 	// ----- Intro texts -----
 	// Keyed by the ?text= URL param. `{group}` is replaced with the active group's displayName.
-	// Values are rendered as HTML so you can use <strong>, <em>, etc. for emphasis.
+	// `text` is rendered as HTML so you can use <strong>, <em>, etc. for emphasis.
+	// `utmContent` (optional) overrides the default `kudos-intro-<key>` analytics tag —
+	// use this to bump the analytics bucket when you rewrite copy *in place* without
+	// changing the URL key (e.g. so embedders don't have to update their iframe src).
 	// If ?text= is missing or unknown, no intro is shown.
-	const INTRO_TEXTS: Record<string, string> = {
-		v2:
-			'{group} is proud to partner with Circles, a new kind of money that is backed by ' +
-			'the social network of its users. No banks, no permissions required. Every user ' +
-			'can create 1 CRC per hour, unconditionally, which sums up to roughly $100/year. ' +
-			'You can donate your CRC to {group}, along with a message of appreciation. ' +
-			'<strong>Click the button below to get started. No existing account required!</strong>',
-		test:
-			'TEST TEXT — if you see this, the ?text= URL param is working. The active group ' +
-			'is {group}. Swap to ?text=v2 to see the production intro.'
+	interface IntroText {
+		text: string;
+		utmContent?: string;
+	}
+	const INTRO_TEXTS: Record<string, IntroText> = {
+		v2: {
+			// Copy rewritten 2026-05 — URL key stays `v2` for partner-link stability,
+			// but UTM bumped to v3 so analytics can separate old- vs new-copy traffic.
+			text:
+				'Circles gives every member €100/year in community currency. Automatically, ' +
+				'no banks, no middlemen. {group} accepts it as a real donation. Sign up in ' +
+				'two minutes, free forever. Send what you’d like, add a message if you want.',
+			utmContent: 'kudos-intro-v3'
+		},
+		test: {
+			text:
+				'TEST TEXT — if you see this, the ?text= URL param is working. The active ' +
+				'group is {group}. Swap to ?text=v2 to see the production intro.'
+		}
 	};
 
 	// ----- Query params -----
@@ -129,10 +141,11 @@
 
 	// ?text=<key> selects an entry from INTRO_TEXTS. Missing or unknown → no intro.
 	const introTextKey = $derived(page.url.searchParams.get('text'));
+	const activeIntro = $derived(
+		introTextKey && INTRO_TEXTS[introTextKey] ? INTRO_TEXTS[introTextKey] : null
+	);
 	const introText = $derived(
-		introTextKey && INTRO_TEXTS[introTextKey]
-			? INTRO_TEXTS[introTextKey].replaceAll('{group}', groupDisplayName)
-			: ''
+		activeIntro ? activeIntro.text.replaceAll('{group}', groupDisplayName) : ''
 	);
 
 	const kudosHref = $derived.by(() => {
@@ -146,8 +159,9 @@
 			'utm_medium=kudos-miniapp',
 			'utm_campaign=kudos-ga'
 		];
-		if (introTextKey && INTRO_TEXTS[introTextKey]) {
-			utmParts.push(`utm_content=${encodeURIComponent(`kudos-intro-${introTextKey}`)}`);
+		if (activeIntro && introTextKey) {
+			const value = activeIntro.utmContent ?? `kudos-intro-${introTextKey}`;
+			utmParts.push(`utm_content=${encodeURIComponent(value)}`);
 		}
 		const utm = '&' + utmParts.join('&');
 		return `https://circles.gnosis.io/invitation/${slug}?redirect_to=${encodeURIComponent(transferPath)}${utm}`;
@@ -242,6 +256,25 @@
 		}
 		pairs.sort((a, b) => b.timestamp - a.timestamp || a.transactionHash.localeCompare(b.transactionHash));
 		return pairs;
+	});
+
+	// ----- Social proof: total donations to the group in the last N days -----
+	// Counts ALL valid donations to the group org, ignoring the `?address=` filter
+	// (we want a group-wide number, not just kudos for one recipient).
+	// Recomputes whenever transferEntries refreshes (every 5s via loadHistory).
+	const SOCIAL_PROOF_WINDOW_DAYS = 14;
+	const SOCIAL_PROOF_WINDOW_SEC = SOCIAL_PROOF_WINDOW_DAYS * 24 * 60 * 60;
+	const recentDonationsCount = $derived.by((): number => {
+		const cutoff = Math.floor(Date.now() / 1000) - SOCIAL_PROOF_WINDOW_SEC;
+		let n = 0;
+		for (const entry of transferEntries) {
+			if (entry.to.toLowerCase() !== orgLower) continue;
+			if (HIDDEN_TX_HASHES.has(entry.transactionHash.toLowerCase())) continue;
+			if (!decodeRecipient(entry.data)) continue;
+			if (entry.timestamp < cutoff) continue;
+			n++;
+		}
+		return n;
 	});
 
 	// ----- Helpers -----
@@ -429,7 +462,7 @@
 	{#if activeConfig && introText}
 		<header class="intro-block">
 			<img class="intro-logo" src="/circles-token.svg" alt="Circles" />
-			<h1 class="intro-cta">Make a donation with a new kind of money!</h1>
+			<h1 class="intro-cta">Donate for free</h1>
 			<!-- INTRO_TEXTS values are hardcoded in this file, so {@html} is safe here. -->
 			<p class="intro">{@html introText}</p>
 		</header>
@@ -440,16 +473,6 @@
 		<!-- ===== KUDOS ===== -->
 			{#if recipientAddress}
 				{@const recipientProfile = getProfile(recipientAddress)}
-				<div class="kudos-msg-wrap">
-					<input
-						class="kudos-msg-input"
-						type="text"
-						maxlength="120"
-						placeholder="Add a message… (optional)"
-						bind:value={kudosMessage}
-						onkeydown={(e) => { if (e.key === 'Enter') openKudos(e as unknown as MouseEvent); }}
-					/>
-				</div>
 				<a
 					class="kudos-btn"
 					href={kudosHref}
@@ -484,6 +507,16 @@
 						</span>
 					</div>
 				</a>
+				<div class="kudos-msg-wrap">
+					<input
+						class="kudos-msg-input"
+						type="text"
+						maxlength="120"
+						placeholder="Add a message… (optional)"
+						bind:value={kudosMessage}
+						onkeydown={(e) => { if (e.key === 'Enter') openKudos(e as unknown as MouseEvent); }}
+					/>
+				</div>
 
 				{#if showQr && qrDataUrl}
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -539,9 +572,16 @@
 			{/if}
 
 			<div class="refresh-bar">
-				<div class="loading-state" class:invisible={!txLoading || !txManualRefresh}>
-					<span class="spinner"></span>
-					Loading…
+				<div class="bar-status">
+					{#if txLoading && txManualRefresh}
+						<span class="spinner"></span>
+						<span>Loading…</span>
+					{:else if activeConfig && recentDonationsCount > 0}
+						<span class="social-proof">
+							<span class="social-proof-count">{recentDonationsCount}</span>
+							{recentDonationsCount === 1 ? 'recent donation' : 'recent donations'}
+						</span>
+					{/if}
 				</div>
 				<button class="btn-refresh" onclick={() => loadHistory(ORG_ADDRESS, GROUP_ADDRESS, true)} disabled={txLoading && txManualRefresh}>
 					↻ Refresh
@@ -722,17 +762,16 @@
 		}
 	}
 
-	.loading-state {
+	/* Status slot inside .refresh-bar — holds either the loading spinner+text
+	   or the social-proof counter. Sits left, refresh button sits right. */
+	.bar-status {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		color: #7d7d7d;
 		font-size: 0.85rem;
 		flex: 1;
-	}
-
-	.invisible {
-		visibility: hidden;
+		min-width: 0;
 	}
 
 	.spinner {
@@ -758,9 +797,26 @@
 	.row-even { background: #ffffff; }
 	.row-odd  { background: #f9f9f9; }
 
-	/* ----- Kudos message input (above the button) ----- */
+	/* ----- Kudos message input (below the button) ----- */
 	.kudos-msg-wrap {
-		margin-bottom: 14px;
+		margin-top: 14px;
+	}
+
+	/* ----- Social proof counter (inline in the refresh-bar) ----- */
+	.social-proof {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 5px;
+		color: #2a2a2a;
+		font-weight: 600;
+		font-size: 0.92rem;
+	}
+
+	.social-proof-count {
+		font-size: 1.25rem;
+		font-weight: 800;
+		line-height: 1;
+		color: var(--theme-primary, #38318b);
 	}
 
 	.kudos-msg-input {
@@ -1024,6 +1080,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+		margin-top: 24px;
 		margin-bottom: 12px;
 	}
 
