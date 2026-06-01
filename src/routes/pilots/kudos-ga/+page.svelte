@@ -258,6 +258,24 @@
 		return pairs;
 	});
 
+	// ----- Social proof: total donations to the group in the last N days -----
+	// Counts ALL valid donations to the group org, ignoring the `?address=` filter
+	// (we want a group-wide number, not just kudos for one recipient).
+	// Recomputes whenever transferEntries refreshes (every 5s via loadHistory).
+	const SOCIAL_PROOF_WINDOW_SEC = 7 * 24 * 60 * 60;
+	const recentDonationsCount = $derived.by((): number => {
+		const cutoff = Math.floor(Date.now() / 1000) - SOCIAL_PROOF_WINDOW_SEC;
+		let n = 0;
+		for (const entry of transferEntries) {
+			if (entry.to.toLowerCase() !== orgLower) continue;
+			if (HIDDEN_TX_HASHES.has(entry.transactionHash.toLowerCase())) continue;
+			if (!decodeRecipient(entry.data)) continue;
+			if (entry.timestamp < cutoff) continue;
+			n++;
+		}
+		return n;
+	});
+
 	// ----- Helpers -----
 	function truncate(addr: string): string {
 		return addr.length < 12 ? addr : addr.slice(0, 8) + '...' + addr.slice(-6);
@@ -552,8 +570,11 @@
 				{/if}
 			{/if}
 
-			{#if activeConfig}
-				<h2 class="feed-heading">Recent donations</h2>
+			{#if activeConfig && recentDonationsCount > 0}
+				<p class="social-proof">
+					<span class="social-proof-count">{recentDonationsCount}</span>
+					{recentDonationsCount === 1 ? 'donation' : 'donations'} in the last 7 days
+				</p>
 			{/if}
 			<div class="refresh-bar">
 				<div class="loading-state" class:invisible={!txLoading || !txManualRefresh}>
@@ -780,14 +801,19 @@
 		margin-top: 14px;
 	}
 
-	/* ----- Feed section heading ("Recent donations") ----- */
-	.feed-heading {
+	/* ----- Social proof counter above the feed ----- */
+	.social-proof {
 		margin: 24px 0 8px;
-		font-size: 0.95rem;
-		font-weight: 700;
-		letter-spacing: 0.02em;
-		text-transform: uppercase;
-		color: #6a6a6a;
+		font-size: 0.9rem;
+		font-weight: 500;
+		color: #4a4a4a;
+		text-align: center;
+	}
+
+	.social-proof-count {
+		font-weight: 800;
+		color: var(--theme-primary, #38318b);
+		margin-right: 4px;
 	}
 
 	.kudos-msg-input {
