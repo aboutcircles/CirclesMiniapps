@@ -236,5 +236,15 @@
     "description": "Card games on Circles network. Play classic card games — Cribbage, Golf Solitaire, Blackjack, Pyramid and more to come — 1 CRC per game with seasonal leader board distributions.",
     "tags": ["game"],
     "category": "garage"
+  },
+  {
+    "slug": "dappcon-chat",
+    "name": "Dappcon Chat",
+    "logo": "https://dmdappcon.vercel.app/icon.svg",
+    "url": "https://dmdappcon.vercel.app/",
+    "description": "Trust-graph-filtered wall and DMs for Circles users at Dappcon 2026.",
+    "tags": ["internal"],
+    "category": "miniapp",
+    "isHidden": true
   }
 ]
