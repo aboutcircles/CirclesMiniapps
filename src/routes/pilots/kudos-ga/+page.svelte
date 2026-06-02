@@ -70,7 +70,7 @@
 			text:
 				'Circles gives every member €100/year in community currency. Automatically, ' +
 				'no banks, no middlemen. {group} accepts it as a real donation. Sign up in ' +
-				'two minutes, free forever. Send what you’d like, add a message if you want.',
+				'two minutes, free forever.',
 			utmContent: 'kudos-intro-v3'
 		},
 		test: {
@@ -507,16 +507,6 @@
 						</span>
 					</div>
 				</a>
-				<div class="kudos-msg-wrap">
-					<input
-						class="kudos-msg-input"
-						type="text"
-						maxlength="120"
-						placeholder="Add a message… (optional)"
-						bind:value={kudosMessage}
-						onkeydown={(e) => { if (e.key === 'Enter') openKudos(e as unknown as MouseEvent); }}
-					/>
-				</div>
 
 				{#if showQr && qrDataUrl}
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
@@ -797,11 +787,6 @@
 	.row-even { background: #ffffff; }
 	.row-odd  { background: #f9f9f9; }
 
-	/* ----- Kudos message input (below the button) ----- */
-	.kudos-msg-wrap {
-		margin-top: 14px;
-	}
-
 	/* ----- Social proof counter (inline in the refresh-bar) ----- */
 	.social-proof {
 		display: inline-flex;
@@ -810,35 +795,6 @@
 		color: #2a2a2a;
 		font-weight: 600;
 		font-size: 0.92rem;
-	}
-
-	.social-proof-count {
-		font-size: 1.25rem;
-		font-weight: 800;
-		line-height: 1;
-		color: var(--theme-primary, #38318b);
-	}
-
-	.kudos-msg-input {
-		width: 100%;
-		box-sizing: border-box;
-		padding: 12px 14px;
-		border: 1.5px solid #ddd;
-		border-radius: 0.625rem;
-		font-size: 0.95rem;
-		color: #1a1a1a;
-		background: #ffffff;
-		outline: none;
-		transition: border-color 0.15s, box-shadow 0.15s;
-	}
-
-	.kudos-msg-input:focus {
-		border-color: var(--theme-primary, #00af5e);
-		box-shadow: 0 0 0 3px rgba(0, 175, 94, 0.15);
-	}
-
-	.kudos-msg-input::placeholder {
-		color: #999;
 	}
 
 	/* ----- Kudos donate button ----- */
