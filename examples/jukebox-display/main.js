@@ -41,6 +41,7 @@ let allEntries = []; // chronologically sorted
 let currentIndex = -1;
 let widget = null;
 let widgetReady = false;
+let isPlaying = false; // guard so poll doesn't interrupt a playing song
 const profileCache = new Map();
 
 // ─── SDK + RPC ──────────────────────────────────────────────
@@ -242,7 +243,7 @@ async function refreshFromChain() {
 }
 
 function advanceIfIdle() {
-  if (!widgetReady) return;
+  if (!widgetReady || isPlaying) return;
   const next = currentIndex + 1;
   if (next < allEntries.length) {
     playEntry(next);
@@ -250,6 +251,7 @@ function advanceIfIdle() {
 }
 
 function onSongEnded() {
+  isPlaying = false;
   if (currentIndex >= 0 && currentIndex < allEntries.length) {
     savePlayhead(allEntries[currentIndex].txHash);
   }
@@ -265,6 +267,7 @@ function onSongEnded() {
 
 async function playEntry(index) {
   currentIndex = index;
+  isPlaying = true;
   const entry = allEntries[index];
   if (!entry) return;
 
