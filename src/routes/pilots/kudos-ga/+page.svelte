@@ -266,6 +266,15 @@
 	// compelling than a 7/14-day slice. Revisit when numbers get bigger.
 	const recentDonationsCount = $derived(kudosPairs.length);
 
+	// ----- Feed display cap -----
+	// We render at most this many rows so the iframe doesn't grow unboundedly on
+	// the embedder's page. The counter above still shows the true total, and an
+	// "And more…" footer makes the truncation explicit. Bump if the embedder
+	// asks for a longer feed.
+	const FEED_DISPLAY_LIMIT = 10;
+	const kudosPairsVisible = $derived(kudosPairs.slice(0, FEED_DISPLAY_LIMIT));
+	const hasMoreLocal = $derived(kudosPairs.length > FEED_DISPLAY_LIMIT);
+
 	// ----- Helpers -----
 	function truncate(addr: string): string {
 		return addr.length < 12 ? addr : addr.slice(0, 8) + '...' + addr.slice(-6);
@@ -572,7 +581,7 @@
 
 			{#if kudosPairs.length > 0}
 				<div class="tx-list">
-					{#each kudosPairs as tx, i (tx.transactionHash)}
+					{#each kudosPairsVisible as tx, i (tx.transactionHash)}
 						{@const senderProfile = getProfile(tx.sender)}
 						{@const recipientProfile = getProfile(tx.recipient)}
 						<div class="tx-row {i % 2 === 0 ? 'row-even' : 'row-odd'}">
@@ -634,8 +643,8 @@
 					{/each}
 				</div>
 
-				{#if hasMore}
-					<p class="has-more">More appreciations available — showing most recent batch.</p>
+				{#if hasMoreLocal || hasMore}
+					<p class="has-more">And more…</p>
 				{/if}
 			{/if}
 
