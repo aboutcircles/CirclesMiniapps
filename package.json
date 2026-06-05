@@ -13,7 +13,7 @@
     "demo:sign": "cd examples/sign-demo && npx vite --port 5181"
   },
   "dependencies": {
-    "@aboutcircles/miniapp-sdk": "^0.1.24",
+    "@aboutcircles/miniapp-sdk": "^0.1.44",
     "@aboutcircles/sdk": "^0.1.24",
     "@aboutcircles/sdk-abis": "^0.1.24",
     "@aboutcircles/sdk-core": "^0.1.24",
