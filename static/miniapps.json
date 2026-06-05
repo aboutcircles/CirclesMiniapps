@@ -257,11 +257,11 @@
     "category": "garage"
   },
   {
-    "slug": "chess-wager",
-    "name": "Chess Wager",
-    "logo": "/app-logos/chess-wager.png",
+    "slug": "stakemate",
+    "name": "Stakemate",
+    "logo": "/app-logos/stakemate.png",
     "url": "https://chess-wager-pauls-projects-c98ee56d.vercel.app/",
-    "description": "Challenge a connected player to a staked 1v1 game on Lichess — both stake, winner takes the pot.",
+    "description": "Stakemate — challenge a friend to a staked 1v1 game on Lichess; both stake, winner takes the pot.",
     "tags": ["game", "chess"],
     "category": "garage",
     "isHidden": true
