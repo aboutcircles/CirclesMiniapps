@@ -255,5 +255,15 @@
     "description": "Solve the daily chess puzzle as fast as you can — pay to enter in Circles, fastest solve wins the daily pot.",
     "tags": ["game", "chess"],
     "category": "garage"
+  },
+  {
+    "slug": "chess-wager",
+    "name": "Chess Wager",
+    "logo": "/app-logos/chess-wager.png",
+    "url": "https://chess-wager-pauls-projects-c98ee56d.vercel.app/",
+    "description": "Challenge a connected player to a staked 1v1 game on Lichess — both stake, winner takes the pot.",
+    "tags": ["game", "chess"],
+    "category": "garage",
+    "isHidden": true
   }
 ]
