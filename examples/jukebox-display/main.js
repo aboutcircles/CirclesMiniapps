@@ -18,7 +18,7 @@ import songsCatalog from './songs.json';
 import {
   RPC_URL,
   JUKEBOX_ADDRESS,
-  ACCEPTED_TOKEN_ADDRESS,
+  ACCEPTED_TOKEN_SET,
   BASE_AMOUNT_WEI,
   SONG_ID_MOD,
   POLL_INTERVAL_MS,
@@ -228,10 +228,9 @@ async function fetchQueueEntries() {
     1000,
   );
 
-  const accepted = ACCEPTED_TOKEN_ADDRESS.toLowerCase();
   const entries = [];
   for (const row of rows) {
-    if ((row.tokenAddress || '').toLowerCase() !== accepted) continue;
+    if (!ACCEPTED_TOKEN_SET.has((row.tokenAddress || '').toLowerCase())) continue;
     try {
       const value = BigInt(row.amount);
       const songId = Number(value % SONG_ID_MOD);

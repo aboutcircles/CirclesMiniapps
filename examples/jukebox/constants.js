@@ -14,23 +14,35 @@ export const RPC_FALLBACKS = [
 // All clients (miniapp + display) read incoming ERC-20 Transfer events
 // to this address to assemble the global queue.
 //
-// This is an org avatar that trusts the Gnosis group, so any Gnosis
-// group member can transfer wrapped group CRC to it.
+// This is an org avatar that trusts both accepted groups, so any member
+// of either group can transfer wrapped group CRC to it.
 export const JUKEBOX_ADDRESS = '0xbe6e5a0bdface700cbe8f0d1c28fcb8404a1622b';
 
-// Only this exact wrapped ERC-20 token is accepted as payment: the
-// DEMURRAGED Gnosis group CRC wrapper. Demurraged means 1e18 raw == 1 CRC
-// today (1:1), which is exactly what the songId-in-low-bits encoding needs
-// (amount = 10e18 + songId == 10 CRC + songId). The inflationary wrapper
-// (0xeeF7B1f06B092625228C835Dd5D5B14641D1e54A) was wrong here: 10e18 of it
-// is only ~6.67 CRC, so payments underpaid by ~33%.
-export const ACCEPTED_TOKEN_ADDRESS = '0x548c20e6c24E4876E20daDbEAb75362e2F5A4bC1';
+// Accepted payment tokens: DEMURRAGED group-CRC wrappers from the two
+// approved groups. Demurraged means 1e18 raw == 1 CRC today (1:1), which
+// is exactly what the songId-in-low-bits encoding needs
+// (amount = 10e18 + songId == 10 CRC + songId).
+//
+// Only demurraged wrappers are accepted because the inflationary wrappers
+// (10e18 raw of which == ~6.67 CRC) would underpay by ~33% and break the
+// songId decode. Users MUST already hold one of these — no personal CRC
+// auto-mint is performed any more.
+export const ACCEPTED_TOKEN_ADDRESSES = [
+  // Group 1: 0xc19bc204eb1c1d5b3fe500e5e5dfabab625f286c — original "Gnosis" gCRC
+  '0x548c20e6c24E4876E20daDbEAb75362e2F5A4bC1',
+  // Group 2: 0x93eD5A96347927ff6fF6b790F8Cf5258240c321f — second "Gnosis" gCRC
+  '0x8cbd18accdce45a3e6ac6909ecf42ee13f1f927a',
+];
+// Set of lowercase addresses for fast O(1) membership checks.
+export const ACCEPTED_TOKEN_SET = new Set(ACCEPTED_TOKEN_ADDRESSES.map(a => a.toLowerCase()));
 
-// The Gnosis group avatar. Used as the avatar arg for groupMint + wrap in the
-// auto-mint flow (user has personal CRC but no wrapped group CRC yet).
+// Group 1 avatar (the one we currently mint from in the original groupMint flow).
+// Kept for back-compat / debug only — auto-mint is no longer used.
 export const GNOSIS_GROUP_ADDRESS = '0xc19bc204eb1c1d5b3fe500e5e5dfabab625f286c';
+// Second approved group.
+export const GNOSIS_GROUP_2_ADDRESS = '0x93eD5A96347927ff6fF6b790F8Cf5258240c321f';
 
-// Circles Hub V2 (ERC-1155). groupMint + wrap are called here.
+// Circles Hub V2 (ERC-1155). Used for any group-mint operations (legacy).
 export const HUB_V2_ADDRESS = '0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8';
 
 // Payment encoding.

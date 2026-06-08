@@ -25,7 +25,7 @@ import {
   RPC_URL,
   RPC_FALLBACKS,
   JUKEBOX_ADDRESS,
-  ACCEPTED_TOKEN_ADDRESS,
+  ACCEPTED_TOKEN_ADDRESSES,
   GNOSIS_GROUP_ADDRESS,
   HUB_V2_ADDRESS,
   BASE_AMOUNT_WEI,
@@ -294,84 +294,49 @@ async function payForSong(song) {
   if (!connectedAddress) throw new Error('Wallet not connected');
 
   const user = getAddress(connectedAddress);
-  // The accepted token is a known, already-deployed inflationary wrapper - we
-  // don't need the user to already hold it, so address it directly.
-  const wrapperAddress = getAddress(ACCEPTED_TOKEN_ADDRESS);
-
   // amount = 10·10^18 + songId. The songId rides in the low bits; the display
   // decodes it as amount % 10000. This is the exact value transferred.
   const amountWei = BASE_AMOUNT_WEI + BigInt(song.id);
 
-  // Real on-chain ERC-20 balance is exactly what `transfer` enforces. The
-  // SDK's attoCircles is a demurrage-adjusted figure in a different
-  // denomination (inflationary wrapper) and false-fails valid payments, so
-  // never compare against it.
-  const wrappedBal = await readAny({
-    address: wrapperAddress,
-    abi: ERC20_TRANSFER_ABI,
-    functionName: 'balanceOf',
-    args: [user],
-  });
+  // The jukebox accepts only wrapped group CRC from two approved groups.
+  // No personal-CRC auto-mint any more — the user MUST already hold one of
+  // the accepted wrappers. We read balanceOf across all of them and use the
+  // first one that has enough. If none do, surface a clear error.
+  setConfirmStatus('Looking up your wrapped group CRC…', 'info');
 
-  const txs = [];
-
-  if (wrappedBal !== null && wrappedBal < amountWei) {
-    // Auto-mint path: the user lacks wrapped Gnosis group CRC. Batch
-    //   groupMint (personal CRC -> group CRC, 1:1)
-    //   wrap       (group CRC ERC-1155 -> DEMURRAGED ERC-20, 1:1)
-    //   transfer   (10 CRC -> treasury)
-    // into ONE atomic Safe multisend. All-or-nothing: if the user can't mint
-    // (not a Gnosis-group member, or short on personal CRC) the whole batch
-    // reverts and no funds move.
-    //
-    // The accepted token is the DEMURRAGED wrapper: 1e18 raw == 1 CRC today,
-    // so there is no inflationary ratio to apply - mint and wrap exactly the
-    // shortfall (plus a tiny buffer for wrap rounding). Surplus stays as
-    // wrapped gCRC in the user's wallet (1:1 redeemable, not lost).
-    setConfirmStatus('Preparing mint + wrap…', 'info');
-
-    const have = wrappedBal ?? 0n;
-    const needToday = amountWei > have ? amountWei - have : 0n;
-    const mintToday = needToday + needToday / 1000n + 1n; // +0.1% wrap-rounding slack
-
-    setConfirmStatus('Confirm in your wallet: mint + wrap + pay…', 'info');
-    txs.push({
-      to: getAddress(HUB_V2_ADDRESS),
-      data: encodeFunctionData({
-        abi: HUB_V2_ABI,
-        functionName: 'groupMint',
-        args: [getAddress(GNOSIS_GROUP_ADDRESS), [user], [mintToday], '0x'],
-      }),
-      value: '0x0',
+  let chosenWrapper = null;
+  for (const tokenAddr of ACCEPTED_TOKEN_ADDRESSES) {
+    const bal = await readAny({
+      address: getAddress(tokenAddr),
+      abi: ERC20_TRANSFER_ABI,
+      functionName: 'balanceOf',
+      args: [user],
     });
-    txs.push({
-      to: getAddress(HUB_V2_ADDRESS),
-      data: encodeFunctionData({
-        abi: HUB_V2_ABI,
-        functionName: 'wrap',
-        args: [getAddress(GNOSIS_GROUP_ADDRESS), mintToday, CIRCLES_TYPE_DEMURRAGE],
-      }),
-      value: '0x0',
-    });
-  } else {
-    // Either the balance read failed (let the chain be the arbiter) or the
-    // user already holds enough - a single transfer.
-    setConfirmStatus('Confirm the transaction in your wallet…', 'info');
+    if (bal !== null && bal >= amountWei) {
+      chosenWrapper = getAddress(tokenAddr);
+      break;
+    }
+  }
+  if (!chosenWrapper) {
+    throw new Error(
+      'You need at least 10 CRC in one of the accepted group tokens to play a song.'
+    );
   }
 
-  // Final leg: transfer exactly amountWei of the wrapped token to the treasury.
-  txs.push({
-    to: wrapperAddress,
+  setConfirmStatus('Confirm the transaction in your wallet…', 'info');
+
+  // Single transfer of exactly amountWei of the chosen wrapper to the treasury.
+  // One sendTransactions call = one Safe multisend (here just one tx, but
+  // same code path as before so it's atomic with one signature).
+  const hashes = await sendTransactions([{
+    to: chosenWrapper,
     data: encodeFunctionData({
       abi: ERC20_TRANSFER_ABI,
       functionName: 'transfer',
       args: [getAddress(JUKEBOX_ADDRESS), amountWei],
     }),
     value: '0x0',
-  });
-
-  // One sendTransactions call = one atomic Safe multisend (one signature).
-  const hashes = await sendTransactions(txs);
+  }]);
   if (!hashes || hashes.length === 0) {
     throw new Error('Wallet returned no transaction hash');
   }
@@ -470,10 +435,10 @@ async function fetchQueueEntries() {
     1000,
   );
 
-  const accepted = ACCEPTED_TOKEN_ADDRESS.toLowerCase();
+  const accepted = new Set(ACCEPTED_TOKEN_ADDRESSES.map(a => a.toLowerCase()));
   const entries = [];
   for (const row of rows) {
-    if ((row.tokenAddress || '').toLowerCase() !== accepted) continue;
+    if (!accepted.has((row.tokenAddress || '').toLowerCase())) continue;
     try {
       const value = BigInt(row.amount);
       const songId = Number(value % SONG_ID_MOD);

@@ -10,10 +10,19 @@ export const RPC_FALLBACKS = [
 
 export const JUKEBOX_ADDRESS = '0xbe6e5a0bdface700cbe8f0d1c28fcb8404a1622b';
 
-// Demurraged Gnosis group CRC wrapper (1e18 raw == 1 CRC today). Only
-// Transfer events of this exact token to JUKEBOX_ADDRESS count as a paid
-// song request. Must stay in sync with examples/jukebox/constants.js.
-export const ACCEPTED_TOKEN_ADDRESS = '0x548c20e6c24E4876E20daDbEAb75362e2F5A4bC1';
+// Accepted payment tokens: DEMURRAGED group-CRC wrappers from the two
+// approved groups. The display watches for incoming ERC-20 Transfer events
+// to JUKEBOX_ADDRESS across this whole list (filter happens client-side
+// after the indexer query). 1e18 raw == 1 CRC (1:1) — the songId-in-low-bits
+// encoding depends on this. Inflationary wrappers (1e18 raw ~= 0.667 CRC)
+// are intentionally excluded because they break the songId decode.
+export const ACCEPTED_TOKEN_ADDRESSES = [
+  // Group 1: 0xc19bc204eb1c1d5b3fe500e5e5dfabab625f286c — original "Gnosis" gCRC
+  '0x548c20e6c24E4876E20daDbEAb75362e2F5A4bC1',
+  // Group 2: 0x93eD5A96347927ff6fF6b790F8Cf5258240c321f — second "Gnosis" gCRC
+  '0x8cbd18accdce45a3e6ac6909ecf42ee13f1f927a',
+];
+export const ACCEPTED_TOKEN_SET = new Set(ACCEPTED_TOKEN_ADDRESSES.map(a => a.toLowerCase()));
 
 export const BASE_AMOUNT_WEI = 10n * 10n ** 18n;
 export const SONG_ID_MOD = 10000n;
