@@ -6,62 +6,115 @@
   <title>Circles Jukebox · Display</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js"></script>
   <script src="https://w.soundcloud.com/player/api.js"></script>
 </head>
 <body>
-  <div id="tsparticles" aria-hidden="true"></div>
-
-  <div class="stage">
-    <header class="stage-header">
-      <div class="brand">
-        <span class="brand-text">Circles Jukebox</span>
+  <!-- 1920x1080 stage scaled to fit any viewport. All content lives inside #stage. -->
+  <div id="stageWrap"><div id="stage">
+    <div class="screen" id="screen">
+      <!-- Background: drifting blobs that compose an aurora over the dark base -->
+      <div class="bg" aria-hidden="true">
+        <div class="blob blob-a"></div>
+        <div class="blob blob-b"></div>
+        <div class="blob blob-c"></div>
       </div>
-      <div class="status">
-        <span id="status-dot" class="status-dot"></span>
-        <span id="status-text">Connecting…</span>
-      </div>
-    </header>
 
-    <main class="stage-main">
-      <section class="now-playing-card" id="now-playing-card">
-        <div class="now-playing-art-wrap">
-          <img id="now-playing-art" class="now-playing-art" alt="" src="/idle-art.jpg" />
+      <!-- Header: brand mark + connection status + clock -->
+      <header class="hdr" id="header" hidden>
+        <div class="hdr-left">
+          <span class="mark-dot"></span>
+          <span class="mark">CIRCLES JUKEBOX</span>
         </div>
-        <div class="now-playing-meta">
-          <div class="now-playing-label">Now playing</div>
-          <h2 id="now-playing-title" class="now-playing-title">Waiting for a request…</h2>
-          <div id="now-playing-artist" class="now-playing-artist"></div>
-          <div id="now-playing-attribution" class="now-playing-attribution"></div>
+        <div class="hdr-right">
+          <span class="live off" id="live-badge">
+            <span class="live-dot"></span>
+            <span id="live-text">CONNECTING</span>
+          </span>
+          <span class="clock" id="clock">--:--</span>
         </div>
-      </section>
+      </header>
 
-      <aside class="up-next">
-        <h3>Up next</h3>
-        <div id="up-next-list" class="up-next-list">
-          <div class="up-next-empty">Pay 10 CRC in the Circles Jukebox miniapp to queue a song.</div>
+      <!-- Main: now-playing (left) + queue + pay panel (right) -->
+      <main class="main" id="main" hidden>
+        <div class="col-left">
+          <section class="np" id="now-playing-section">
+            <div class="cover cover-big idle" id="cover-wrap" style="width: 560px; height: 560px;">
+              <img id="now-playing-art" alt="" style="position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:none;" />
+              <div class="cover-grain"></div>
+              <div class="cover-bloom"></div>
+            </div>
+            <div class="np-body">
+              <div class="np-labelrow">
+                <span class="np-label">NOW PLAYING</span>
+                <div class="eq eq-on" id="eq" aria-hidden="true">
+                  <span style="animation-delay: 0s"></span>
+                  <span style="animation-delay: 0.16s"></span>
+                  <span style="animation-delay: 0.32s"></span>
+                  <span style="animation-delay: 0.48s"></span>
+                  <span style="animation-delay: 0.64s"></span>
+                </div>
+              </div>
+              <h1 class="np-title" id="np-title">Waiting for a request…</h1>
+              <p class="np-artist" id="np-artist">The garden is quiet. Queue the next one.</p>
+              <div class="np-prog" id="np-prog" hidden>
+                <div class="np-bar"><i id="np-bar-fill"></i></div>
+                <div class="np-time">
+                  <span id="np-time-elapsed">0:00</span>
+                  <span class="np-by" id="np-by">queued by —</span>
+                  <span id="np-time-total">0:00</span>
+                </div>
+              </div>
+            </div>
+          </section>
         </div>
-      </aside>
-    </main>
+        <aside class="col-right">
+          <section class="queue" id="queue-section">
+            <div class="q-head">
+              <span class="np-label">UP NEXT</span>
+              <span class="q-count" id="q-count">0 in queue</span>
+            </div>
+            <div class="q-list" id="q-list">
+              <div class="q-empty" id="q-empty">No one in line yet. Be the first.</div>
+            </div>
+          </section>
+          <section class="pay">
+            <div class="pay-copy">
+              <div class="np-label">PAY TO PLAY</div>
+              <p class="pay-lead">
+                Drop <b>10 CRC</b> in the Jukebox miniapp to slide your track into the garden.
+              </p>
+            </div>
+            <div class="qr-pair">
+              <figure class="qr">
+                <div class="qr-frame qr-pulse"><img src="/qr-jukebox.svg" alt="Open the Jukebox miniapp" /></div>
+                <figcaption>Pay to play</figcaption>
+              </figure>
+              <figure class="qr">
+                <div class="qr-frame"><img src="/qr-join.png" alt="Get the Circles app" /></div>
+                <figcaption>Get the app</figcaption>
+              </figure>
+            </div>
+          </section>
+        </aside>
+      </main>
 
-    <footer class="stage-footer">
-      <span>Powered by Circles · Pay 10 CRC in the Jukebox miniapp to add a song</span>
-    </footer>
-  </div>
+      <footer class="ftr" id="footer" hidden>Powered by Circles · 10 CRC per track</footer>
 
-  <!-- Bottom-right call-to-action QR codes. Static images in public/. -->
-  <aside class="qr-corner" aria-label="Join Circles or open the jukebox">
-    <figure class="qr-tile">
-      <img class="qr-img" src="/qr-join.png" alt="QR code to get the Circles app" />
-      <figcaption>Get the app!</figcaption>
-    </figure>
-    <figure class="qr-tile">
-      <img class="qr-img" src="/qr-jukebox.svg" alt="QR code to open the Circles Jukebox miniapp" />
-      <figcaption>Pay to play!</figcaption>
-    </figure>
-  </aside>
+      <!-- Texture overlays (always on, even during start gate) -->
+      <div class="grain"></div>
+      <div class="scan"></div>
+      <div class="vignette"></div>
+
+      <!-- Start gate: fullscreen tap-to-start that primes the SoundCloud widget autoplay -->
+      <button class="gate" id="start-gate">
+        <span class="gate-orb"><span class="gate-tri"></span></span>
+        <span class="gate-mark">CIRCLES JUKEBOX</span>
+        <span class="gate-cta">Tap to start the jukebox</span>
+      </button>
+    </div>
+  </div></div>
 
   <!-- Hidden SoundCloud widget; this is the audio source for the room. -->
   <iframe
@@ -71,67 +124,9 @@
     scrolling="no"
     frameborder="no"
     allow="autoplay; encrypted-media"
-    src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/&color=%230e00a8&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false">
+    src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/&color=%232fe3d2&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false">
   </iframe>
 
-  <!-- Tap-to-resume overlay: shown when browser blocks autoplay after refresh -->
-  <div id="tap-overlay" class="tap-overlay hidden">
-    <div class="tap-overlay-content">
-      <div class="tap-icon">▶</div>
-      <div class="tap-text">Tap to start the jukebox</div>
-    </div>
-  </div>
-
-  <script>
-    // tsParticles — organic ambient particle field
-    tsParticles.load("tsparticles", {
-      fullScreen: { enable: true, zIndex: 0 },
-      fpsLimit: 30,
-      particles: {
-        number: { value: 40, density: { enable: true } },
-        color: { value: ["#e8a850", "#7a9a7e", "#5b8c85", "#c4a882", "#d1a96a"] },
-        shape: { type: "circle" },
-        opacity: {
-          value: { min: 0.1, max: 0.6 },
-          animation: { enable: true, speed: 0.3, sync: false, minimumValue: 0.1 }
-        },
-        size: {
-          value: { min: 2, max: 14 },
-          animation: { enable: true, speed: 1.5, sync: false, minimumValue: 1 }
-        },
-        move: {
-          enable: true,
-          speed: { min: 0.3, max: 1.2 },
-          direction: "none",
-          random: true,
-          straight: false,
-          outModes: { default: "bounce" },
-          trail: { enable: true, length: 6, fill: { color: "#fef9f0" } }
-        },
-        links: {
-          enable: true,
-          distance: 150,
-          color: "#c4a882",
-          opacity: 0.2,
-          width: 0.8,
-          triangles: { enable: false }
-        }
-      },
-      interactivity: {
-        events: {
-          onHover: { enable: true, mode: "grab" },
-          onClick: { enable: false }
-        },
-        modes: {
-          grab: { distance: 180, links: { opacity: 0.4, color: "#e8a850" } }
-        }
-      },
-      background: {
-        color: { value: "transparent" }
-      },
-      detectRetina: true
-    });
-  </script>
   <script type="module" src="main.js"></script>
 </body>
 </html>
