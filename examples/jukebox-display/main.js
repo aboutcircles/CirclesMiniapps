@@ -24,6 +24,7 @@ import {
   SONG_ID_MOD,
   POLL_INTERVAL_MS,
   PLAYHEAD_KEY,
+  START_BLOCK,
 } from './constants.js';
 
 // ─── DOM refs ───────────────────────────────────────────────
@@ -93,7 +94,15 @@ function initWidget() {
     // Skip ahead so a broken song doesn't lock the queue.
     onSongEnded();
   });
+  widget.bind(SC.Widget.Events.PLAY, () => {
+    // Autoplay succeeded — clear the check timer and hide the tap overlay.
+    clearTimeout(autoplayCheckTimer);
+    const overlay = document.getElementById('tap-overlay');
+    if (overlay) overlay.classList.add('hidden');
+  });
 }
+
+let autoplayCheckTimer = null;
 
 function loadAndPlay(soundcloudUrl) {
   if (!widget || !widgetReady) return;
@@ -105,6 +114,15 @@ function loadAndPlay(soundcloudUrl) {
     show_teaser: false,
     visual: false,
   });
+  // Detect autoplay blocking: if PLAY event doesn't fire within 3s, show
+  // the tap-to-resume overlay (browsers block autoplay after page refresh).
+  clearTimeout(autoplayCheckTimer);
+  autoplayCheckTimer = setTimeout(() => {
+    const overlay = document.getElementById('tap-overlay');
+    if (overlay && isPlaying) {
+      overlay.classList.remove('hidden');
+    }
+  }, 3000);
 }
 
 // ─── Playhead persistence ───────────────────────────────────
@@ -177,6 +195,7 @@ async function fetchQueueEntries() {
       const songId = Number(value % SONG_ID_MOD);
       const base = value - (value % SONG_ID_MOD);
       if (base !== BASE_AMOUNT_WEI) continue;
+      if (Number(row.blockNumber) < Number(START_BLOCK)) continue;
       const song = songById(songId);
       if (!song) continue;
       entries.push({
@@ -271,6 +290,9 @@ async function playEntry(index) {
   const entry = allEntries[index];
   if (!entry) return;
 
+  // Save playhead immediately so a mid-song refresh skips to the next track.
+  savePlayhead(entry.txHash);
+
   await renderNowPlaying(entry);
   renderUpNext();
   loadAndPlay(entry.song.soundcloudUrl);
@@ -325,6 +347,16 @@ async function renderUpNext() {
     upNextList.appendChild(row);
   }
 }
+
+// ─── Tap-to-resume overlay ──────────────────────────────────
+// If the browser blocked autoplay after a page refresh, the overlay appears.
+// One click gives the browser a user gesture context so widget.play() works.
+document.getElementById('tap-overlay').addEventListener('click', () => {
+  if (widget && widgetReady) {
+    widget.play();
+  }
+  document.getElementById('tap-overlay').classList.add('hidden');
+});
 
 // ─── Boot ───────────────────────────────────────────────────
 function start() {

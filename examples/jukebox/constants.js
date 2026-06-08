@@ -47,8 +47,7 @@ export const SONG_ID_MOD = 10000n;
 export const TRANSFER_EVENT_TOPIC =
   '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 
-// Earliest block to scan. Roughly the deploy time of the treasury org;
-// keeps the getLogs queries fast on every RPC. Bump if the org existed
-// for a while before this miniapp went live and we want to skip its
-// pre-jukebox transfer history.
-export const START_BLOCK = 41_500_000n;
+// Earliest block to scan. Bump this when deploying a fresh playlist to
+// ignore payments from previous events. Set to current block at deploy
+// time so the queue starts empty.
+export const START_BLOCK = 46_625_000n;

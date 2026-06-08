@@ -30,6 +30,7 @@ import {
   HUB_V2_ADDRESS,
   BASE_AMOUNT_WEI,
   SONG_ID_MOD,
+  START_BLOCK,
 } from './constants.js';
 
 // ─── DOM refs ───────────────────────────────────────────────
@@ -42,6 +43,11 @@ const songList = document.getElementById('song-list');
 const queueList = document.getElementById('queue-list');
 const disconnectedHint = document.getElementById('disconnected-hint');
 const confirmModal = document.getElementById('confirm-modal');
+const nowPlayingBar = document.getElementById('now-playing');
+const nowPlayingArt = document.getElementById('now-playing-art');
+const nowPlayingTitle = document.getElementById('now-playing-title');
+const nowPlayingArtist = document.getElementById('now-playing-artist');
+const backToTopBtn = document.getElementById('back-to-top');
 const confirmTitle = document.getElementById('confirm-title');
 const confirmArtwork = document.getElementById('confirm-artwork');
 const confirmSongTitle = document.getElementById('confirm-song-title');
@@ -474,6 +480,7 @@ async function fetchQueueEntries() {
       const base = value - (value % SONG_ID_MOD);
       // Only accept payments that round to the 10 CRC base price.
       if (base !== BASE_AMOUNT_WEI) continue;
+      if (Number(row.blockNumber) < Number(START_BLOCK)) continue;
       const song = songById(songId);
       if (!song) continue;
       entries.push({
@@ -552,9 +559,55 @@ onWalletChange((address) => {
   renderSongList();
 });
 
+// ─── Now playing bar ────────────────────────────────────────
+// Polls the same queue data the display uses, shows the most recent entry
+// as "now playing". Refreshes on the same cadence as the display (10s).
+let nowPlayingPollTimer = null;
+
+async function refreshNowPlaying() {
+  try {
+    const entries = await fetchQueueEntries();
+    if (entries.length === 0) {
+      nowPlayingBar.classList.add('hidden');
+      return;
+    }
+    // The last entry in chronological order is the most recent request.
+    // The display plays them in order, so this is the current (or next) track.
+    const latest = entries[entries.length - 1];
+    nowPlayingArt.src = latest.song.artworkUrl;
+    nowPlayingTitle.textContent = latest.song.title;
+    nowPlayingArtist.textContent = latest.song.artist;
+    nowPlayingBar.classList.remove('hidden');
+  } catch {
+    // Silently hide on error — not critical.
+    nowPlayingBar.classList.add('hidden');
+  }
+}
+
+// ─── Back to top button ────────────────────────────────────
+// Shows when the page is scrolled past 300px, scrolls to top on click.
+let scrollRaf = null;
+window.addEventListener('scroll', () => {
+  if (scrollRaf) return;
+  scrollRaf = requestAnimationFrame(() => {
+    if (window.scrollY > 300) {
+      backToTopBtn.classList.remove('hidden');
+    } else {
+      backToTopBtn.classList.add('hidden');
+    }
+    scrollRaf = null;
+  });
+}, { passive: true });
+
+backToTopBtn.addEventListener('click', () => {
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
 // ─── Init ───────────────────────────────────────────────────
 renderSongList();
 refreshQueue();
+refreshNowPlaying();
+nowPlayingPollTimer = setInterval(refreshNowPlaying, 10_000);
 
 if (!isMiniappMode()) {
   console.warn('[jukebox] Not running inside the Circles MiniApp host.');

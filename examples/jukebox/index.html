@@ -20,6 +20,19 @@
       <p class="subtitle">Pick a song, pay 10 CRC, hear it on the room speakers.</p>
     </header>
 
+    <!-- Now playing bar — always visible -->
+    <div id="now-playing" class="now-playing hidden">
+      <div class="now-playing-inner">
+        <div class="now-playing-pulse"></div>
+        <img id="now-playing-art" class="now-playing-art" alt="" />
+        <div class="now-playing-meta">
+          <div class="now-playing-label">Now playing</div>
+          <div id="now-playing-title" class="now-playing-title"></div>
+          <div id="now-playing-artist" class="now-playing-artist"></div>
+        </div>
+      </div>
+    </div>
+
     <nav class="tabs" role="tablist">
       <button id="tab-songs" class="tab active" role="tab" aria-selected="true">Songs</button>
       <button id="tab-queue" class="tab" role="tab" aria-selected="false">Recent requests</button>
@@ -27,6 +40,7 @@
 
     <!-- Songs tab -->
     <section id="songs-panel" class="panel" role="tabpanel">
+      <div id="back-to-top" class="back-to-top hidden" title="Back to top">↑</div>
       <div id="disconnected-hint" class="card card-hint">
         <div class="card-icon">🔗</div>
         <p class="card-text">

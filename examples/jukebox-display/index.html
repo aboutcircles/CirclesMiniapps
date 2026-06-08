@@ -6,17 +6,13 @@
   <title>Circles Jukebox · Display</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Monoton&family=Orbitron:wght@500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/tsparticles@2.12.0/tsparticles.bundle.min.js"></script>
   <script src="https://w.soundcloud.com/player/api.js"></script>
 </head>
 <body>
-  <div class="bg-fx" aria-hidden="true">
-    <div class="retro-sun"></div>
-    <div class="grid-floor"></div>
-    <div class="scanlines"></div>
-    <div class="vignette"></div>
-  </div>
+  <div id="tsparticles" aria-hidden="true"></div>
 
   <div class="stage">
     <header class="stage-header">
@@ -78,6 +74,64 @@
     src="https://w.soundcloud.com/player/?url=https%3A//soundcloud.com/&color=%230e00a8&auto_play=false&hide_related=true&show_comments=false&show_user=false&show_reposts=false&show_teaser=false">
   </iframe>
 
+  <!-- Tap-to-resume overlay: shown when browser blocks autoplay after refresh -->
+  <div id="tap-overlay" class="tap-overlay hidden">
+    <div class="tap-overlay-content">
+      <div class="tap-icon">▶</div>
+      <div class="tap-text">Tap to start the jukebox</div>
+    </div>
+  </div>
+
+  <script>
+    // tsParticles — organic ambient particle field
+    tsParticles.load("tsparticles", {
+      fullScreen: { enable: true, zIndex: 0 },
+      fpsLimit: 30,
+      particles: {
+        number: { value: 40, density: { enable: true } },
+        color: { value: ["#e8a850", "#7a9a7e", "#5b8c85", "#c4a882", "#d1a96a"] },
+        shape: { type: "circle" },
+        opacity: {
+          value: { min: 0.1, max: 0.6 },
+          animation: { enable: true, speed: 0.3, sync: false, minimumValue: 0.1 }
+        },
+        size: {
+          value: { min: 2, max: 14 },
+          animation: { enable: true, speed: 1.5, sync: false, minimumValue: 1 }
+        },
+        move: {
+          enable: true,
+          speed: { min: 0.3, max: 1.2 },
+          direction: "none",
+          random: true,
+          straight: false,
+          outModes: { default: "bounce" },
+          trail: { enable: true, length: 6, fill: { color: "#fef9f0" } }
+        },
+        links: {
+          enable: true,
+          distance: 150,
+          color: "#c4a882",
+          opacity: 0.2,
+          width: 0.8,
+          triangles: { enable: false }
+        }
+      },
+      interactivity: {
+        events: {
+          onHover: { enable: true, mode: "grab" },
+          onClick: { enable: false }
+        },
+        modes: {
+          grab: { distance: 180, links: { opacity: 0.4, color: "#e8a850" } }
+        }
+      },
+      background: {
+        color: { value: "transparent" }
+      },
+      detectRetina: true
+    });
+  </script>
   <script type="module" src="main.js"></script>
 </body>
 </html>

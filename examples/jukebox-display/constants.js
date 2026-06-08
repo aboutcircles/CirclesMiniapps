@@ -21,10 +21,11 @@ export const SONG_ID_MOD = 10000n;
 export const TRANSFER_EVENT_TOPIC =
   '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 
-export const START_BLOCK = 41_500_000n;
+// Bump when deploying a fresh playlist to ignore old payments.
+export const START_BLOCK = 46_625_000n;
 
 // How often to refresh the queue from chain (milliseconds).
 export const POLL_INTERVAL_MS = 10_000;
 
 // localStorage key for the playhead.
-export const PLAYHEAD_KEY = 'jukebox.playhead.v1';
+export const PLAYHEAD_KEY = 'jukebox.playhead.v2';
