@@ -62,7 +62,7 @@ export function resolveShop(address: Address): Shop {
 	);
 }
 
-// "Get €1 off over €10 by paying 100 dAMS"
+// "1€ off for 100 dAMS when purchasing above 10€"
 export function offerSentence(o: Offer): string {
-	return `Get €${o.discountEuro} off over €${o.minPurchaseEuro} by paying ${o.amountDams} dAMS`;
+	return `${o.discountEuro}€ off for ${o.amountDams} dAMS when purchasing above ${o.minPurchaseEuro}€`;
 }

@@ -394,14 +394,14 @@
 				<div class="coin coin-md">
 					<div class="coin-num">
 						<span class="num">{availableWhole}</span>
-						<span class="unit">dAMS</span>
+						<span class="unit">Your dAMS</span>
 					</div>
 				</div>
 				<h1 class="display sm">{shopName ?? shortAddress(selectedShop)}</h1>
 				<div class="card offer">
-					<p class="offer-big">€{offer.discountEuro} off</p>
+					<p class="offer-big">{offer.discountEuro}€ off</p>
 					<p class="offer-sub">
-						over €{offer.minPurchaseEuro} by paying <strong>{offer.amountDams} dAMS</strong>
+						for <strong>{offer.amountDams} dAMS</strong> when purchasing above {offer.minPurchaseEuro}€
 					</p>
 				</div>
 
@@ -435,7 +435,7 @@
 				<div class="coin coin-lg">
 					<div class="coin-num">
 						<span class="num big">{availableWhole}</span>
-						<span class="unit">dAMS</span>
+						<span class="unit">Your dAMS</span>
 					</div>
 				</div>
 
@@ -695,7 +695,6 @@
 	.coin-num .unit {
 		font-family: 'Poppins', sans-serif;
 		font-weight: 600;
-		text-transform: uppercase;
 		font-size: 0.8rem;
 		letter-spacing: 0.04em;
 		color: rgba(255, 255, 255, 0.9);
