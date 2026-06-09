@@ -1,4 +1,5 @@
- /* NFT Viewer — main.js
+/**
+ * NFT Viewer — main.js
  * Read-only gallery of ERC-721 NFTs held by the connected Circles wallet.
  * Data sourced from the Safe Transaction Service API.
  */
@@ -261,6 +262,121 @@ function updateHiddenCount() {
 function cssEscape(s) {
   if (typeof CSS !== 'undefined' && CSS.escape) return CSS.escape(s);
   return String(s).replace(/[^a-zA-Z0-9_-]/g, (c) => `\\${c}`);
+}
+
+// ============================================================================
+// Zoom / lightbox
+// ============================================================================
+
+let activeZoomOverlay = null;
+let activeZoomKeyHandler = null;
+let activeZoomScrollLock = 0;
+
+function openZoom(nft) {
+  if (!nft) return;
+  if (activeZoomOverlay) return; // already open
+
+  const srcImg = getNftImage(nft);
+  const name = getNftName(nft);
+  const collection = nft.tokenName || '';
+
+  // Build the overlay
+  const overlay = el('div', { class: 'zoom-overlay' });
+
+  const closeBtn = el('button', {
+    class: 'zoom-close',
+    attrs: { 'aria-label': 'Close', type: 'button' },
+    text: '×',
+  });
+  overlay.appendChild(closeBtn);
+
+  if (srcImg) {
+    const zoomImg = el('img', {
+      class: 'zoom-img',
+      attrs: { src: srcImg, alt: name, draggable: 'false' },
+    });
+    overlay.appendChild(zoomImg);
+
+    const caption = el('div', { class: 'zoom-caption' },
+      el('div', { class: 'zoom-name' }, name),
+      collection ? el('div', { class: 'zoom-collection' }, collection) : null,
+    );
+    overlay.appendChild(caption);
+
+    // Close on image click (anywhere on the image) — openZoom is reached
+    // via image click, so clicking again is the natural way to dismiss.
+    zoomImg.addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeZoom();
+    });
+  } else {
+    // No image — show a placeholder
+    overlay.appendChild(el('div', {
+      class: 'zoom-img',
+      style: 'display:flex;align-items:center;justify-content:center;font-size:6rem;background:#1c1c26;color:#8e8ea0;',
+    }, '🖼'));
+  }
+
+  // Close on backdrop click (but not on the close button, which has its own handler)
+  overlay.addEventListener('click', () => closeZoom());
+  closeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeZoom();
+  });
+
+  // Escape key
+  activeZoomKeyHandler = (e) => {
+    if (e.key === 'Escape') closeZoom();
+  };
+  document.addEventListener('keydown', activeZoomKeyHandler);
+
+  // Body scroll lock
+  activeZoomScrollLock = window.scrollY;
+  document.body.style.position = 'fixed';
+  document.body.style.top = `-${activeZoomScrollLock}px`;
+  document.body.style.left = '0';
+  document.body.style.right = '0';
+  document.body.style.overflow = 'hidden';
+
+  document.body.appendChild(overlay);
+  activeZoomOverlay = overlay;
+
+  // Animate in
+  const img = overlay.querySelector('.zoom-img');
+  const caption = overlay.querySelector('.zoom-caption');
+  animator.zoomIn({ backdrop: overlay, img, caption });
+}
+
+function closeZoom() {
+  if (!activeZoomOverlay) return;
+  const overlay = activeZoomOverlay;
+  const img = overlay.querySelector('.zoom-img');
+  const caption = overlay.querySelector('.zoom-caption');
+
+  // Clean up listeners and body lock immediately so re-opening works
+  if (activeZoomKeyHandler) {
+    document.removeEventListener('keydown', activeZoomKeyHandler);
+    activeZoomKeyHandler = null;
+  }
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.left = '';
+  document.body.style.right = '';
+  document.body.style.overflow = '';
+  if (activeZoomScrollLock) {
+    window.scrollTo(0, activeZoomScrollLock);
+    activeZoomScrollLock = 0;
+  }
+
+  activeZoomOverlay = null;
+
+  animator.zoomOut({
+    backdrop: overlay,
+    img,
+    caption,
+  }).then(() => {
+    overlay.remove();
+  });
 }
 
 // ============================================================================
@@ -534,15 +650,17 @@ function renderDetail(nft) {
 
   // Image
   if (img) {
-    detail.appendChild(el('img', {
+    const imgEl = el('img', {
       class: 'detail-img',
-      attrs: { src: img, alt: name },
+      attrs: { src: img, alt: name, draggable: 'false' },
       on: {
+        click: () => openZoom(nft),
         error: (e) => {
           e.target.replaceWith(el('div', 'detail-img placeholder', '🖼'));
         },
       },
-    }));
+    });
+    detail.appendChild(imgEl);
   } else {
     detail.appendChild(el('div', 'detail-img placeholder', '🖼'));
   }

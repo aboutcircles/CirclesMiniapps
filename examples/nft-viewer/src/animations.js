@@ -433,6 +433,93 @@ export function createAnimator() {
   }
 
   // ========================================================================
+  // Zoom / lightbox
+  // ========================================================================
+
+  /**
+   * Animate a lightbox/zoom overlay open. The image scales from 0.92
+   * to 1 while the backdrop fades in.
+   *
+   * @param {object} els
+   * @param {Element} els.backdrop - the full-viewport overlay container
+   * @param {Element} els.img      - the image element being zoomed
+   * @param {Element} [els.caption] - optional caption element
+   * @returns {Promise<void>}
+   */
+  function zoomIn({ backdrop, img, caption } = {}) {
+    return new Promise((resolve) => {
+      if (backdrop) {
+        tweenFrom(backdrop, {
+          opacity: 0,
+          duration: 0.3,
+          ease: EASE.out,
+        });
+      }
+      if (img) {
+        tweenFrom(img, {
+          opacity: 0,
+          scale: 0.92,
+          duration: 0.5,
+          ease: EASE.outStrong,
+          onComplete: resolve,
+        });
+      } else {
+        resolve();
+      }
+      if (caption) {
+        tweenFrom(caption, {
+          y: 10,
+          opacity: 0,
+          duration: 0.4,
+          ease: EASE.out,
+          delay: 0.2,
+        });
+      }
+    });
+  }
+
+  /**
+   * Animate a lightbox/zoom overlay closed. Resolves when the backdrop
+   * fade-out is complete.
+   *
+   * @param {object} els
+   * @param {Element} els.backdrop
+   * @param {Element} els.img
+   * @param {Element} [els.caption]
+   * @returns {Promise<void>}
+   */
+  function zoomOut({ backdrop, img, caption } = {}) {
+    return new Promise((resolve) => {
+      if (caption) {
+        tweenTo(caption, {
+          opacity: 0,
+          y: 10,
+          duration: 0.2,
+          ease: EASE.in,
+        });
+      }
+      if (img) {
+        tweenTo(img, {
+          opacity: 0,
+          scale: 0.96,
+          duration: 0.3,
+          ease: EASE.in,
+        });
+      }
+      if (backdrop) {
+        tweenTo(backdrop, {
+          opacity: 0,
+          duration: 0.3,
+          ease: EASE.in,
+          onComplete: resolve,
+        });
+      } else {
+        resolve();
+      }
+    });
+  }
+
+  // ========================================================================
   // Cleanup
   // ========================================================================
 
@@ -462,6 +549,9 @@ export function createAnimator() {
     showDetailImage,
     openDetail,
     closeDetail,
+    // zoom
+    zoomIn,
+    zoomOut,
     // lifecycle
     kill,
   };

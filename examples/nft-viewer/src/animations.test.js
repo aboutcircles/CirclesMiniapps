@@ -70,6 +70,8 @@ describe('createAnimator', () => {
     expect(typeof a.showDetailImage).toBe('function');
     expect(typeof a.openDetail).toBe('function');
     expect(typeof a.closeDetail).toBe('function');
+    expect(typeof a.zoomIn).toBe('function');
+    expect(typeof a.zoomOut).toBe('function');
     expect(typeof a.kill).toBe('function');
   });
 
