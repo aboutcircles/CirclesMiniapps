@@ -20,11 +20,12 @@ import { gnosis } from 'viem/chains';
 export const CIRCLES_RPC = 'https://rpc.aboutcircles.com/';
 
 // Canonical Circles V2 deployment on Gnosis Chain (verified on-chain).
-export const HUB_V2: Address = '0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8';
+// Normalized through getAddress() so the checksum casing can never be wrong.
+export const HUB_V2: Address = getAddress('0xc12c1e50abb450d6205ea2c3fa861b3b834d13e8');
 
 // Circles Amsterdam group ("dAMS") and its demurraged ERC20 wrapper.
-export const GROUP: Address = '0xef63594eEA262E3D6cF3B93143773Ac65fAFC2e6';
-export const DAMS_ERC20: Address = '0xC8e489adf9602c2Af39CC141Cb7a54e7F88c5c07';
+export const GROUP: Address = getAddress('0xef63594eea262e3d6cf3b93143773ac65fafc2e6');
+export const DAMS_ERC20: Address = getAddress('0xc8e489adf9602c2af39cc141cb7a54e7f88c5c07');
 
 export const ONE = 10n ** 18n;
 const CIRCLES_TYPE_DEMURRAGE = 0; // CirclesType enum: 0 = Demurrage, 1 = Inflation
