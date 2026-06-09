@@ -13,6 +13,7 @@
 		type UserState
 	} from './circles';
 	import { SHOPS, resolveShop, offerSentence, DEFAULT_OFFER, type Offer } from './shops';
+	import { maxConvertibleToDams, buildBoostTxs } from './boost';
 
 	// Server (service EOA) that adds new users to the Circles Amsterdam group so
 	// they can mint dAMS. Defaults to the deployed pilot endpoint; override with
@@ -44,8 +45,17 @@
 	let showReceipt = $state(false);
 	let menuOpen = $state(false);
 
+	// Boost ("secret" route): convert existing Circles into max dAMS.
+	let showBoostHint = $state(false);
+	let boostPhase = $state<'idle' | 'computing' | 'choose' | 'converting'>('idle');
+	let boostMax = $state(0); // whole dAMS the user can convert
+	let boostAmount = $state(0); // whole dAMS the user chose
+	let boostError = $state('');
+	let boostDone = $state(0); // whole dAMS converted in the last run (for the toast)
+
 	let membershipTried = '';
 	let loadedFor = '';
+	let lastCoinTap = 0;
 
 	// ----- Derived -----
 	const connectedAddress = $derived(
@@ -224,6 +234,57 @@
 		userState = null;
 		loadedFor = '';
 		receipt = null;
+	}
+
+	// ----- Boost: double-tap the coin to convert existing Circles into dAMS -----
+	function handleCoinTap() {
+		const t = Date.now();
+		if (t - lastCoinTap < 400) {
+			lastCoinTap = 0;
+			startBoost();
+		} else {
+			lastCoinTap = t;
+		}
+	}
+
+	async function startBoost() {
+		const a = connectedAddress;
+		if (!a || boostPhase !== 'idle') return;
+		showBoostHint = false;
+		boostError = '';
+		boostPhase = 'computing';
+		try {
+			const max = await maxConvertibleToDams(a);
+			boostMax = Math.floor(Number(max) / 1e18);
+			boostAmount = boostMax;
+			boostPhase = 'choose';
+		} catch (e: any) {
+			boostError = e?.message ?? 'Could not check your balance.';
+			boostPhase = 'idle';
+		}
+	}
+
+	async function confirmBoost() {
+		const a = connectedAddress;
+		if (!a || boostAmount <= 0) return;
+		boostError = '';
+		boostPhase = 'converting';
+		try {
+			const txs = await buildBoostTxs(a, BigInt(boostAmount) * ONE);
+			await wallet.sendTransactions(txs);
+			boostDone = boostAmount;
+			await loadState(a);
+			boostPhase = 'idle';
+		} catch (e: any) {
+			const m = e?.message ?? 'Conversion failed.';
+			boostError = /reject|cancel|denied|rejected/i.test(m) ? 'Cancelled.' : m;
+			boostPhase = 'choose';
+		}
+	}
+
+	function closeBoost() {
+		boostPhase = 'idle';
+		boostError = '';
 	}
 
 	// ----- Lifecycle -----
@@ -432,17 +493,22 @@
 			<!-- Home -->
 		{:else}
 			<section class="screen">
-				<div class="coin coin-lg">
+				<button class="coin coin-lg" onclick={handleCoinTap} aria-label="Your dAMS balance">
 					<div class="coin-num">
 						<span class="num big">{availableWhole}</span>
 						<span class="unit">Your dAMS</span>
 					</div>
-				</div>
+				</button>
 
 				<div class="countdown">
 					<div class="countdown-row">
 						<span aria-hidden="true">⏳</span>
 						<span>Next dAMS in <strong>{nextMint.label}</strong></span>
+						<button
+							class="helper"
+							aria-label="Can I have more dAMS?"
+							onclick={() => (showBoostHint = true)}>?</button
+						>
 					</div>
 					<div class="meter"><div class="meter-fill" style="width:{nextMint.progressPct}%"></div></div>
 				</div>
@@ -513,6 +579,73 @@
 			{#if connectedAddress}<p class="menu-addr">{shortAddress(connectedAddress)}</p>{/if}
 			<button class="btn-secondary wide" onclick={signOut}>Sign out</button>
 		</div>
+	{/if}
+
+	<!-- Boost: hint -->
+	{#if showBoostHint}
+		<button class="sheet-backdrop" aria-label="Close" onclick={() => (showBoostHint = false)}></button>
+		<div class="sheet" role="dialog" aria-modal="true">
+			<div class="grab"></div>
+			<p class="sheet-body">
+				Already had an account for a while and think it should be more? Tap the red ball twice to
+				see whether you can increase your balance.
+			</p>
+			<button class="btn-secondary wide" onclick={() => (showBoostHint = false)}>Got it</button>
+		</div>
+	{/if}
+
+	<!-- Boost: computing / choose / converting -->
+	{#if boostPhase !== 'idle'}
+		<button class="sheet-backdrop" aria-label="Close" onclick={closeBoost}></button>
+		<div class="sheet" role="dialog" aria-modal="true">
+			<div class="grab"></div>
+			{#if boostPhase === 'computing'}
+				<div class="sheet-center">
+					<div class="spinner"></div>
+					<p class="muted">Checking how much you can convert…</p>
+				</div>
+			{:else if boostPhase === 'choose'}
+				{#if boostMax <= 0}
+					<h2 class="sheet-title">Nothing extra to convert</h2>
+					<p class="muted">Your balance is already as high as it can go right now.</p>
+					<button class="btn-secondary wide" onclick={closeBoost}>Close</button>
+				{:else}
+					<h2 class="sheet-title">Increase your balance</h2>
+					<p class="muted">
+						You can convert your other Circles into up to <strong>{boostMax} dAMS</strong>.
+					</p>
+					<div class="boost-amount">
+						<span class="boost-num">{boostAmount}</span>
+						<span class="boost-unit">dAMS</span>
+					</div>
+					<input
+						class="slider"
+						type="range"
+						min="1"
+						max={boostMax}
+						bind:value={boostAmount}
+						aria-label="Amount to convert"
+					/>
+					<div class="slider-ends"><span>1</span><span>{boostMax} (max)</span></div>
+					{#if boostError}<p class="error">{boostError}</p>{/if}
+					<button class="btn-primary" onclick={confirmBoost}>Convert {boostAmount} dAMS</button>
+					<button class="btn-text" onclick={closeBoost}>Cancel</button>
+				{/if}
+			{:else if boostPhase === 'converting'}
+				<div class="sheet-center">
+					<div class="spinner"></div>
+					<p class="muted">Converting…</p>
+					<p class="muted small">Confirm with your device when prompted.</p>
+				</div>
+			{/if}
+		</div>
+	{/if}
+
+	<!-- Boost: success toast -->
+	{#if boostDone > 0 && boostPhase === 'idle'}
+		<button class="toast" onclick={() => (boostDone = 0)}>
+			✅ Added {boostDone} dAMS to your balance
+		</button>
 	{/if}
 </div>
 
@@ -648,6 +781,12 @@
 	}
 
 	/* Coin orb */
+	button.coin {
+		border: none;
+		font: inherit;
+		color: inherit;
+		cursor: pointer;
+	}
 	.coin {
 		background-image: radial-gradient(
 			circle at 35% 30%,
@@ -1065,6 +1204,119 @@
 		margin: 2px 0 12px;
 		font-size: 0.85rem;
 		color: rgba(255, 255, 255, 0.55);
+	}
+
+	/* Boost */
+	.helper {
+		width: 20px;
+		height: 20px;
+		border-radius: 999px;
+		border: 1px solid rgba(255, 255, 255, 0.3);
+		background: transparent;
+		color: rgba(255, 255, 255, 0.7);
+		font-size: 0.7rem;
+		font-weight: 700;
+		line-height: 1;
+		cursor: pointer;
+		padding: 0;
+	}
+	.sheet-backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 45;
+		background: rgba(46, 31, 140, 0.6);
+		border: none;
+	}
+	.sheet {
+		position: fixed;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		z-index: 46;
+		max-width: 460px;
+		margin: 0 auto;
+		background: #3a2aaf;
+		border: 1px solid rgba(255, 255, 255, 0.14);
+		border-bottom: none;
+		border-radius: 28px 28px 0 0;
+		padding: 14px 22px 28px;
+		box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.35);
+		animation: riseIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+	}
+	.grab {
+		width: 44px;
+		height: 5px;
+		border-radius: 999px;
+		background: rgba(255, 255, 255, 0.25);
+		margin: 0 auto 16px;
+	}
+	.sheet-body {
+		font-size: 1.05rem;
+		line-height: 1.5;
+		color: rgba(255, 255, 255, 0.85);
+		margin: 4px 0 18px;
+	}
+	.sheet-title {
+		font-family: 'Poppins', sans-serif;
+		font-size: 1.3rem;
+		font-weight: 600;
+		margin: 0 0 4px;
+	}
+	.sheet-center {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 12px;
+		padding: 24px 0 8px;
+	}
+	.boost-amount {
+		display: flex;
+		align-items: baseline;
+		justify-content: center;
+		gap: 8px;
+		margin: 18px 0 6px;
+	}
+	.boost-num {
+		font-family: 'Archivo', sans-serif;
+		font-weight: 900;
+		font-size: 3rem;
+		line-height: 1;
+	}
+	.boost-unit {
+		font-family: 'Poppins', sans-serif;
+		font-weight: 600;
+		color: #9991ef;
+	}
+	.slider {
+		width: 100%;
+		accent-color: #f26e2e;
+		margin: 6px 0 2px;
+	}
+	.slider-ends {
+		display: flex;
+		justify-content: space-between;
+		font-size: 0.8rem;
+		color: rgba(255, 255, 255, 0.5);
+		margin-bottom: 16px;
+	}
+	.sheet .btn-primary {
+		margin-top: 6px;
+	}
+	.toast {
+		position: fixed;
+		left: 50%;
+		bottom: 24px;
+		transform: translateX(-50%);
+		z-index: 47;
+		border: 1px solid rgba(118, 205, 156, 0.5);
+		background: rgba(46, 31, 140, 0.96);
+		color: #fff;
+		border-radius: 999px;
+		padding: 12px 20px;
+		font-weight: 600;
+		cursor: pointer;
+		box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+		animation: riseIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 	}
 
 	/* Animations */

@@ -181,6 +181,18 @@ export interface Transaction {
 	value?: string;
 }
 
+// Wrap `amountWei` of the group's ERC1155 dAMS into demurraged ERC20.
+export function wrapTx(amountWei: bigint): Transaction {
+	return {
+		to: HUB_V2,
+		data: encodeFunctionData({
+			abi: hubAbi,
+			functionName: 'wrap',
+			args: [GROUP, amountWei, CIRCLES_TYPE_DEMURRAGE]
+		})
+	};
+}
+
 export interface ClaimPlan {
 	txs: Transaction[];
 	deliverableErc20: bigint; // dAMS that will be deliverable as ERC20 after the batch (wei)
