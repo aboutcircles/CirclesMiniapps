@@ -189,5 +189,18 @@
       "template"
     ],
     "category": "garage"
+  },
+  {
+    "slug": "nft-viewer",
+    "name": "NFT Gallery",
+    "logo": "/app-logos/nft-viewer.svg",
+    "url": "https://nft-viewer-ten.vercel.app/",
+    "description": "Read-only gallery of every ERC-721 NFT held by the connected Circles wallet. Highlights the Gnosis NFT, hides spam, exposes contract + Blockscout copy buttons.",
+    "tags": [
+      "nft",
+      "gallery",
+      "tools"
+    ],
+    "category": "garage"
   }
 ]
