@@ -9,9 +9,11 @@
  *
  * Payment rail: a native Circles ERC-1155 transfer on Hub V2 —
  * `safeTransferFrom(payer, JUKEBOX_ADDRESS, crcTokenId, amount, "")`. Payment is
- * restricted to native group CRC ("gCRC") from two approved groups: we look up
- * the payer's balances and pick a native v2 token whose id is one of the two
- * accepted group token ids (see ACCEPTED_TOKEN_IDS). On-chain encoding:
+ * restricted to group CRC ("gCRC") from two approved groups; personal CRC and
+ * other groups are rejected. The payer may hold that gCRC in native ERC-1155
+ * form or wrapped as an ERC-20 — we count both, and if a wrapped balance is
+ * needed we unwrap it to native in the same transaction bundle, so the payment
+ * always lands as a single native TransferSingle. On-chain encoding:
  * amount = 10e18 + songId wei. The display decodes the songId from each
  * incoming TransferSingle as `amount % SONG_ID_MOD`.
  */
@@ -86,6 +88,19 @@ const rpcClients = RPC_FALLBACKS.map(url =>
 // from the canonical SDK ABI (@aboutcircles/sdk-abis) so it can't drift. The
 // payer's balances come from the SDK's indexer (sdk.rpc.balance), not raw
 // balanceOf, so we can pick from any CRC they hold.
+
+// Minimal ABI for unwrapping a Circles ERC-20 wrapper back to native ERC-1155
+// CRC. Both wrapper kinds (demurraged and inflationary) expose the same
+// `unwrap(uint256)`; the argument is the balance in the wrapper's own units.
+// Used to free wrapped gCRC into native form in the same tx as the payment, so
+// users never have to unwrap by hand.
+const erc20UnwrapAbi = [{
+  type: 'function',
+  name: 'unwrap',
+  inputs: [{ name: '_amount', type: 'uint256' }],
+  outputs: [],
+  stateMutability: 'nonpayable',
+}];
 
 // ─── Helpers ────────────────────────────────────────────────
 function decodeError(err) {
@@ -258,12 +273,14 @@ async function payForSong(song) {
   // Hub emits TransferSingle with this value verbatim.
   const amountWei = BASE_AMOUNT_WEI + BigInt(song.id);
 
-  // Pick a native Hub V2 CRC token the user actually holds. Payment is
-  // restricted to the two approved groups' gCRC — only an unwrapped v2 ERC-1155
-  // token whose id is in ACCEPTED_TOKEN_IDS qualifies. Personal CRC and other
-  // groups are rejected. Native balances are demurraged 1:1, so `attoCircles`
-  // (the demurraged balance, == on-chain balanceOf) is directly comparable to
-  // amountWei and is the unit safeTransferFrom moves. There is no auto-mint.
+  // Gather the user's holdings of each approved group, counting native ERC-1155
+  // and wrapped ERC-20 (demurraged or inflationary) together. Payment is
+  // restricted to the two approved groups' gCRC; personal CRC and other groups
+  // are ignored. `attoCircles` is the demurraged/par value for every form, so
+  // it's directly comparable to amountWei and summable across forms. We always
+  // *pay* in native CRC — any wrapped portion is unwrapped first, in the same tx
+  // bundle, so the user never has to deal with wrap state. There is no auto-mint
+  // and no pathfinding: payment can only ever move the user's own approved gCRC.
   setConfirmStatus('Looking up your group CRC balance…', 'info');
 
   let balances;
@@ -274,36 +291,93 @@ async function payForSong(song) {
     throw new Error("Couldn't read your CRC balance — please try again.");
   }
 
-  const candidates = (balances || []).filter(b =>
-    b.isErc1155 && !b.isWrapped && Number(b.version) === 2 &&
-    isAcceptedTokenId(b.tokenId) &&
-    BigInt(b.attoCircles) >= amountWei
-  );
-  // Spend the largest balance first — avoids a demurrage rounding edge where a
-  // just-enough balance dips below the price between this read and execution.
-  candidates.sort((a, b) =>
-    BigInt(b.attoCircles) > BigInt(a.attoCircles) ? 1 : -1
-  );
-  const chosen = candidates[0];
-  if (!chosen) {
-    // Hold enough of an approved group's CRC, but wrapped as an ERC-20? The
-    // native transfer can't reach it — point them at unwrapping.
-    const hasWrappedAccepted = (balances || []).some(b =>
-      b.isWrapped && isAcceptedGroupOwner(b) && BigInt(b.attoCircles) >= amountWei
-    );
-    if (hasWrappedAccepted) {
-      throw new Error('Your group CRC is wrapped as an ERC-20. Unwrap it to native CRC in your wallet, then try again.');
+  // owner(lowercase) -> { native, combined, wrapped: [{ tokenAddress, atto, raw }] }
+  const groups = new Map();
+  for (const b of (balances || [])) {
+    if (Number(b.version) !== 2 || !isAcceptedGroupOwner(b)) continue;
+    const owner = String(b.tokenOwner).toLowerCase();
+    const slot = groups.get(owner) || { native: 0n, combined: 0n, wrapped: [] };
+    const atto = BigInt(b.attoCircles);
+    slot.combined += atto;
+    if (b.isErc1155 && !b.isWrapped) {
+      slot.native += atto;
+    } else if (b.isWrapped) {
+      // `raw` is this wrapper's full balance in its own units (the value to
+      // pass to unwrap() to free all of it): demurraged == attoCircles (par),
+      // inflationary == staticAttoCircles.
+      slot.wrapped.push({
+        tokenAddress: getAddress(b.tokenAddress),
+        atto,
+        isInflationary: !!b.isInflationary,
+        raw: b.isInflationary ? BigInt(b.staticAttoCircles) : atto,
+      });
     }
+    groups.set(owner, slot);
+  }
+
+  // Pick the approved group with the most total CRC that covers the price.
+  // Gating on the *combined* (native + wrapped) balance guarantees the unwrap
+  // step below only ever frees the user's own gCRC, never spilling over to a
+  // non-approved token.
+  let chosenOwner = null;
+  let chosen = null;
+  for (const [owner, slot] of groups) {
+    if (slot.combined < amountWei) continue;
+    if (!chosen || slot.combined > chosen.combined) {
+      chosenOwner = owner;
+      chosen = slot;
+    }
+  }
+  if (!chosen) {
     throw new Error('You need at least 10 CRC from one of the two approved Circles groups to play a song.');
   }
-  const tokenId = BigInt(chosen.tokenId);
+  // Native Hub V2 token id for this group == uint256(group avatar). After any
+  // unwrap below, this is the token safeTransferFrom moves.
+  const tokenId = BigInt(getAddress(chosenOwner));
+
+  // If the native balance alone doesn't cover the price, unwrap approved-group
+  // wrappers until it does. Demurraged wrappers come first (1:1 with native, so
+  // we can unwrap just the shortfall and leave the rest wrapped); inflationary
+  // wrappers are a fallback and get unwrapped in full, since their ERC-20 unit
+  // is "static" and a partial amount would need an on-chain conversion. Any
+  // leftover stays as native CRC. These calls are prepended to the payment so
+  // the wallet asks for a single confirmation (one atomic Safe bundle).
+  const prelude = [];
+  if (chosen.native < amountWei) {
+    setConfirmStatus('Preparing your CRC…', 'info');
+    let running = chosen.native;
+    const wrappers = chosen.wrapped.slice().sort((a, b) => {
+      if (a.isInflationary !== b.isInflationary) return a.isInflationary ? 1 : -1;
+      return b.atto > a.atto ? 1 : -1;
+    });
+    for (const w of wrappers) {
+      if (running >= amountWei) break;
+      const need = amountWei - running;
+      // demurraged: unwrap just the shortfall (capped at this wrapper's balance);
+      // inflationary: unwrap the whole balance (in its own static units).
+      const amount = w.isInflationary || need >= w.atto ? w.raw : need;
+      prelude.push({
+        to: w.tokenAddress,
+        data: encodeFunctionData({
+          abi: erc20UnwrapAbi,
+          functionName: 'unwrap',
+          args: [amount],
+        }),
+        value: '0x0',
+      });
+      running += w.isInflationary || need >= w.atto ? w.atto : need;
+    }
+  }
 
   setConfirmStatus('Confirm the transaction in your wallet…', 'info');
 
-  // Native ERC-1155 transfer: move exactly amountWei of the chosen CRC to the
-  // treasury. One sendTransactions call = one Safe tx; the Safe is both _from
-  // and msg.sender, so no operator approval is needed.
-  const hashes = await sendTransactions([{
+  // Native ERC-1155 transfer: move exactly amountWei of the group's CRC to the
+  // treasury. The Safe is both _from and msg.sender, so no operator approval is
+  // needed. Bundled after any unwrap calls — sendTransactions runs the whole
+  // array as one Safe tx (the native freed by unwrap is spendable by the
+  // transfer in the same tx), and the on-chain TransferSingle carries amountWei
+  // verbatim, so the songId decode on the reader/display side is unchanged.
+  const payTx = {
     to: getAddress(HUB_V2_ADDRESS),
     data: encodeFunctionData({
       abi: hubV2Abi,
@@ -311,13 +385,17 @@ async function payForSong(song) {
       args: [user, getAddress(JUKEBOX_ADDRESS), tokenId, amountWei, '0x'],
     }),
     value: '0x0',
-  }]);
+  };
+
+  const hashes = await sendTransactions([...prelude, payTx]);
   if (!hashes || hashes.length === 0) {
     throw new Error('Wallet returned no transaction hash');
   }
 
   setConfirmStatus('Waiting for confirmation…', 'info');
-  const receipt = await waitForReceipt(hashes[0]);
+  // The payment is the last call in the bundle; wait on the last returned hash
+  // (one Safe tx → one hash, but stay robust if the bridge returns one per call).
+  const receipt = await waitForReceipt(hashes[hashes.length - 1]);
   if (receipt.status !== 'success') {
     throw new Error('Transaction reverted on-chain');
   }
