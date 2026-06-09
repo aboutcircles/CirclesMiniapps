@@ -49,9 +49,34 @@ This activates a viem-based local wallet instead of the miniapp-sdk bridge.
 npm run build
 ```
 
-Output goes to `dist/`. Deploy to any static host (Vercel recommended).
+Output goes to `dist/`. Deploy to any static host (Netlify or Vercel).
 
-## Deploy to Vercel
+## Deploy to Netlify (same project)
+
+This app ships with a `netlify.toml` so the existing Netlify project can host
+it without any extra config.
+
+**Option A — Git integration (recommended):**
+1. In the Netlify dashboard, open the existing site.
+2. **Site settings → Build & deploy → Continuous deployment**:
+   - Base directory: `examples/nft-viewer`
+   - Build command: `npm run build`
+   - Publish directory: `dist`
+   - Production branch: `feature/nft-viewer-miniapp` (or whichever branch you want deployed)
+3. Push to that branch → Netlify builds and deploys automatically.
+
+**Option B — CLI (one-off deploys):**
+```bash
+cd examples/nft-viewer
+npm run deploy        # production deploy to the linked site
+# or
+npm run deploy:draft  # draft URL for preview
+```
+
+You'll need to be logged in first: `npx netlify login` and `npx netlify link`
+to associate the directory with the existing site (one-time setup).
+
+## Deploy to Vercel (alternative)
 
 ```bash
 # From repo root
