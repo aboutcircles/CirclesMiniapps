@@ -16,6 +16,8 @@
 	interface GroupConfig {
 		groupAddress: string;
 		orgAddress: string;
+		/** Human-readable name shown in the intro text (e.g. "Dandelion"). */
+		displayName: string;
 		/** Invitation slug for this group. Falls back to DEFAULT_INVITE_SLUG if omitted. */
 		inviteSlug?: string;
 	}
@@ -26,29 +28,107 @@
 	const GROUP_CONFIGS: Record<string, GroupConfig> = {
 		'parallel-society': {
 			groupAddress: '0x6F99506cD91560305bD4859DcDdcb422EAA81F02',
-			orgAddress:   '0x62532eeB3779fDA75554e1EeEce552D0a9FF1C56'
+			orgAddress:   '0x62532eeB3779fDA75554e1EeEce552D0a9FF1C56',
+			displayName:  'Parallel Society'
 		},
 		'dandelion': {
 		    groupAddress: '0x1d3663CebF6c7f54bE62B210d68eeA0E38838582',
 			orgAddress: '0x33aa31e1392FFB37b1b3572A1E2cc0651D0BCb7F',
+			displayName: 'Dandelion',
 			inviteSlug: '0Gsv1Xjl'
 		},
 		'bfn': {
 			groupAddress: '0xeb614ef61367687704cd4628a68a02f3b10ce68c',
-			orgAddress:   '0xd4591B6F845C0C496D03A4eAb3a8ca4304EFA60D'
+			orgAddress:   '0xd4591B6F845C0C496D03A4eAb3a8ca4304EFA60D',
+			displayName:  'BFN'
 			// inviteSlug: 'XXXXXXXX'  ← set a group-specific slug here when available
 		}
 		// Add more entries like this:
 		// myevent: {
 		//   groupAddress: '0xAAAA...',
 		//   orgAddress:   '0xBBBB...',
+		//   displayName:  'My Event',
 		//   inviteSlug:   'YYYYYYYY'
 		// }
+	};
+
+	// ----- Intro texts -----
+	// Keyed by the ?text= URL param. `{group}` is replaced with the active group's displayName.
+	// `text` is rendered as HTML so you can use <strong>, <em>, etc. for emphasis.
+	// `utmContent` (optional) overrides the default `kudos-intro-<key>` analytics tag —
+	// use this to bump the analytics bucket when you rewrite copy *in place* without
+	// changing the URL key (e.g. so embedders don't have to update their iframe src).
+	// If ?text= is missing or unknown, no intro is shown.
+	interface IntroText {
+		text: string;
+		utmContent?: string;
+	}
+	const INTRO_TEXTS: Record<string, IntroText> = {
+		v2: {
+			// Copy rewritten 2026-05 — URL key stays `v2` for partner-link stability,
+			// but UTM bumped to v3 so analytics can separate old- vs new-copy traffic.
+			text:
+				'Circles gives every member €100/year in community currency. Automatically, ' +
+				'no banks, no middlemen. {group} accepts it as a real donation. Sign up in ' +
+				'two minutes, free forever.',
+			utmContent: 'kudos-intro-v3'
+		},
+		test: {
+			text:
+				'TEST TEXT — if you see this, the ?text= URL param is working. The active ' +
+				'group is {group}. Swap to ?text=v2 to see the production intro.'
+		}
 	};
 
 	// ----- Query params -----
 	const recipientAddress = $derived(page.url.searchParams.get('address') ?? null);
 	const showTrust = $derived(page.url.searchParams.has('trust'));
+	const themeColor = $derived(parseThemeColor(page.url.searchParams.get('theme_color')));
+
+	function parseThemeColor(input: string | null): string | null {
+		if (!input) return null;
+		let s = input.trim();
+		if (s.startsWith('#')) s = s.slice(1);
+		else if (s.startsWith('%23')) s = s.slice(3);
+		if (s.length === 3) s = s.split('').map((c) => c + c).join('');
+		if (!/^[0-9a-fA-F]{6}$/.test(s)) return null;
+		return `#${s.toLowerCase()}`;
+	}
+
+	// ----- Theme override -----
+	// ?theme_color=<hex> (with or without #, 3 or 6 digits) overrides the
+	// primary accent. Border / hover / 3D shadow shades are derived from it.
+	function parseHex(input: string | null): { r: number; g: number; b: number } | null {
+		if (!input) return null;
+		let h = input.trim().replace(/^#/, '');
+		if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+		if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+		return {
+			r: parseInt(h.slice(0, 2), 16),
+			g: parseInt(h.slice(2, 4), 16),
+			b: parseInt(h.slice(4, 6), 16)
+		};
+	}
+	function shade({ r, g, b }: { r: number; g: number; b: number }, factor: number): string {
+		const adj = (c: number) => Math.max(0, Math.min(255, Math.round(c * factor)));
+		const toHex = (c: number) => c.toString(16).padStart(2, '0');
+		return `#${toHex(adj(r))}${toHex(adj(g))}${toHex(adj(b))}`;
+	}
+	const themeRgb = $derived(parseHex(page.url.searchParams.get('theme_color')));
+	const themeVars = $derived.by(() => {
+		if (!themeRgb) return '';
+		const primary = shade(themeRgb, 1);
+		const hover = shade(themeRgb, 1.08);
+		const border = shade(themeRgb, 0.88);
+		const shadow = shade(themeRgb, 0.7);
+		return [
+			`--theme-primary:${primary}`,
+			`--theme-primary-hover:${hover}`,
+			`--theme-border:${border}`,
+			`--theme-shadow:${shadow}`,
+			`--theme-shadow-rgba:${themeRgb.r},${themeRgb.g},${themeRgb.b}`
+		].join(';');
+	});
 
 	// ----- Dynamic group / org resolution -----
 	// ?group=<key> is required. The key must match an entry in GROUP_CONFIGS above.
@@ -57,11 +137,34 @@
 	);
 	const GROUP_ADDRESS = $derived(activeConfig?.groupAddress ?? '');
 	const ORG_ADDRESS = $derived(activeConfig?.orgAddress ?? '');
+	const groupDisplayName = $derived(activeConfig?.displayName ?? '');
+
+	// ?text=<key> selects an entry from INTRO_TEXTS. Missing or unknown → no intro.
+	const introTextKey = $derived(page.url.searchParams.get('text'));
+	const activeIntro = $derived(
+		introTextKey && INTRO_TEXTS[introTextKey] ? INTRO_TEXTS[introTextKey] : null
+	);
+	const introText = $derived(
+		activeIntro ? activeIntro.text.replaceAll('{group}', groupDisplayName) : ''
+	);
+
 	const kudosHref = $derived.by(() => {
 		if (!recipientAddress || !ORG_ADDRESS) return '#';
 		const transferPath = `/transfer/${ORG_ADDRESS}/crc?data=${encodeKudosData(recipientAddress, kudosMessage)}&amount=1`;
 		const slug = activeConfig?.inviteSlug ?? DEFAULT_INVITE_SLUG;
-		return `https://circles.gnosis.io/invitation/${slug}?redirect_to=${encodeURIComponent(transferPath)}`;
+		// UTM tags on the outbound invitation URL. Hardcoded for the dandelion pilot for
+		// now — revisit (e.g. derive utm_source from the group key) once other groups go live.
+		const utmParts = [
+			'utm_source=dandelion',
+			'utm_medium=kudos-miniapp',
+			'utm_campaign=kudos-ga'
+		];
+		if (activeIntro && introTextKey) {
+			const value = activeIntro.utmContent ?? `kudos-intro-${introTextKey}`;
+			utmParts.push(`utm_content=${encodeURIComponent(value)}`);
+		}
+		const utm = '&' + utmParts.join('&');
+		return `https://circles.gnosis.io/invitation/${slug}?redirect_to=${encodeURIComponent(transferPath)}${utm}`;
 	});
 
 
@@ -154,6 +257,26 @@
 		pairs.sort((a, b) => b.timestamp - a.timestamp || a.transactionHash.localeCompare(b.transactionHash));
 		return pairs;
 	});
+
+	// ----- Social proof: donations dedicated to the active recipient -----
+	// Same scope as the feed: when `?address=` is set, count only donations whose
+	// encoded recipient matches that address; otherwise count all group donations.
+	// Deriving from kudosPairs guarantees the counter and the feed can never drift.
+	// No time window for now — while volume is small the cumulative figure is more
+	// compelling than a 7/14-day slice. Revisit when numbers get bigger.
+	const recentDonationsCount = $derived(kudosPairs.length);
+
+	// ----- Feed display cap -----
+	// We render at most this many rows so the iframe doesn't grow unboundedly on
+	// the embedder's page. The counter above still shows the true total, and an
+	// "And more…" footer makes the truncation explicit. Bump if the embedder
+	// asks for a longer feed.
+	const FEED_DISPLAY_LIMIT = 10;
+	const kudosPairsVisible = $derived(kudosPairs.slice(0, FEED_DISPLAY_LIMIT));
+	// `>=` instead of `>` so the "And more…" footer renders whenever the feed is
+	// at the cap — even if the local list happens to land on exactly 10. Treats
+	// the feed as a window onto the history rather than a definitive list.
+	const hasMoreLocal = $derived(kudosPairs.length >= FEED_DISPLAY_LIMIT);
 
 	// ----- Helpers -----
 	function truncate(addr: string): string {
@@ -328,9 +451,23 @@
 
 <svelte:head>
 	<title>Appreciations</title>
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+	<link
+		rel="stylesheet"
+		href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap"
+	/>
 </svelte:head>
 
-<div class="page">
+<div class="page" style={themeVars}>
+	{#if activeConfig && introText}
+		<header class="intro-block">
+			<img class="intro-logo" src="/circles-token.svg" alt="Circles" />
+			<h1 class="intro-cta">Donate for free</h1>
+			<!-- INTRO_TEXTS values are hardcoded in this file, so {@html} is safe here. -->
+			<p class="intro">{@html introText}</p>
+		</header>
+	{/if}
 	<div class="card">
 
 
@@ -342,14 +479,10 @@
 					href={kudosHref}
 					target="_blank"
 					rel="noopener noreferrer"
+					onclick={openKudos}
 				>
-					<div class="kudos-top-row" role="button" tabindex="0" onclick={openKudos} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') openKudos(e as unknown as MouseEvent); }}>
-						<span class="kudos-arrow">
-							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-								<path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
-							</svg>
-						</span>
-						<span class="kudos-label">Send CRC to</span>
+					<div class="kudos-top-row">
+						<span class="kudos-label">Donate to</span>
 						<div class="kudos-avatar">
 							{#if recipientProfile.imageUrl}
 								<img
@@ -368,25 +501,11 @@
 							{/if}
 						</div>
 						<strong class="kudos-name">{recipientProfile.name ?? recipientAddress.slice(0, 8) + '…' + recipientAddress.slice(-6)}</strong>
-					</div>
-					<div class="kudos-input-row">
-						<input
-							class="kudos-msg-input"
-							type="text"
-							maxlength="120"
-							placeholder="Add a message… (optional)"
-							bind:value={kudosMessage}
-							onclick={(e) => { e.preventDefault(); e.stopPropagation(); }}
-							onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); openKudos(e as unknown as MouseEvent); } }}
-						/>
-						<!--<div class="kudos-suggestions">
-							{#each ['🙏', '🌟', '💪', '❤️'] as emoji}
-								<button
-									class="kudos-suggestion"
-									onclick={(e) => { e.preventDefault(); e.stopPropagation(); kudosMessage = (kudosMessage + emoji).slice(0, 120); }}
-								>{emoji}</button>
-							{/each}
-						</div>-->
+						<span class="kudos-arrow">
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
+								<path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+							</svg>
+						</span>
 					</div>
 				</a>
 
@@ -398,7 +517,7 @@
 							<button class="qr-close" onclick={() => { showQr = false; }}>✕</button>
 							<div class="qr-header">
 								<span class="qr-icon">📱</span>
-								<p class="qr-title">Scan to send CRC</p>
+								<p class="qr-title">Scan to Donate CRC</p>
 								<p class="qr-subtitle">Point your phone camera at the code</p>
 							</div>
 							<div class="qr-frame">
@@ -444,9 +563,16 @@
 			{/if}
 
 			<div class="refresh-bar">
-				<div class="loading-state" class:invisible={!txLoading || !txManualRefresh}>
-					<span class="spinner"></span>
-					Loading…
+				<div class="bar-status">
+					{#if txLoading && txManualRefresh}
+						<span class="spinner"></span>
+						<span>Loading…</span>
+					{:else if activeConfig && recentDonationsCount > 0}
+						<span class="social-proof">
+							<span class="social-proof-count">{recentDonationsCount}</span>
+							{recentDonationsCount === 1 ? 'recent donation' : 'recent donations'}
+						</span>
+					{/if}
 				</div>
 				<button class="btn-refresh" onclick={() => loadHistory(ORG_ADDRESS, GROUP_ADDRESS, true)} disabled={txLoading && txManualRefresh}>
 					↻ Refresh
@@ -458,7 +584,7 @@
 
 			{#if kudosPairs.length > 0}
 				<div class="tx-list">
-					{#each kudosPairs as tx, i (tx.transactionHash)}
+					{#each kudosPairsVisible as tx, i (tx.transactionHash)}
 						{@const senderProfile = getProfile(tx.sender)}
 						{@const recipientProfile = getProfile(tx.recipient)}
 						<div class="tx-row {i % 2 === 0 ? 'row-even' : 'row-odd'}">
@@ -520,8 +646,8 @@
 					{/each}
 				</div>
 
-				{#if hasMore}
-					<p class="has-more">More appreciations available — showing most recent batch.</p>
+				{#if hasMoreLocal || hasMore}
+					<p class="has-more">And more…</p>
 				{/if}
 			{/if}
 
@@ -537,18 +663,20 @@
 		margin: 0;
 		background: #ffffff;
 		color: #101010;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 		-webkit-font-smoothing: antialiased;
 	}
 
 	.page {
 		min-height: 100vh;
 		display: flex;
-		align-items: flex-start;
-		justify-content: center;
+		flex-direction: column;
+		align-items: center;
+		justify-content: flex-start;
 		padding: 48px 16px;
 		box-sizing: border-box;
 		background: #ffffff;
+		gap: 32px;
+		font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 	}
 
 	/* When embedded in an iframe (parent toggles the body class), drop 100vh —
@@ -558,9 +686,39 @@
 		min-height: 0;
 	}
 
+	.intro-block {
+		max-width: 860px;
+		width: 100%;
+		text-align: center;
+		margin: 0;
+	}
+
+	.intro-logo {
+		display: block;
+		width: 56px;
+		height: 56px;
+		margin: 0 auto 16px;
+	}
+
+	.intro-cta {
+		margin: 0 0 14px;
+		font-size: clamp(1.4rem, 2.6vw, 1.85rem);
+		line-height: 1.2;
+		font-weight: 800;
+		letter-spacing: -0.01em;
+		color: var(--theme-primary, #101010);
+	}
+
+	.intro {
+		margin: 0;
+		font-size: clamp(0.95rem, 1.1vw, 1.05rem);
+		line-height: 1.55;
+		color: #2a2a2a;
+	}
+
 	.card {
 		background: #ffffff;
-		border-radius: 24px;
+		border-radius: 0.625rem;
 		box-shadow: 0 8px 40px rgba(0, 0, 0, 0.08);
 		max-width: 480px;
 		width: 100%;
@@ -570,7 +728,22 @@
 
 	@media (max-width: 450px) {
 		.page {
-			padding: 0;
+			padding: 24px 16px;
+			gap: 24px;
+		}
+
+		.intro-logo {
+			width: 44px;
+			height: 44px;
+			margin-bottom: 12px;
+		}
+
+		.intro-cta {
+			font-size: 1.3rem;
+		}
+
+		.intro {
+			font-size: 0.95rem;
 		}
 
 		.card {
@@ -580,17 +753,16 @@
 		}
 	}
 
-	.loading-state {
+	/* Status slot inside .refresh-bar — holds either the loading spinner+text
+	   or the social-proof counter. Sits left, refresh button sits right. */
+	.bar-status {
 		display: flex;
 		align-items: center;
 		gap: 8px;
 		color: #7d7d7d;
 		font-size: 0.85rem;
 		flex: 1;
-	}
-
-	.invisible {
-		visibility: hidden;
+		min-width: 0;
 	}
 
 	.spinner {
@@ -598,7 +770,7 @@
 		width: 18px;
 		height: 18px;
 		border: 2.5px solid #ddd;
-		border-top-color: #00af5e;
+		border-top-color: var(--theme-primary, #00af5e);
 		border-radius: 50%;
 		animation: spin 0.75s linear infinite;
 		flex-shrink: 0;
@@ -616,24 +788,39 @@
 	.row-even { background: #ffffff; }
 	.row-odd  { background: #f9f9f9; }
 
-	/* ----- Kudos button ----- */
+	/* ----- Social proof counter (inline in the refresh-bar) ----- */
+	.social-proof {
+		display: inline-flex;
+		align-items: baseline;
+		gap: 5px;
+		color: #2a2a2a;
+		font-weight: 600;
+		font-size: 0.92rem;
+	}
+
+	/* ----- Kudos donate button ----- */
 	.kudos-btn {
-		display: flex;
-		flex-direction: column;
-		align-items: stretch;
-		gap: 0;
-		background: #00af5e;
+		display: block;
+		background: var(--theme-primary, #00af5e);
 		color: #ffffff;
-		border-radius: 16px;
+		border-radius: 0.625rem;
 		padding: 0;
 		text-decoration: none;
 		margin-bottom: 20px;
-		transition: opacity 0.15s;
 		cursor: pointer;
-		overflow: hidden;
+		border: 1px solid var(--theme-border, #009a52);
+		box-shadow: 0 4px 0 var(--theme-shadow, #007a41), 0 6px 14px rgba(var(--theme-shadow-rgba, 0, 122, 65), 0.25);
+		transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s;
 	}
 
-	.kudos-btn:hover { opacity: 0.88; }
+	.kudos-btn:hover {
+		background: var(--theme-primary-hover, #00bb66);
+	}
+
+	.kudos-btn:active {
+		transform: translateY(2px);
+		box-shadow: 0 2px 0 var(--theme-shadow, #007a41), 0 3px 8px rgba(var(--theme-shadow-rgba, 0, 122, 65), 0.25);
+	}
 
 	.kudos-top-row {
 		display: flex;
@@ -641,17 +828,9 @@
 		align-items: center;
 		justify-content: center;
 		flex-wrap: nowrap;
-		gap: 8px;
-		padding: 14px 16px;
+		gap: 10px;
+		padding: 16px 20px;
 		min-width: 0;
-	}
-
-	.kudos-input-row {
-		border-top: 1px solid rgba(255, 255, 255, 0.25);
-		padding: 10px 14px;
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
 	}
 
 	.kudos-arrow {
@@ -659,6 +838,7 @@
 		flex-shrink: 0;
 		display: flex;
 		align-items: center;
+		margin-left: 2px;
 	}
 
 	.kudos-label {
@@ -728,33 +908,10 @@
 		flex-shrink: 0;
 	}
 
-	/* ----- Kudos message input (inside button) ----- */
-	.kudos-msg-input {
-		width: 100%;
-		box-sizing: border-box;
-		padding: 8px 12px;
-		border: none;
-		border-radius: 8px;
-		font-size: 0.88rem;
-		color: #1a1a1a;
-		background: rgba(255, 255, 255, 0.92);
-		outline: none;
-		transition: background 0.15s, box-shadow 0.15s;
-	}
-
-	.kudos-msg-input:focus {
-		background: #ffffff;
-		box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8);
-	}
-
-	.kudos-msg-input::placeholder {
-		color: #888;
-	}
-
 	/* ----- Appreciations ----- */
 	.tx-list {
 		border: 1.5px solid #ddd;
-		border-radius: 14px;
+		border-radius: 0.625rem;
 		overflow: hidden;
 		margin-bottom: 4px;
 	}
@@ -880,6 +1037,7 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
+		margin-top: 24px;
 		margin-bottom: 12px;
 	}
 
@@ -939,7 +1097,7 @@
 
 	.qr-card {
 		background: #ffffff;
-		border-radius: calc(var(--qr-size) * 0.11);
+		border-radius: 0.625rem;
 		padding: var(--card-pad);
 		display: flex;
 		flex-direction: column;
@@ -973,8 +1131,8 @@
 	}
 
 	.qr-close:hover {
-		background: #e0e0e0;
-		color: #101010;
+		background: var(--theme-primary, #00af5e);
+		color: #ffffff;
 	}
 
 	.qr-header {
@@ -996,6 +1154,7 @@
 		margin: 0;
 		font-size: calc(var(--qr-size) * 0.075);
 		font-weight: 700;
+		letter-spacing: -0.01em;
 		color: #101010;
 		text-align: center;
 	}
@@ -1009,7 +1168,7 @@
 
 	.qr-frame {
 		background: #f5f5f5;
-		border-radius: calc(var(--qr-size) * 0.073);
+		border-radius: 0.625rem;
 		padding: var(--qr-pad);
 		margin-bottom: var(--gap-md);
 	}
@@ -1017,7 +1176,7 @@
 	.qr-img {
 		width: var(--qr-size);
 		height: var(--qr-size);
-		border-radius: calc(var(--qr-size) * 0.027);
+		border-radius: 0;
 		display: block;
 	}
 
@@ -1027,16 +1186,23 @@
 		box-sizing: border-box;
 		text-align: center;
 		padding: calc(var(--qr-size) * 0.045) calc(var(--qr-size) * 0.073);
-		background: #f0faf5;
-		border-radius: calc(var(--qr-size) * 0.045);
+		background: var(--theme-primary, #00af5e);
+		border: 1px solid var(--theme-border, #009a52);
+		border-radius: 0.625rem;
+		box-shadow: 0 4px 0 var(--theme-shadow, #007a41), 0 6px 14px rgba(var(--theme-shadow-rgba, 0, 122, 65), 0.25);
 		font-size: calc(var(--qr-size) * 0.06);
 		font-weight: 600;
-		color: #00874a;
+		color: #ffffff;
 		text-decoration: none;
-		transition: background 0.12s;
+		transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s;
 	}
 
 	.qr-link-btn:hover {
-		background: #e0f5eb;
+		background: var(--theme-primary-hover, #00bb66);
+	}
+
+	.qr-link-btn:active {
+		transform: translateY(2px);
+		box-shadow: 0 2px 0 var(--theme-shadow, #007a41), 0 3px 8px rgba(var(--theme-shadow-rgba, 0, 122, 65), 0.25);
 	}
 </style>

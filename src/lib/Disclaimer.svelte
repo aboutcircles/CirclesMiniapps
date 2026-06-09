@@ -2,14 +2,22 @@
 	import { page } from '$app/stores';
 
 	const PLAYGROUND_KEY = 'disclaimer-dismissed-playground';
+	const MINIAPPS_KEY = 'disclaimer-dismissed-miniapps';
 	const CURATED_KEY = 'disclaimer-dismissed-curated';
 
 	const isPlayground = $derived($page.url.pathname === '/playground');
+	const isMiniapps = $derived($page.url.pathname.startsWith('/miniapps'));
 	const isHidden = $derived(
 		$page.url.pathname.startsWith('/pilots/kudos-ga') ||
 		$page.url.pathname.startsWith('/invitation')
 	);
-	const disclaimerDismissedKey = $derived(isPlayground ? PLAYGROUND_KEY : CURATED_KEY);
+
+	// Mini-apps and playground share the same strong-warning copy. Each surface
+	// has its own dismissal key so accepting one doesn't waive the other.
+	const isStrongWarning = $derived(isPlayground || isMiniapps);
+	const disclaimerDismissedKey = $derived(
+		isPlayground ? PLAYGROUND_KEY : isMiniapps ? MINIAPPS_KEY : CURATED_KEY
+	);
 
 	let disclaimerDismissed = $state(false);
 
@@ -27,10 +35,10 @@
 
 {#if !disclaimerDismissed && !isHidden}
 	<div class="disclaimer-banner">
-		<div class="disclaimer-shell" class:compact={!isPlayground}>
+		<div class="disclaimer-shell" class:compact={!isStrongWarning}>
 			<div class="disclaimer-header">
 				<div class="disclaimer-badge">Legal notice</div>
-				{#if isPlayground}
+				{#if isStrongWarning}
 					<h2 class="disclaimer-title">DEVELOPMENT PREVIEW - USE AT YOUR OWN RISK</h2>
 				{:else}
 					<h2 class="disclaimer-title">Curated mini-app notice</h2>
@@ -38,7 +46,7 @@
 			</div>
 
 			<div class="disclaimer-content">
-				{#if isPlayground}
+				{#if isStrongWarning}
 					<p class="disclaimer-text">
 						This experimental mini-apps feature is made available in connection with the Gnosis App
 						offered by Gnosis Ecosystem (Cayman) Ltd (“Gnosis”). This website, the mini-apps listing
@@ -79,7 +87,7 @@
 
 			<div class="disclaimer-actions">
 				<button class="disclaimer-close" onclick={dismissDisclaimer}>
-					{isPlayground ? 'I understand the risks' : 'Continue'}
+					{isStrongWarning ? 'I understand the risks' : 'Continue'}
 				</button>
 			</div>
 		</div>

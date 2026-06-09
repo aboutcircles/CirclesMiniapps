@@ -2,9 +2,57 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { env } from '$env/dynamic/public';
+	import { createPublicClient, http, type Address } from 'viem';
+	import { privateKeyToAddress } from 'viem/accounts';
+	import { gnosis } from 'viem/chains';
 
 	const REFERRALS_BASE = env.PUBLIC_REFERRALS_BASE ?? 'https://referrals.aboutcircles.com';
 	const DESTINATION_BASE = 'https://app.gnosis.io/referral';
+
+	// ReferralsModule on Gnosis Chain — exposes accounts(signer) → (account, claimed).
+	const ONCHAIN_RPC_URL = 'https://rpc.aboutcircles.com/';
+	const REFERRALS_MODULE_ADDRESS =
+		(env.PUBLIC_REFERRALS_MODULE_ADDRESS as Address) ??
+		('0x12105a9B291aF2ABb0591001155A75949b062CE5' as Address);
+
+	const referralsModuleAbi = [
+		{
+			type: 'function',
+			name: 'accounts',
+			stateMutability: 'view',
+			inputs: [{ name: 'signer', type: 'address' }],
+			outputs: [
+				{ name: 'account', type: 'address' },
+				{ name: 'claimed', type: 'bool' }
+			]
+		}
+	] as const;
+
+	/**
+	 * Check on-chain whether the referral behind a cached private key has been claimed.
+	 *
+	 * Derives the signer address from the key and reads ReferralsModule.accounts(signer).
+	 * Returns true only when we can positively confirm the referral is claimed; on any
+	 * RPC/derivation error we return false so a transient failure never strands the user.
+	 */
+	async function isReferralClaimed(privateKey: string): Promise<boolean> {
+		try {
+			const key = (privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`) as `0x${string}`;
+			const signer = privateKeyToAddress(key);
+
+			const client = createPublicClient({ chain: gnosis, transport: http(ONCHAIN_RPC_URL) });
+			const [, claimed] = await client.readContract({
+				address: REFERRALS_MODULE_ADDRESS,
+				abi: referralsModuleAbi,
+				functionName: 'accounts',
+				args: [signer]
+			});
+
+			return claimed === true;
+		} catch {
+			return false;
+		}
+	}
 
 	type Status = 'loading' | 'redirecting' | 'exhausted' | 'paused' | 'error';
 
@@ -19,11 +67,17 @@
 		try {
 			const cached = localStorage.getItem(storageKey);
 			if (cached) {
-				const dest = `${DESTINATION_BASE}/${cached}${window.location.search}`;
-				referralUrl = dest;
-				status = 'redirecting';
-				window.location.href = dest;
-				return;
+				// Only reuse the cached link if its referral hasn't been claimed on-chain.
+				// If it's already claimed, drop it and fall through to fetch the next one.
+				const claimed = await isReferralClaimed(cached);
+				if (!claimed) {
+					const dest = `${DESTINATION_BASE}/${cached}${window.location.search}`;
+					referralUrl = dest;
+					status = 'redirecting';
+					window.location.href = dest;
+					return;
+				}
+				try { localStorage.removeItem(storageKey); } catch { }
 			}
 		} catch { }
 

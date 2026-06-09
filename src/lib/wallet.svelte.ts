@@ -113,6 +113,26 @@ async function connectWithPasskey() {
 	}
 }
 
+/**
+ * Adopt an already-constructed Cometh smart-account client as the active wallet,
+ * WITHOUT rebuilding it from the passkey. Used right after sign-up: createPasskeySafe()
+ * already created the passkey AND built a working client for the new Safe, so
+ * re-deriving it via connect() would trigger an extra, redundant passkey prompt.
+ */
+function adoptSmartAccount(client: any, safeAddress: string) {
+	smartAccountClient = client;
+	manuallyDisconnected = false;
+	address = getAddress(safeAddress);
+	connected = true;
+	connectionError = '';
+	try {
+		localStorage.setItem(SAFE_ADDRESS_KEY, address);
+	} catch {
+		/* non-fatal */
+	}
+	fetchAvatarInfo(address);
+}
+
 async function connect(safeAddress: string) {
 	const config = getConfig();
 	if (!config) return;
@@ -628,6 +648,7 @@ export const wallet = {
 	get pickerProfiles() { return pickerProfiles; },
 	getSavedSafeAddress,
 	connect,
+	adoptSmartAccount,
 	connectWithPasskey,
 	connectAndPick,
 	autoConnect,

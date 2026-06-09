@@ -1,9 +1,11 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
+	import { onMount, type Snippet } from 'svelte';
+	import { afterNavigate } from '$app/navigation';
 	import { getAddress } from 'viem';
 	import Disclaimer from '$lib/Disclaimer.svelte';
 	import OfflineNotice from '$lib/OfflineNotice.svelte';
 	import ChildSafePicker from '$lib/ChildSafePicker.svelte';
+	import { initAnalytics, trackPageView } from '$lib/analytics';
 	import '../style.css';
 	import '../wallet-ui.css';
 
@@ -26,6 +28,13 @@
 		}
 	}
 
+	onMount(() => {
+		initAnalytics();
+	});
+
+	afterNavigate((nav) => {
+		if (nav.to?.url) trackPageView(nav.to.url.pathname);
+	});
 </script>
 
 <Disclaimer />
