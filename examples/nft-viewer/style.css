@@ -131,13 +131,14 @@ body {
   border-radius: var(--radius);
   overflow: hidden;
   cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+  /* No `transition` on `transform` — GSAP owns the transform property.
+     Only box-shadow and border-color transition (which GSAP doesn't touch). */
+  transition: box-shadow 0.15s, border-color 0.15s;
   border: 2px solid transparent;
   position: relative;
 }
 
 .nft-card:hover {
-  transform: translateY(-2px);
   box-shadow: 0 8px 24px #00000040;
   border-color: var(--accent-soft);
 }
@@ -385,11 +386,18 @@ body {
 }
 
 /* ---- Toast ---- */
+/* Centered via fit-content/margin (not translateX) so GSAP can own
+   the transform property without clobbering horizontal centering. */
 .toast {
   position: fixed;
   bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%) translateY(100px);
+  left: 0;
+  right: 0;
+  width: fit-content;
+  max-width: calc(100vw - 40px);
+  margin: 0 auto;
+  transform: translateY(100px);
+  opacity: 0;
   font-family: var(--font);
   font-size: 0.84rem;
   padding: 10px 20px;
@@ -398,11 +406,11 @@ body {
   color: var(--ink);
   box-shadow: 0 8px 32px #00000060;
   z-index: 200;
-  transition: transform 0.25s ease;
   pointer-events: none;
+  will-change: transform, opacity;
 }
 
-.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.show { opacity: 1; }
 .toast.success { border: 1px solid var(--success); }
 .toast.error { border: 1px solid var(--danger); }
 
@@ -517,3 +525,25 @@ body {
     padding: 14px;
   }
 }
+
+/* ---- Reduced motion (belt-and-braces; animations.js also checks via JS) ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .nft-card.highlighted {
+    /* Disable the GSAP gold-pulse entirely when reduced motion is on. */
+    box-shadow: 0 0 0 1px var(--gold), 0 4px 16px rgba(245, 158, 11, 0.19);
+  }
+}
+
+/* Performance hints intentionally omitted — `will-change: transform, opacity`
+   on every animated element kept the browser in compositor mode permanently,
+   which is expensive and can cause visual tearing. GSAP manages its own
+   layer promotion efficiently. */

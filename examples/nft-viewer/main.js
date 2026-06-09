@@ -6,6 +6,13 @@
 
 import { onWalletChange } from '@aboutcircles/miniapp-sdk';
 import { getAddress } from 'viem';
+import { gsap } from 'gsap';
+import { createAnimator } from './src/animations.js';
+
+// Expose for console debugging. Harmless in production.
+if (typeof window !== 'undefined') {
+  window.__gsap = gsap;
+}
 
 // ============================================================================
 // Constants
@@ -23,6 +30,26 @@ const GNOSIS_NFT = {
 };
 
 const HIDDEN_STORAGE_KEY = 'nft-viewer-hidden';
+
+// ============================================================================
+// Animator
+// ============================================================================
+
+const animator = createAnimator();
+
+// Expose for console debugging. Harmless in production.
+if (typeof window !== 'undefined') {
+  window.__animator = animator;
+  // Expose a quick replay helper for verifying the entrance animation.
+  window.__replayEntrance = () => {
+    animator.kill();
+    animator.pageEnter({
+      topbar: document.querySelector('.topbar'),
+      tabs: document.querySelector('.nav-tabs'),
+    });
+    renderCurrentView();
+  };
+}
 
 // ============================================================================
 // State
@@ -77,7 +104,11 @@ function toast(message, kind = '') {
   const t = document.getElementById('toast');
   t.textContent = message;
   t.className = `toast show ${kind}`;
-  setTimeout(() => { t.className = 'toast'; }, 4500);
+  animator.showToast(t);
+  setTimeout(() => {
+    animator.hideToast(t);
+    setTimeout(() => { t.className = 'toast'; }, 250);
+  }, 4250);
 }
 
 function fallbackCopy(text) {
@@ -184,7 +215,9 @@ function isHidden(nft) {
   return getHiddenKeys().includes(nftKey(nft));
 }
 
-function hideNft(nft) {
+async function hideNft(nft) {
+  const card = document.querySelector(`.nft-card[data-key="${cssEscape(nftKey(nft))}"]`);
+  // Update state immediately so the re-render is consistent
   const keys = getHiddenKeys();
   const k = nftKey(nft);
   if (!keys.includes(k)) {
@@ -192,11 +225,16 @@ function hideNft(nft) {
     saveHiddenKeys(keys);
   }
   updateHiddenCount();
+
+  if (card) {
+    // Animate the card out, then re-render so it disappears
+    await animator.removeCard(card);
+  }
   renderCurrentView();
   toast('NFT hidden', 'success');
 }
 
-function unhideNft(nft) {
+async function unhideNft(nft) {
   const keys = getHiddenKeys();
   const k = nftKey(nft);
   const idx = keys.indexOf(k);
@@ -218,6 +256,12 @@ function updateHiddenCount() {
   } else {
     badge.classList.add('hidden');
   }
+}
+
+// CSS.escape polyfill for older browsers
+function cssEscape(s) {
+  if (typeof CSS !== 'undefined' && CSS.escape) return CSS.escape(s);
+  return String(s).replace(/[^a-zA-Z0-9_-]/g, (c) => `\\${c}`);
 }
 
 // ============================================================================
@@ -347,6 +391,7 @@ function renderSkeletons() {
     grid.appendChild(card);
   }
   render(grid);
+  animator.showSkeleton(grid);
 }
 
 function renderNftCard(nft, opts = {}) {
@@ -361,6 +406,7 @@ function renderNftCard(nft, opts = {}) {
   if (hidden) return null;
 
   const card = el('div', `nft-card${highlighted ? ' highlighted' : ''}${showUnhide ? ' hidden-card' : ''}`);
+  card.dataset.key = nftKey(nft);
 
   // Badge for highlighted NFT
   if (highlighted) {
@@ -407,10 +453,9 @@ function renderNftCard(nft, opts = {}) {
   body.appendChild(el('div', 'card-collection', collection));
   card.appendChild(body);
 
-  // Click → detail
+  // Click → detail (async, awaits the morph)
   card.addEventListener('click', () => {
-    state.selectedNft = nft;
-    renderDetail(nft);
+    openDetail(nft, card);
   });
 
   return card;
@@ -421,12 +466,14 @@ function renderGallery() {
   const visible = sortNfts(state.nfts.filter((nft) => !hiddenKeys.includes(nftKey(nft))));
 
   if (visible.length === 0) {
-    render(el('div', 'empty-state',
+    const empty = el('div', 'empty-state',
       el('span', { class: 'icon' }, '🖼'),
       el('p', {}, state.nfts.length === 0
         ? 'No NFTs found in this wallet'
         : 'All NFTs are hidden. Check the Hidden tab.'),
-    ));
+    );
+    render(empty);
+    animator.showEmpty(empty);
     return;
   }
 
@@ -436,6 +483,11 @@ function renderGallery() {
     if (card) grid.appendChild(card);
   }
   render(grid);
+  animator.showGrid(Array.from(grid.children));
+
+  // Pulse the highlighted (Gnosis) card
+  const gnosisCard = grid.querySelector('.nft-card.highlighted');
+  if (gnosisCard) animator.pulseHighlighted(gnosisCard);
 }
 
 function renderHidden() {
@@ -443,10 +495,12 @@ function renderHidden() {
   const hidden = sortNfts(state.nfts.filter((nft) => hiddenKeys.includes(nftKey(nft))));
 
   if (hidden.length === 0) {
-    render(el('div', 'empty-state',
+    const empty = el('div', 'empty-state',
       el('span', { class: 'icon' }, '👁'),
       el('p', {}, 'No hidden NFTs'),
-    ));
+    );
+    render(empty);
+    animator.showEmpty(empty);
     return;
   }
 
@@ -456,6 +510,7 @@ function renderHidden() {
     if (card) grid.appendChild(card);
   }
   render(grid);
+  animator.showGrid(Array.from(grid.children));
 }
 
 function renderDetail(nft) {
@@ -472,8 +527,7 @@ function renderDetail(nft) {
   // Back button
   const back = el('button', { class: 'back-btn', text: '← Back to gallery' });
   back.addEventListener('click', () => {
-    state.selectedNft = null;
-    renderCurrentView();
+    closeDetail(nft);
   });
   container.appendChild(back);
 
@@ -543,16 +597,21 @@ function renderDetail(nft) {
   const actionRow = el('div', { class: 'row', style: 'margin-top:16px;' });
   if (isHidden(nft)) {
     const unhideBtn = el('button', { class: 'btn btn-secondary btn-sm', text: '↩ Unhide NFT' });
-    unhideBtn.addEventListener('click', () => {
-      unhideNft(nft);
-      renderDetail(nft); // re-render detail
+    unhideBtn.addEventListener('click', async () => {
+      await unhideNft(nft);
+      // After unhide, the active tab decides where to go.
+      // If we're in the gallery tab, go back to it.
+      state.selectedNft = null;
+      renderCurrentView();
     });
     actionRow.appendChild(unhideBtn);
   } else {
     const hideBtn = el('button', { class: 'btn btn-danger btn-sm', text: '✕ Hide NFT' });
     hideBtn.addEventListener('click', () => {
+      // hideNft animates the (now-removed) card, then re-renders the
+      // current view which restages the grid with a stagger.
       hideNft(nft);
-      renderDetail(nft); // re-render detail
+      state.selectedNft = null;
     });
     actionRow.appendChild(hideBtn);
   }
@@ -561,6 +620,33 @@ function renderDetail(nft) {
   detail.appendChild(info);
   container.appendChild(detail);
   render(container);
+
+  return { container, info };
+}
+
+// ============================================================================
+// Detail transitions (image-morph open/close)
+// ============================================================================
+
+// openDetail / closeDetail used to animate an image morph between the
+// card and detail view. The hand-rolled clone-and-animate approach was
+// glitchy in practice, so the detail view now appears instantly and only
+// the info rows stagger in. The functions remain in the animator for
+// the future, but the morph-specific plumbing is gone.
+
+async function openDetail(nft, _cardEl) {
+  state.selectedNft = nft;
+  const { info } = renderDetail(nft);
+  await animator.openDetail({ infoEl: info });
+}
+
+// closeDetail used to also call animator.closeDetail, but the hand-rolled
+// morph was removed and that call became redundant — it overlapped with
+// showGrid (which renderCurrentView already triggers) and reset the cards
+// to opacity:0 mid-animation, leaving the gallery looking blank.
+function closeDetail(_nft) {
+  state.selectedNft = null;
+  renderCurrentView();
 }
 
 function renderError(message) {
@@ -572,6 +658,16 @@ function renderError(message) {
   retryBtn.addEventListener('click', () => loadNfts());
   container.appendChild(retryBtn);
   render(container);
+  animator.showError(container);
+}
+
+function renderConnectWallet() {
+  const empty = el('div', 'empty-state',
+    el('span', { class: 'icon' }, '👛'),
+    el('p', {}, 'Connect your wallet to view NFTs'),
+  );
+  render(empty);
+  animator.showEmpty(empty);
 }
 
 function renderCurrentView() {
@@ -592,10 +688,7 @@ function renderCurrentView() {
 
 async function loadNfts() {
   if (!state.wallet) {
-    render(el('div', 'empty-state',
-      el('span', { class: 'icon' }, '👛'),
-      el('p', {}, 'Connect your wallet to view NFTs'),
-    ));
+    renderConnectWallet();
     return;
   }
 
@@ -656,6 +749,13 @@ function updateWalletChip(address) {
 initTabs();
 updateHiddenCount();
 
+// First-paint entrance: topbar + tabs drop in. The view content is
+// animated separately by showEmpty / showGrid / showSkeleton as it loads.
+animator.pageEnter({
+  topbar: document.querySelector('.topbar'),
+  tabs: document.querySelector('.nav-tabs'),
+});
+
 onWalletChange((address) => {
   state.wallet = address;
   updateWalletChip(address);
@@ -670,11 +770,8 @@ onWalletChange((address) => {
       updateWalletChip(devWallet);
       loadNfts();
     } else {
-    state.nfts = [];
-    render(el('div', 'empty-state',
-      el('span', { class: 'icon' }, '👛'),
-      el('p', {}, 'Connect your wallet to view NFTs'),
-    ));
+      state.nfts = [];
+      renderConnectWallet();
     }
   }
 });

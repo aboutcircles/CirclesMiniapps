@@ -25,6 +25,14 @@ npm run dev
 
 The app runs standalone — no contracts, no API server, no environment variables needed for basic dev.
 
+### Animations
+
+All motion is owned by `src/animations.js` (GSAP core, no premium plugins). Honors `prefers-reduced-motion: reduce` by snapping to the final frame. Add `?demo` (or `?animate`) to the URL to bypass reduced motion and see the full timing — useful for verifying the system is alive.
+
+Console helpers (dev only):
+- `__replayEntrance()` — re-runs the page-load animation.
+- `__gsap` / `__animator` — direct handles to GSAP and the animator instance.
+
 ### Dev mode with local wallet
 
 Create a `.env` file:
