@@ -189,6 +189,7 @@
       "music",
       "events"
     ],
+    "isHidden": true,
     "category": "miniapp"
   },
   {
