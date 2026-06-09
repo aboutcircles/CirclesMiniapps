@@ -1,16 +1,16 @@
 # Circles Jukebox (miniapp)
 
-A Circles MiniApp that lets people pick a song from a curated SoundCloud catalog and pay **10 CRC** to add it to the global jukebox queue. The audio doesn't play in the miniapp — it plays through the room's speakers via the companion `jukebox-display` page.
+A Circles MiniApp that lets people pick a song from a curated SoundCloud catalog and pay **10 CRC** to add it to the global jukebox queue. The audio doesn't play in the miniapp — it plays through the room's speakers via the companion **`jukebox-display`** app, which lives in its own separate repo (it's a standalone webpage, not a miniapp). Both read the same on-chain queue, so keep `JUKEBOX_ADDRESS`, `BASE_AMOUNT_WEI`, `SONG_ID_MOD`, and `START_BLOCK` in sync between them.
 
 ## How a payment becomes a queue entry
 
-There is no backend. The miniapp pays with a standard wrapped CRC ERC-20 `transfer` to a fixed `JUKEBOX_ADDRESS`, but it encodes the chosen songId in the low bits of the amount:
+There is no backend. The miniapp pays with a native Circles ERC-1155 transfer on Hub V2 — `safeTransferFrom(payer, JUKEBOX_ADDRESS, personalCrcId, amount, "")`, where `personalCrcId == uint256(uint160(payer))` is the payer's own personal CRC. It encodes the chosen songId in the low bits of the amount:
 
 ```
 amount_wei = 10 * 10^18 + songId
 ```
 
-The recipient receives essentially 10 CRC (the extra is < 1e-13 CRC of dust). Any client can recover the songId by reading the transfer log and computing `value % SONG_ID_MOD`. The display app uses the same trick to play songs in chronological order.
+The recipient receives essentially 10 CRC (the extra is < 1e-13 CRC of dust). The Hub emits `TransferSingle` with exactly this value — demurrage only discounts the sender's stored balance — so any client can recover the songId by reading the event and computing `value % SONG_ID_MOD`. Native CRC is demurraged 1:1 for every avatar, so any avatar's CRC pays at par and there's no token allowlist. The display app uses the same trick to play songs in chronological order.
 
 ## Tabs
 

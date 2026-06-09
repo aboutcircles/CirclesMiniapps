@@ -3,16 +3,22 @@
  *
  * Browse a curated catalog of SoundCloud songs and pay 10 CRC to add one to
  * the global jukebox queue. The miniapp itself never plays audio — that's
- * the display device's job (examples/jukebox-display/). This app only handles
- * picking, paying, and showing recent requests.
+ * the display device's job (the standalone `jukebox-display` app, kept in a
+ * separate repo). This app only handles picking, paying, and showing recent
+ * requests.
  *
- * On-chain encoding: amount = 10e18 + songId wei. Decoder reads
- * `amount % SONG_ID_MOD` to recover the songId.
+ * Payment rail: a native Circles ERC-1155 transfer on Hub V2 —
+ * `safeTransferFrom(payer, JUKEBOX_ADDRESS, crcTokenId, amount, "")`. The payer
+ * spends whichever CRC they already hold (personal or group); we look up their
+ * balances and pick a native v2 token with enough. On-chain encoding:
+ * amount = 10e18 + songId wei. The display decodes the songId from each
+ * incoming TransferSingle as `amount % SONG_ID_MOD`.
  */
 
 // @ts-nocheck
 import { onWalletChange, sendTransactions, isMiniappMode } from '@aboutcircles/miniapp-sdk';
 import { Sdk } from '@aboutcircles/sdk';
+import { hubV2Abi } from '@aboutcircles/sdk-abis';
 import {
   getAddress,
   encodeFunctionData,
@@ -25,8 +31,6 @@ import {
   RPC_URL,
   RPC_FALLBACKS,
   JUKEBOX_ADDRESS,
-  ACCEPTED_TOKEN_ADDRESSES,
-  GNOSIS_GROUP_ADDRESS,
   HUB_V2_ADDRESS,
   BASE_AMOUNT_WEI,
   SONG_ID_MOD,
@@ -74,67 +78,11 @@ const rpcClients = RPC_FALLBACKS.map(url =>
   createPublicClient({ chain: gnosis, transport: http(url) })
 );
 
-// ─── ABIs ───────────────────────────────────────────────────
-const ERC20_TRANSFER_ABI = [
-  {
-    type: 'function',
-    name: 'transfer',
-    inputs: [
-      { name: 'to', type: 'address' },
-      { name: 'amount', type: 'uint256' },
-    ],
-    outputs: [{ name: '', type: 'bool' }],
-  },
-  {
-    type: 'function',
-    name: 'balanceOf',
-    stateMutability: 'view',
-    inputs: [{ name: 'account', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-];
-
-// Hub V2 (ERC-1155) - group mint + wrap, and the ERC-1155 balanceOf for the
-// personal-CRC preflight. Signatures taken verbatim from @aboutcircles/sdk-abis.
-const HUB_V2_ABI = [
-  {
-    type: 'function',
-    name: 'groupMint',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: '_group', type: 'address' },
-      { name: '_collateralAvatars', type: 'address[]' },
-      { name: '_amounts', type: 'uint256[]' },
-      { name: '_data', type: 'bytes' },
-    ],
-    outputs: [],
-  },
-  {
-    type: 'function',
-    name: 'wrap',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: '_avatar', type: 'address' },
-      { name: '_amount', type: 'uint256' },
-      { name: '_type', type: 'uint8' },
-    ],
-    outputs: [{ name: '', type: 'address' }],
-  },
-  {
-    type: 'function',
-    name: 'balanceOf',
-    stateMutability: 'view',
-    inputs: [
-      { name: '_account', type: 'address' },
-      { name: '_id', type: 'uint256' },
-    ],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-];
-
-// Hub V2 wrap type enum: 0 = Demurrage, 1 = Inflation. The accepted token is
-// the demurraged wrapper (1e18 raw == 1 CRC today), so we wrap as Demurrage.
-const CIRCLES_TYPE_DEMURRAGE = 0;
+// ─── ABI ────────────────────────────────────────────────────
+// Native Circles Hub V2 (ERC-1155). We only need `safeTransferFrom`, encoded
+// from the canonical SDK ABI (@aboutcircles/sdk-abis) so it can't drift. The
+// payer's balances come from the SDK's indexer (sdk.rpc.balance), not raw
+// balanceOf, so we can pick from any CRC they hold.
 
 // ─── Helpers ────────────────────────────────────────────────
 function decodeError(err) {
@@ -249,7 +197,7 @@ confirmProceed.addEventListener('click', async () => {
   confirmProceed.disabled = true;
   confirmCancel.disabled = true;
   confirmProceed.textContent = 'Sending…';
-  setConfirmStatus('Looking up your wrapped CRC…', 'info');
+  setConfirmStatus('Looking up your CRC balance…', 'info');
 
   try {
     await payForSong(song);
@@ -277,63 +225,64 @@ confirmProceed.addEventListener('click', async () => {
 });
 
 // ─── Payment flow ───────────────────────────────────────────
-// Read a view/pure function across the RPC fallbacks. Returns null if every
-// RPC fails (callers decide whether that's fatal or "let the chain decide").
-async function readAny(params) {
-  for (const client of rpcClients) {
-    try {
-      return await client.readContract(params);
-    } catch (err) {
-      console.warn('[jukebox] read failed, trying next RPC:', decodeError(err));
-    }
-  }
-  return null;
-}
-
 async function payForSong(song) {
   if (!connectedAddress) throw new Error('Wallet not connected');
 
   const user = getAddress(connectedAddress);
   // amount = 10·10^18 + songId. The songId rides in the low bits; the display
-  // decodes it as amount % 10000. This is the exact value transferred.
+  // decodes it as amount % 10000. This is the exact value transferred — the
+  // Hub emits TransferSingle with this value verbatim.
   const amountWei = BASE_AMOUNT_WEI + BigInt(song.id);
 
-  // The jukebox accepts only wrapped group CRC from two approved groups.
-  // No personal-CRC auto-mint any more — the user MUST already hold one of
-  // the accepted wrappers. We read balanceOf across all of them and use the
-  // first one that has enough. If none do, surface a clear error.
-  setConfirmStatus('Looking up your wrapped group CRC…', 'info');
+  // Pick a native Hub V2 CRC token the user actually holds. We accept personal
+  // OR group CRC — any unwrapped v2 ERC-1155 token. Native balances are
+  // demurraged 1:1, so `attoCircles` (the demurraged balance, == on-chain
+  // balanceOf) is directly comparable to amountWei and is the unit
+  // safeTransferFrom moves. There is no auto-mint.
+  setConfirmStatus('Looking up your CRC balance…', 'info');
 
-  let chosenWrapper = null;
-  for (const tokenAddr of ACCEPTED_TOKEN_ADDRESSES) {
-    const bal = await readAny({
-      address: getAddress(tokenAddr),
-      abi: ERC20_TRANSFER_ABI,
-      functionName: 'balanceOf',
-      args: [user],
-    });
-    if (bal !== null && bal >= amountWei) {
-      chosenWrapper = getAddress(tokenAddr);
-      break;
-    }
+  let balances;
+  try {
+    balances = await getReadSdk().rpc.balance.getTokenBalances(user);
+  } catch (err) {
+    console.error('[jukebox] balance lookup failed:', err);
+    throw new Error("Couldn't read your CRC balance — please try again.");
   }
-  if (!chosenWrapper) {
-    throw new Error(
-      'You need at least 10 CRC in one of the accepted group tokens to play a song.'
+
+  const candidates = (balances || []).filter(b =>
+    b.isErc1155 && !b.isWrapped && Number(b.version) === 2 &&
+    BigInt(b.attoCircles) >= amountWei
+  );
+  // Spend the largest balance first — avoids a demurrage rounding edge where a
+  // just-enough balance dips below the price between this read and execution.
+  candidates.sort((a, b) =>
+    BigInt(b.attoCircles) > BigInt(a.attoCircles) ? 1 : -1
+  );
+  const chosen = candidates[0];
+  if (!chosen) {
+    // If they hold enough but it's wrapped as an ERC-20, the native transfer
+    // can't reach it — point them at unwrapping rather than a generic error.
+    const hasWrapped = (balances || []).some(b =>
+      b.isWrapped && BigInt(b.attoCircles) >= amountWei
     );
+    if (hasWrapped) {
+      throw new Error('Your CRC is wrapped as an ERC-20. Unwrap it to native CRC in your wallet, then try again.');
+    }
+    throw new Error('You need at least 10 CRC (personal or group) to play a song.');
   }
+  const tokenId = BigInt(chosen.tokenId);
 
   setConfirmStatus('Confirm the transaction in your wallet…', 'info');
 
-  // Single transfer of exactly amountWei of the chosen wrapper to the treasury.
-  // One sendTransactions call = one Safe multisend (here just one tx, but
-  // same code path as before so it's atomic with one signature).
+  // Native ERC-1155 transfer: move exactly amountWei of the chosen CRC to the
+  // treasury. One sendTransactions call = one Safe tx; the Safe is both _from
+  // and msg.sender, so no operator approval is needed.
   const hashes = await sendTransactions([{
-    to: chosenWrapper,
+    to: getAddress(HUB_V2_ADDRESS),
     data: encodeFunctionData({
-      abi: ERC20_TRANSFER_ABI,
-      functionName: 'transfer',
-      args: [getAddress(JUKEBOX_ADDRESS), amountWei],
+      abi: hubV2Abi,
+      functionName: 'safeTransferFrom',
+      args: [user, getAddress(JUKEBOX_ADDRESS), tokenId, amountWei, '0x'],
     }),
     value: '0x0',
   }]);
@@ -390,8 +339,8 @@ async function refreshQueue() {
 
 // Query the Circles indexer instead of raw eth_getLogs. The indexer has no
 // block-range limit (raw getLogs over millions of blocks is rejected by every
-// public Gnosis RPC). `amount` on this table is the raw on-chain uint256, so
-// the songId-in-low-bits decode below is exact (verified against chain logs).
+// public Gnosis RPC). `value` on the TransferSingle table is the raw on-chain
+// uint256, so the songId-in-low-bits decode below is exact.
 async function circlesQuery(table, columns, filters, order, limit) {
   const res = await fetch(RPC_URL, {
     method: 'POST',
@@ -425,22 +374,22 @@ async function circlesQuery(table, columns, filters, order, limit) {
 }
 
 async function fetchQueueEntries() {
-  // All wrapped-ERC20 transfers received by the treasury org. Filter by token
-  // client-side (the treasury is a low-traffic org, so the result set is tiny).
+  // All native ERC-1155 (TransferSingle) payments received by the treasury org.
+  // Any avatar's CRC counts — native balances are demurraged 1:1, so there is
+  // no token allowlist; the 10 CRC base-price check below is the only filter
+  // that matters (the treasury is a low-traffic org, so the set is tiny).
   const rows = await circlesQuery(
-    'Erc20WrapperTransfer',
-    ['blockNumber', 'timestamp', 'transactionHash', 'logIndex', 'tokenAddress', 'from', 'to', 'amount'],
+    'TransferSingle',
+    ['blockNumber', 'timestamp', 'transactionHash', 'logIndex', 'from', 'to', 'value'],
     [{ column: 'to', value: JUKEBOX_ADDRESS.toLowerCase() }],
     [{ Column: 'blockNumber', SortOrder: 'ASC' }],
     1000,
   );
 
-  const accepted = new Set(ACCEPTED_TOKEN_ADDRESSES.map(a => a.toLowerCase()));
   const entries = [];
   for (const row of rows) {
-    if (!accepted.has((row.tokenAddress || '').toLowerCase())) continue;
     try {
-      const value = BigInt(row.amount);
+      const value = BigInt(row.value);
       const songId = Number(value % SONG_ID_MOD);
       const base = value - (value % SONG_ID_MOD);
       // Only accept payments that round to the 10 CRC base price.

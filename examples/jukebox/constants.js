@@ -3,7 +3,7 @@
 
 export const RPC_URL = 'https://rpc.aboutcircles.com/';
 
-// Fallback RPCs used for receipt polling and getLogs.
+// Fallback RPCs used for receipt polling and balance reads.
 export const RPC_FALLBACKS = [
   RPC_URL,
   'https://rpc.gnosischain.com',
@@ -11,38 +11,21 @@ export const RPC_FALLBACKS = [
 ];
 
 // The jukebox treasury address. Every 10 CRC payment is sent here.
-// All clients (miniapp + display) read incoming ERC-20 Transfer events
-// to this address to assemble the global queue.
+// All clients (miniapp + display) read incoming Circles ERC-1155
+// TransferSingle events to this address to assemble the global queue.
 //
-// This is an org avatar that trusts both accepted groups, so any member
-// of either group can transfer wrapped group CRC to it.
+// It is a Safe-based org avatar that implements onERC1155Received, so a
+// direct Hub V2 safeTransferFrom of any avatar's CRC to it succeeds.
 export const JUKEBOX_ADDRESS = '0xbe6e5a0bdface700cbe8f0d1c28fcb8404a1622b';
 
-// Accepted payment tokens: DEMURRAGED group-CRC wrappers from the two
-// approved groups. Demurraged means 1e18 raw == 1 CRC today (1:1), which
-// is exactly what the songId-in-low-bits encoding needs
-// (amount = 10e18 + songId == 10 CRC + songId).
+// Circles Hub V2 (ERC-1155). Payments are native CRC transferred via
+// `safeTransferFrom(from, JUKEBOX_ADDRESS, tokenId, amount, "")`, where
+// tokenId == uint256(uint160(payer)) is the payer's personal-CRC id.
 //
-// Only demurraged wrappers are accepted because the inflationary wrappers
-// (10e18 raw of which == ~6.67 CRC) would underpay by ~33% and break the
-// songId decode. Users MUST already hold one of these — no personal CRC
-// auto-mint is performed any more.
-export const ACCEPTED_TOKEN_ADDRESSES = [
-  // Group 1: 0xc19bc204eb1c1d5b3fe500e5e5dfabab625f286c — original "Gnosis" gCRC
-  '0x548c20e6c24E4876E20daDbEAb75362e2F5A4bC1',
-  // Group 2: 0x93eD5A96347927ff6fF6b790F8Cf5258240c321f — second "Gnosis" gCRC
-  '0x8cbd18accdce45a3e6ac6909ecf42ee13f1f927a',
-];
-// Set of lowercase addresses for fast O(1) membership checks.
-export const ACCEPTED_TOKEN_SET = new Set(ACCEPTED_TOKEN_ADDRESSES.map(a => a.toLowerCase()));
-
-// Group 1 avatar (the one we currently mint from in the original groupMint flow).
-// Kept for back-compat / debug only — auto-mint is no longer used.
-export const GNOSIS_GROUP_ADDRESS = '0xc19bc204eb1c1d5b3fe500e5e5dfabab625f286c';
-// Second approved group.
-export const GNOSIS_GROUP_2_ADDRESS = '0x93eD5A96347927ff6fF6b790F8Cf5258240c321f';
-
-// Circles Hub V2 (ERC-1155). Used for any group-mint operations (legacy).
+// Native Hub V2 balances are always demurraged (1e18 raw == 1 CRC today),
+// for every avatar's token, so any CRC pays at par — there is no need for an
+// accepted-token allowlist and no inflationary/demurraged mismatch to guard
+// against (that was only a concern for the old wrapped-ERC-20 rail).
 export const HUB_V2_ADDRESS = '0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8';
 
 // Payment encoding.
@@ -50,16 +33,15 @@ export const HUB_V2_ADDRESS = '0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8';
 // encoded in the low bits of the transfer amount: the recipient receives
 // 10e18 wei + songId wei, where songId wei is < 1e-13 CRC of dust.
 //
+// The Hub emits TransferSingle with exactly the transferred value (demurrage
+// only discounts the sender's stored balance, via a separate burn to the zero
+// address), so the songId survives on-chain untouched.
+//
 // Decoder: songId = Number(amount % SONG_ID_MOD)
 export const BASE_AMOUNT_WEI = 10n * 10n ** 18n;
 export const SONG_ID_MOD = 10000n;
 
-// ERC-20 Transfer event signature: Transfer(address,address,uint256)
-// keccak256("Transfer(address,address,uint256)")
-export const TRANSFER_EVENT_TOPIC =
-  '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
-
 // Earliest block to scan. Bump this when deploying a fresh playlist to
-// ignore payments from previous events. Set to current block at deploy
+// ignore payments from previous events. Set to ~current block at deploy
 // time so the queue starts empty.
-export const START_BLOCK = 46_625_000n;
+export const START_BLOCK = 46_606_900n;

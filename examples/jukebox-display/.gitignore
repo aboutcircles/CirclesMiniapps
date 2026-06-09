@@ -1,5 +1,0 @@
-.vercel
-dist/
-node_modules/
-
-probe_*.mjs
