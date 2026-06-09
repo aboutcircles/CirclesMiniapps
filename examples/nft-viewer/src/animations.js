@@ -361,6 +361,27 @@ export function createAnimator() {
   // ========================================================================
 
   /**
+   * Reveal the detail view's hero image. Runs alongside the info-row
+   * stagger in openDetail() — the image fades + scales in while the
+   * info rows stagger.
+   *
+   * @param {Element} imgEl - the detail image element (or placeholder)
+   * @returns {Promise<void>}
+   */
+  function showDetailImage(imgEl) {
+    if (!imgEl) return Promise.resolve();
+    return new Promise((resolve) => {
+      tweenFrom(imgEl, {
+        opacity: 0,
+        scale: 0.95,
+        duration: 0.7,
+        ease: EASE.outStrong,
+        onComplete: resolve,
+      });
+    });
+  }
+
+  /**
    * Reveal the detail view's info panel. The detail view itself appears
    * instantly (no image morph — the hand-rolled clone-and-animate approach
    * was glitchy in practice).
@@ -437,7 +458,8 @@ export function createAnimator() {
     // toast
     showToast,
     hideToast,
-    // transitions
+    // detail
+    showDetailImage,
     openDetail,
     closeDetail,
     // lifecycle

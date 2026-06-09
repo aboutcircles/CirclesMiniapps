@@ -67,6 +67,7 @@ describe('createAnimator', () => {
     expect(typeof a.pulseHighlighted).toBe('function');
     expect(typeof a.showToast).toBe('function');
     expect(typeof a.hideToast).toBe('function');
+    expect(typeof a.showDetailImage).toBe('function');
     expect(typeof a.openDetail).toBe('function');
     expect(typeof a.closeDetail).toBe('function');
     expect(typeof a.kill).toBe('function');

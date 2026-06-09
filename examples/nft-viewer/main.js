@@ -1,5 +1,4 @@
-/**
- * NFT Viewer — main.js
+ /* NFT Viewer — main.js
  * Read-only gallery of ERC-721 NFTs held by the connected Circles wallet.
  * Data sourced from the Safe Transaction Service API.
  */
@@ -637,7 +636,13 @@ function renderDetail(nft) {
 async function openDetail(nft, _cardEl) {
   state.selectedNft = nft;
   const { info } = renderDetail(nft);
-  await animator.openDetail({ infoEl: info });
+  const detailImg = document.querySelector('.detail-img');
+  // Image and info rows animate in parallel — both run for the same
+  // ~0.7s window so the detail view feels cohesive.
+  await Promise.all([
+    detailImg ? animator.showDetailImage(detailImg) : Promise.resolve(),
+    animator.openDetail({ infoEl: info }),
+  ]);
 }
 
 // closeDetail used to also call animator.closeDetail, but the hand-rolled
