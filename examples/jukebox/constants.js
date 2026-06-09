@@ -28,6 +28,24 @@ export const JUKEBOX_ADDRESS = '0xbe6e5a0bdface700cbe8f0d1c28fcb8404a1622b';
 // against (that was only a concern for the old wrapped-ERC-20 rail).
 export const HUB_V2_ADDRESS = '0xc12C1E50ABB450d6205Ea2C3Fa861b3B834d13e8';
 
+// ─── Accepted payment tokens ────────────────────────────────
+// Payment is restricted to native group CRC ("gCRC") from exactly two approved
+// Circles groups. Personal CRC and any other group's CRC are rejected — both
+// when picking what to spend and when reading the queue.
+//
+// For native Hub V2 CRC an ERC-1155 token id IS its issuing avatar address as a
+// uint256, so the two accepted token ids are just BigInt() of the group avatars
+// below. (The on-chain `id` column / balance `tokenId` carry exactly this.)
+export const GNOSIS_GROUP_ADDRESS = '0xc19bc204eb1c1d5b3fe500e5e5dfabab625f286c';   // Group 1 — "Gnosis" gCRC
+export const GNOSIS_GROUP_2_ADDRESS = '0x93eD5A96347927ff6fF6b790F8Cf5258240c321f'; // Group 2 — second "Gnosis" gCRC
+
+export const ACCEPTED_GROUP_ADDRESSES = [GNOSIS_GROUP_ADDRESS, GNOSIS_GROUP_2_ADDRESS];
+
+// The two accepted ERC-1155 token ids, as BigInts. Compare with
+// `BigInt(x) === id` so both the hex form (balance.tokenId) and the decimal
+// form (indexer `id` column) match without string-format fragility.
+export const ACCEPTED_TOKEN_IDS = ACCEPTED_GROUP_ADDRESSES.map(a => BigInt(a));
+
 // Payment encoding.
 // Each play costs exactly 10 CRC. The chosen songId (0..SONG_ID_MOD-1) is
 // encoded in the low bits of the transfer amount: the recipient receives

@@ -8,9 +8,10 @@
  * requests.
  *
  * Payment rail: a native Circles ERC-1155 transfer on Hub V2 —
- * `safeTransferFrom(payer, JUKEBOX_ADDRESS, crcTokenId, amount, "")`. The payer
- * spends whichever CRC they already hold (personal or group); we look up their
- * balances and pick a native v2 token with enough. On-chain encoding:
+ * `safeTransferFrom(payer, JUKEBOX_ADDRESS, crcTokenId, amount, "")`. Payment is
+ * restricted to native group CRC ("gCRC") from two approved groups: we look up
+ * the payer's balances and pick a native v2 token whose id is one of the two
+ * accepted group token ids (see ACCEPTED_TOKEN_IDS). On-chain encoding:
  * amount = 10e18 + songId wei. The display decodes the songId from each
  * incoming TransferSingle as `amount % SONG_ID_MOD`.
  */
@@ -32,6 +33,8 @@ import {
   RPC_FALLBACKS,
   JUKEBOX_ADDRESS,
   HUB_V2_ADDRESS,
+  ACCEPTED_GROUP_ADDRESSES,
+  ACCEPTED_TOKEN_IDS,
   BASE_AMOUNT_WEI,
   SONG_ID_MOD,
   START_BLOCK,
@@ -109,6 +112,27 @@ function songById(id) {
 
 function shortAddress(a) {
   return a ? `${a.slice(0, 6)}…${a.slice(-4)}` : '';
+}
+
+// True iff `rawId` is one of the two accepted group token ids. Accepts hex
+// (balance.tokenId) or decimal (indexer `id` column) — both normalize via
+// BigInt, so we never depend on string formatting.
+function isAcceptedTokenId(rawId) {
+  if (rawId === null || rawId === undefined || rawId === '') return false;
+  try {
+    const v = BigInt(rawId);
+    return ACCEPTED_TOKEN_IDS.some(id => id === v);
+  } catch {
+    return false;
+  }
+}
+
+// A balance row's issuing avatar is one of the approved groups. Used for the
+// "unwrap" hint where the token id is the ERC-20 wrapper, not the group avatar,
+// so we match on tokenOwner instead.
+function isAcceptedGroupOwner(b) {
+  const owner = b?.tokenOwner ? String(b.tokenOwner).toLowerCase() : '';
+  return owner !== '' && ACCEPTED_GROUP_ADDRESSES.some(a => a.toLowerCase() === owner);
 }
 
 // ─── Tab switching ──────────────────────────────────────────
@@ -234,12 +258,13 @@ async function payForSong(song) {
   // Hub emits TransferSingle with this value verbatim.
   const amountWei = BASE_AMOUNT_WEI + BigInt(song.id);
 
-  // Pick a native Hub V2 CRC token the user actually holds. We accept personal
-  // OR group CRC — any unwrapped v2 ERC-1155 token. Native balances are
-  // demurraged 1:1, so `attoCircles` (the demurraged balance, == on-chain
-  // balanceOf) is directly comparable to amountWei and is the unit
-  // safeTransferFrom moves. There is no auto-mint.
-  setConfirmStatus('Looking up your CRC balance…', 'info');
+  // Pick a native Hub V2 CRC token the user actually holds. Payment is
+  // restricted to the two approved groups' gCRC — only an unwrapped v2 ERC-1155
+  // token whose id is in ACCEPTED_TOKEN_IDS qualifies. Personal CRC and other
+  // groups are rejected. Native balances are demurraged 1:1, so `attoCircles`
+  // (the demurraged balance, == on-chain balanceOf) is directly comparable to
+  // amountWei and is the unit safeTransferFrom moves. There is no auto-mint.
+  setConfirmStatus('Looking up your group CRC balance…', 'info');
 
   let balances;
   try {
@@ -251,6 +276,7 @@ async function payForSong(song) {
 
   const candidates = (balances || []).filter(b =>
     b.isErc1155 && !b.isWrapped && Number(b.version) === 2 &&
+    isAcceptedTokenId(b.tokenId) &&
     BigInt(b.attoCircles) >= amountWei
   );
   // Spend the largest balance first — avoids a demurrage rounding edge where a
@@ -260,15 +286,15 @@ async function payForSong(song) {
   );
   const chosen = candidates[0];
   if (!chosen) {
-    // If they hold enough but it's wrapped as an ERC-20, the native transfer
-    // can't reach it — point them at unwrapping rather than a generic error.
-    const hasWrapped = (balances || []).some(b =>
-      b.isWrapped && BigInt(b.attoCircles) >= amountWei
+    // Hold enough of an approved group's CRC, but wrapped as an ERC-20? The
+    // native transfer can't reach it — point them at unwrapping.
+    const hasWrappedAccepted = (balances || []).some(b =>
+      b.isWrapped && isAcceptedGroupOwner(b) && BigInt(b.attoCircles) >= amountWei
     );
-    if (hasWrapped) {
-      throw new Error('Your CRC is wrapped as an ERC-20. Unwrap it to native CRC in your wallet, then try again.');
+    if (hasWrappedAccepted) {
+      throw new Error('Your group CRC is wrapped as an ERC-20. Unwrap it to native CRC in your wallet, then try again.');
     }
-    throw new Error('You need at least 10 CRC (personal or group) to play a song.');
+    throw new Error('You need at least 10 CRC from one of the two approved Circles groups to play a song.');
   }
   const tokenId = BigInt(chosen.tokenId);
 
@@ -375,12 +401,12 @@ async function circlesQuery(table, columns, filters, order, limit) {
 
 async function fetchQueueEntries() {
   // All native ERC-1155 (TransferSingle) payments received by the treasury org.
-  // Any avatar's CRC counts — native balances are demurraged 1:1, so there is
-  // no token allowlist; the 10 CRC base-price check below is the only filter
-  // that matters (the treasury is a low-traffic org, so the set is tiny).
+  // We fetch the token `id` so we can keep only payments made with one of the
+  // two approved groups' gCRC (ACCEPTED_TOKEN_IDS) — matching the pay path.
+  // The treasury is a low-traffic org, so the membership check below is cheap.
   const rows = await circlesQuery(
     'TransferSingle',
-    ['blockNumber', 'timestamp', 'transactionHash', 'logIndex', 'from', 'to', 'value'],
+    ['blockNumber', 'timestamp', 'transactionHash', 'logIndex', 'from', 'to', 'id', 'value'],
     [{ column: 'to', value: JUKEBOX_ADDRESS.toLowerCase() }],
     [{ Column: 'blockNumber', SortOrder: 'ASC' }],
     1000,
@@ -389,6 +415,8 @@ async function fetchQueueEntries() {
   const entries = [];
   for (const row of rows) {
     try {
+      // Reject anything not paid with an approved group token id.
+      if (!isAcceptedTokenId(row.id)) continue;
       const value = BigInt(row.value);
       const songId = Number(value % SONG_ID_MOD);
       const base = value - (value % SONG_ID_MOD);
@@ -473,9 +501,12 @@ onWalletChange((address) => {
   renderSongList();
 });
 
-// ─── Now playing bar ────────────────────────────────────────
-// Polls the same queue data the display uses, shows the most recent entry
-// as "now playing". Refreshes on the same cadence as the display (10s).
+// ─── Latest request bar ─────────────────────────────────────
+// Shows the most recently *requested* song. This is NOT "now playing": with no
+// channel from the display we can't know what's actually on the speakers, and
+// the display plays the queue in order, so the newest request is the last thing
+// that'll play. Labelled "Latest request" in the UI to stay truthful. Refreshes
+// on the same cadence as the display (10s).
 let nowPlayingPollTimer = null;
 
 async function refreshNowPlaying() {
@@ -486,7 +517,6 @@ async function refreshNowPlaying() {
       return;
     }
     // The last entry in chronological order is the most recent request.
-    // The display plays them in order, so this is the current (or next) track.
     const latest = entries[entries.length - 1];
     nowPlayingArt.src = latest.song.artworkUrl;
     nowPlayingTitle.textContent = latest.song.title;
