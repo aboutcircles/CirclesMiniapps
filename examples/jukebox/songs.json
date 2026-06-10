@@ -230,5 +230,93 @@
     "soundcloudUrl": "https://soundcloud.com/lewring/telefone-529",
     "durationSec": 15,
     "artworkUrl": "https://i1.sndcdn.com/artworks-aelaUCX84ZhEqkiF-q5gabA-t500x500.jpg"
+  },
+  {
+    "id": 30,
+    "title": "Forgetting is Like Syrup",
+    "artist": "Moin",
+    "soundcloudUrl": "https://soundcloud.com/moin-scmusic/moin-forgetting-is-like-syrup",
+    "durationSec": 256,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-Tq6w0eI7Nuiw-0-t500x500.png"
+  },
+  {
+    "id": 31,
+    "title": "Longing For U (Priori Remix)",
+    "artist": "Tour-Maubourg, Priori",
+    "soundcloudUrl": "https://soundcloud.com/tour-maubourg/tour-maubourg-priori-longing",
+    "durationSec": 339,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-JaCzeC2vhNc9-0-t500x500.png"
+  },
+  {
+    "id": 32,
+    "title": "silberfisch",
+    "artist": "Pole",
+    "soundcloudUrl": "https://soundcloud.com/pole-original/pole-silberfisch",
+    "durationSec": 397,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-BryWRaHnMEDmQDf4-g0qakg-t500x500.jpg"
+  },
+  {
+    "id": 33,
+    "title": "Compact Impulse",
+    "artist": "Dublicator",
+    "soundcloudUrl": "https://soundcloud.com/eintakt-records/dublicator-compact-impulse",
+    "durationSec": 424,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-000169492067-dejz1m-t500x500.jpg"
+  },
+  {
+    "id": 34,
+    "title": "Love Me A Little",
+    "artist": "K-LONE",
+    "soundcloudUrl": "https://soundcloud.com/k-lone93/love-me-a-little-3",
+    "durationSec": 260,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-shrnun1xuJSnGh00-t0Bc5g-t500x500.jpg"
+  },
+  {
+    "id": 35,
+    "title": "Tabt Optagelse",
+    "artist": "Palta",
+    "soundcloudUrl": "https://soundcloud.com/melodyastruth/palta-tabt-optagelse",
+    "durationSec": 91,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-000246587946-mitv5u-t500x500.jpg"
+  },
+  {
+    "id": 36,
+    "title": "Oenology ft. CFCF",
+    "artist": "Unknown Mobile",
+    "soundcloudUrl": "https://soundcloud.com/pacificrhythm/unknown-mobile-oenology-ft-cfcf",
+    "durationSec": 404,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-000550147437-udxj7s-t500x500.jpg"
+  },
+  {
+    "id": 37,
+    "title": "Cape Cira",
+    "artist": "K-LONE",
+    "soundcloudUrl": "https://soundcloud.com/mixmag-1/premiere-k-lone-cape-cira",
+    "durationSec": 377,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-7UbzBBTafBnEz82g-gd68pA-t500x500.jpg"
+  },
+  {
+    "id": 38,
+    "title": "The Ultimate Which Manages The World",
+    "artist": "Yu Su",
+    "soundcloudUrl": "https://soundcloud.com/secondcircle/b2-yu-su-the-ultimate-which-manages-the-world",
+    "durationSec": 151,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-000517563801-yba7xi-t500x500.jpg"
+  },
+  {
+    "id": 39,
+    "title": "The Fog of The Far Small Town",
+    "artist": "El Fog",
+    "soundcloudUrl": "https://soundcloud.com/flaurecords/el-fog-the-fog-of-the-far",
+    "durationSec": 314,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-000032274277-wl3gvx-t500x500.jpg"
+  },
+  {
+    "id": 40,
+    "title": "Mountain Dub",
+    "artist": "Masayoshi Fujita / el fog",
+    "soundcloudUrl": "https://soundcloud.com/masayoshifujita/mountain-dub",
+    "durationSec": 343,
+    "artworkUrl": "https://i1.sndcdn.com/artworks-000003474880-hj0m72-t500x500.jpg"
   }
 ]
