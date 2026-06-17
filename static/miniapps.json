@@ -179,6 +179,19 @@
     "category": "miniapp"
   },
   {
+    "slug": "coffee-loyalty",
+    "name": "Coffee Loyalty",
+    "logo": "/app-logos/coffee-loyalty.svg",
+    "url": "https://circles.gnosis.io/apps/coffee-loyalty",
+    "description": "Scan the shop's QR to collect coffee stamps. Every 10th coffee is free — and you join the coffee shop's Circles group automatically.",
+    "tags": [
+      "commerce",
+      "loyalty",
+      "social"
+    ],
+    "category": "miniapp"
+  },
+  {
     "slug": "jukebox",
     "name": "Circles Jukebox",
     "logo": "/app-logos/jukebox.png",
