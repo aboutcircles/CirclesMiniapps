@@ -276,5 +276,18 @@
     "tags": ["internal", "events"],
     "category": "miniapp",
     "isHidden": true
+  },
+  {
+    "slug": "roebel-inviter",
+    "name": "Röbel · Invite Citizens",
+    "logo": "https://circles-inviter.vercel.app/logo.svg",
+    "url": "https://circles-inviter.vercel.app/",
+    "description": "Invite verified Röbel citizens into Circles using your invitation quota.",
+    "tags": [
+      "town",
+      "internal"
+    ],
+    "category": "miniapp",
+    "isHidden": true
   }
 ]
