@@ -11,7 +11,10 @@
 	const isMiniapps = $derived($page.url.pathname.startsWith('/miniapps'));
 	const isHidden = $derived(
 		$page.url.pathname.startsWith('/pilots') ||
-		$page.url.pathname.startsWith('/invitation')
+		$page.url.pathname.startsWith('/invitation') ||
+		// crc-signin is an embedded wallet connector inside a small third-party
+		// iframe — a full-width legal banner would cover the entire connect UI.
+		$page.url.pathname.startsWith('/crc-signin')
 	);
 
 	// The playground and mini-apps flagged `strongDisclaimer` in the manifest
