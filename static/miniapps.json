@@ -276,5 +276,14 @@
     "tags": ["internal", "events"],
     "category": "miniapp",
     "isHidden": true
+  },
+  {
+    "slug": "crchours",
+    "name": "crchours",
+    "logo": "https://crchours.vercel.app/logo.svg",
+    "url": "https://crchours.vercel.app/",
+    "description": "Monthly uniform-price call auction for labor-time, priced in CRC. Sellers offer hours, buyers bid, and each category/tier market clears at a single market price.",
+    "tags": ["marketplace", "auction", "labor", "crc", "hours"],
+    "category": "garage"
   }
 ]
