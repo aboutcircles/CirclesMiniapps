@@ -137,6 +137,15 @@ async function connect(safeAddress: string) {
 	const config = getConfig();
 	if (!config) return;
 
+	// Never tear down a live session for a redundant connect. If we're already
+	// connected to this same safe with a working client, a second connect() (e.g. a
+	// re-entrant auto-restore racing an in-flight transaction signature) is a no-op.
+	// Without this, that redundant attempt could throw mid-setup and the catch below
+	// would wipe the session + saved address, bouncing the user back to sign-in.
+	if (smartAccountClient && connected && getAddress(safeAddress) === address) {
+		return;
+	}
+
 	connecting = true;
 	connectionError = '';
 
@@ -192,6 +201,7 @@ async function connect(safeAddress: string) {
 		// half-mounted spinner that the user can't escape. Also clear the saved
 		// safe_address — a stale value would silently route the next autoConnect
 		// down the same broken path without ever prompting the passkey.
+		console.warn('[wallet] connect() failed → disconnecting (connected=false). Saved address wiped.', error);
 		smartAccountClient = null;
 		publicClient = null;
 		address = '';

@@ -56,12 +56,12 @@
 	// Kept outside $state so Svelte never proxies the cross-origin Window object.
 	let pendingSource: MessageEventSource | null = null;
 
-	// User-initiated auth popup (the "Log in" / "Create account" buttons), distinct
-	// from the parent-initiated `request_create_account` flow tracked by pendingRequest.
-	// 'login' retrieves an existing device passkey; 'signup' mints a new passkey + Safe.
-	// A fresh origin (e.g. a third-party site or localhost) has no passkey to retrieve,
-	// so first-time users must use 'signup'.
-	let authMode = $state<'login' | 'signup' | null>(null);
+	// User-initiated signup popup (the "Create account" button), distinct from the
+	// parent-initiated `request_create_account` flow tracked by pendingRequest. Signup
+	// mints a new passkey + Safe and needs a name input, so it keeps a dedicated popup.
+	// "Sign in with Circles" does NOT use this — it logs in directly via the native
+	// passkey prompt (handleSignIn), with no intermediate popup.
+	let authMode = $state<'signup' | null>(null);
 
 	let errorToast = $state<string | null>(null);
 	$effect(() => {
@@ -149,6 +149,20 @@
 			// re-announce so its SDK/listener resyncs.
 			postTo(window.parent, { type: 'crc_bridge_ready' });
 		}
+
+		// Parent-initiated logout. The host can't reach the wallet directly, so it
+		// asks us to drop the session. We must clear the SAVED session (not just the
+		// in-memory connection) — otherwise the one-shot restore effect below, or a
+		// host that reloads the iframe, would immediately auto-connect again. After
+		// wallet.disconnect() the connected-state effect posts `wallet_disconnected`
+		// to the parent, and manuallyDisconnected blocks any further auto-restore in
+		// this page instance.
+		if (data.type === 'disconnect') {
+			didAttemptRestore = true; // belt-and-suspenders: never auto-restore after an explicit logout
+			wallet.disconnect();
+			return;
+		}
+
 		baseHandleMessage(event);
 	}
 
@@ -173,19 +187,27 @@
 		pendingSource = null;
 	}
 
-	// Close the user-initiated auth popup. On a successful login, offer the
-	// child-safe picker (AuthPopup's login path skips it, unlike connectAndPick).
-	function handleUserAuthClose() {
-		const justConnected = wallet.connected;
-		const wasLogin = authMode === 'login';
-		authMode = null;
-		if (justConnected) {
-			wallet.autoConnectAndPick();
-		} else if (wasLogin) {
+	// "Sign in with Circles": trigger the passkey login directly — no intermediate
+	// login popup. connectAndPick() fires the native passkey prompt and then shows
+	// the child-safe picker. Errors surface via the existing errorToast effect; on
+	// failure we run the iframe passkey diagnostic to explain WHY in the console.
+	async function handleSignIn() {
+		await wallet.connectAndPick();
+		if (!wallet.connected) {
 			// Login failed (commonly RetrieveWalletFromPasskeyError). Cometh masks the
 			// real DOMException, so probe navigator.credentials.get() directly to reveal
 			// WHY: a Permissions-Policy block in the iframe vs. no passkey for this origin.
 			diagnosePasskeyFailure();
+		}
+	}
+
+	// Close the user-initiated signup popup. On success, run the child-safe picker
+	// (AuthPopup's flow doesn't, unlike connectAndPick).
+	function handleUserAuthClose() {
+		const justConnected = wallet.connected;
+		authMode = null;
+		if (justConnected) {
+			wallet.autoConnectAndPick();
 		}
 	}
 
@@ -292,8 +314,17 @@
 	// Restore an existing session only once we trust the embedder. We never force a
 	// passkey prompt on mount — the user must click "Log in" — so a hostile parent
 	// can't trigger an unsolicited wallet dialog even after authorization.
+	//
+	// This must fire AT MOST ONCE. Without the guard the effect re-runs every time
+	// wallet.connected toggles; if a transaction's passkey signing momentarily drops
+	// the connection, the effect would re-trigger autoConnect mid-flow and the user
+	// would be bounced back to the sign-in screen after approving. One-shot restore
+	// avoids that race — explicit user actions (Sign in / Logout) handle the rest.
+	let didAttemptRestore = false;
 	$effect(() => {
+		if (didAttemptRestore) return;
 		if (authorized && !wallet.connected && !wallet.connecting && wallet.getSavedSafeAddress()) {
+			didAttemptRestore = true;
 			wallet.autoConnect();
 		}
 	});
@@ -353,9 +384,9 @@
 		</div>
 	</div>
 {:else if wallet.connected}
-	<!-- Connected: minimal account pill + logout. No brand, no address. -->
+	<!-- Connected: avatar + name + logout, all on one row in a single block. -->
 	<div class="shell embedded compact">
-		<div class="account-pill">
+		<div class="account-row">
 			<span class="avatar-img-wrap">
 				{#if wallet.avatarImageUrl}
 					<img class="avatar-img" src={wallet.avatarImageUrl} alt="" />
@@ -364,8 +395,8 @@
 				{/if}
 			</span>
 			<span class="account-name">{wallet.avatarName || truncateAddr(wallet.address)}</span>
+			<button class="logout-btn" onclick={() => wallet.disconnect()}>Logout</button>
 		</div>
-		<button class="logout-btn" onclick={() => wallet.disconnect()}>Logout</button>
 	</div>
 {:else}
 	<!-- Signed out: minimal sign-in. -->
@@ -373,7 +404,7 @@
 		<div class="connector">
 			<button
 				class="btn btn-primary"
-				onclick={() => (authMode = 'login')}
+				onclick={handleSignIn}
 				disabled={wallet.connecting}
 			>
 				{#if wallet.connecting}
@@ -406,15 +437,16 @@
 		request={pendingRequest}
 		onapprove={approvalHandlers.handleApprove}
 		onreject={approvalHandlers.handleReject}
+		fullPage
 	/>
 {/if}
 
 {#if pendingRequest?.kind === 'auth'}
-	<AuthPopup mode="signup" app={parentOrigin} onclose={handleAuthClose} />
+	<AuthPopup mode="signup" app={parentOrigin} onclose={handleAuthClose} fullPage />
 {/if}
 
-{#if authMode}
-	<AuthPopup mode={authMode} app={parentOrigin} onclose={handleUserAuthClose} />
+{#if authMode === 'signup'}
+	<AuthPopup mode="signup" app={parentOrigin} onclose={handleUserAuthClose} fullPage />
 {/if}
 
 <style>
@@ -535,18 +567,20 @@
 		border: 1px solid var(--line);
 	}
 
-	/* Connected account pill — avatar + name only (per design). */
-	.account-pill {
-		display: inline-flex;
+	/* Connected account row — avatar + name + logout, all in one row, one block. */
+	.account-row {
+		display: flex;
 		align-items: center;
 		gap: 10px;
-		padding: 6px 16px 6px 6px;
+		width: 100%;
+		max-width: 340px;
+		padding: 6px 6px 6px 6px;
 		background: var(--card);
 		border: 1px solid var(--line);
 		border-radius: 999px;
 		box-shadow: var(--shadow-card, 0 2px 10px rgba(6, 10, 64, 0.08));
 		min-width: 0;
-		max-width: 100%;
+		flex-wrap: nowrap;
 	}
 
 	.avatar-img-wrap {
@@ -574,6 +608,7 @@
 	}
 
 	.account-name {
+		flex: 1 1 auto;
 		font-size: 16px;
 		font-weight: 600;
 		color: var(--ink);
