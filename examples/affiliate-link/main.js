@@ -77,6 +77,8 @@ const aPreviewBtn = document.getElementById('a-preview-btn');
 const aQr = document.getElementById('a-qr');
 const aPreview = document.getElementById('a-preview');
 const aResultPreview = document.getElementById('a-result-preview');
+const aGroupSearch = document.getElementById('a-group-search');
+const aResults = document.getElementById('a-group-results');
 
 // ─── State ──────────────────────────────────────────────────
 let connectedAddress = null;
@@ -249,14 +251,22 @@ function skeletonRows(n) {
   return h;
 }
 
+// findGroups is groups-only by construction — humans and orgs never appear in
+// its results — so the "groups only" filter is handled server-side. We keep a
+// defensive guard for malformed rows.
+async function fetchGroups(query) {
+  const params = query ? { nameStartsWith: query } : undefined;
+  const res = await getReadSdk().rpc.group.findGroups(30, params);
+  const rows = (res && res.results) || (Array.isArray(res) ? res : []);
+  return rows.filter((g) => g && g.group && isAddress(g.group));
+}
+
 async function loadGroups(query) {
   const seq = ++searchSeq;
   groupListEl.innerHTML = skeletonRows(6);
   let results = [];
   try {
-    const params = query ? { nameStartsWith: query } : undefined;
-    const res = await getReadSdk().rpc.group.findGroups(30, params);
-    results = (res && res.results) || (Array.isArray(res) ? res : []);
+    results = await fetchGroups(query);
   } catch (e) {
     if (seq !== searchSeq) return;
     groupListEl.innerHTML = `<div class="list-hint">Couldn't load groups: ${escapeHtml(decodeError(e))}</div>`;
@@ -266,12 +276,15 @@ async function loadGroups(query) {
   renderGroupList(results);
 }
 
-function renderGroupList(groups) {
+// Reusable group-row renderer. `onPick(addr, name)` fires on click; `opts`
+// controls the trailing label and the member-only selected/current markers.
+// Used by both the member picker and the admin group search.
+function renderGroupRows(container, groups, onPick, opts = {}) {
   if (!groups.length) {
-    groupListEl.innerHTML = '<div class="list-hint">No groups found.</div>';
+    container.innerHTML = '<div class="list-hint">No groups found.</div>';
     return;
   }
-  groupListEl.innerHTML = '';
+  container.innerHTML = '';
   const addrs = [];
   for (const g of groups) {
     const addr = getAddress(g.group);
@@ -279,29 +292,35 @@ function renderGroupList(groups) {
     const cached = getProfile(addr);
     const name = g.name || g.symbol || cached.name || shortAddress(addr);
     const row = document.createElement('button');
+    row.type = 'button';
     row.className = 'group-row';
     row.dataset.addr = addr;
-    if (selected && selected.group.toLowerCase() === addr.toLowerCase()) row.classList.add('selected');
-    const isCurrent = currentAffiliate && currentAffiliate.toLowerCase() === addr.toLowerCase();
+    if (opts.markSelected && selected && selected.group.toLowerCase() === addr.toLowerCase()) row.classList.add('selected');
+    const isCurrent = opts.markCurrent && currentAffiliate && currentAffiliate.toLowerCase() === addr.toLowerCase();
     row.innerHTML = `
       <span class="group-avatar avatar"></span>
       <span class="group-meta">
         <span class="group-name">${escapeHtml(name)}</span>
         <span class="group-sub mono">${g.symbol ? escapeHtml(g.symbol) + ' · ' : ''}${shortAddress(addr)}</span>
       </span>
-      ${isCurrent ? '<span class="group-tag">current</span>' : '<span class="group-pick">Select</span>'}
+      ${isCurrent ? '<span class="group-tag">current</span>' : `<span class="group-pick">${escapeHtml(opts.pickLabel || 'Select')}</span>`}
     `;
     paintAvatar(row.querySelector('.group-avatar'), name, cached.imageUrl);
-    row.addEventListener('click', () => selectGroup(addr, row.querySelector('.group-name').textContent));
-    groupListEl.appendChild(row);
+    row.addEventListener('click', () => onPick(addr, row.querySelector('.group-name').textContent));
+    container.appendChild(row);
   }
-  hydrateGroupRows(addrs);
+  hydrateGroupRows(container, addrs);
+}
+
+function renderGroupList(groups) {
+  renderGroupRows(groupListEl, groups, (addr, name) => selectGroup(addr, name),
+    { markSelected: true, markCurrent: true, pickLabel: 'Select' });
 }
 
 // Fill in real avatars (and upgrade bare-address names) once profiles resolve.
-async function hydrateGroupRows(addrs) {
+async function hydrateGroupRows(container, addrs) {
   await fetchProfiles(addrs);
-  for (const el of groupListEl.querySelectorAll('.group-row')) {
+  for (const el of container.querySelectorAll('.group-row')) {
     const addr = el.dataset.addr;
     if (!addr) continue;
     const p = getProfile(addr);
@@ -449,6 +468,40 @@ function scheduleAdminPreview() {
     renderGroupChip(aPreview, isAddress(raw) ? raw : null, aNameInput.value.trim());
   }, 200);
 }
+
+// Admin group search — same groups-only findGroups call as the member picker,
+// so humans and orgs never show up. Picking a result fills the address +
+// display-name fields (and the preview chip).
+let adminSearchSeq = 0;
+let adminSearchTimer = null;
+async function loadAdminGroups(query) {
+  if (!query) { aResults.classList.add('hidden'); aResults.replaceChildren(); return; }
+  const seq = ++adminSearchSeq;
+  aResults.classList.remove('hidden');
+  aResults.innerHTML = skeletonRows(4);
+  let results = [];
+  try {
+    results = await fetchGroups(query);
+  } catch (e) {
+    if (seq !== adminSearchSeq) return;
+    aResults.innerHTML = `<div class="list-hint">Couldn't load groups: ${escapeHtml(decodeError(e))}</div>`;
+    return;
+  }
+  if (seq !== adminSearchSeq) return; // superseded by a newer query
+  renderGroupRows(aResults, results, pickAdminGroup, { pickLabel: 'Use this' });
+}
+
+function pickAdminGroup(addr, name) {
+  const a = getAddress(addr);
+  aGroupInput.value = a;
+  // Adopt a real profile/display name, but not a fallback short address.
+  if (name && name !== shortAddress(a)) aNameInput.value = name;
+  aResults.classList.add('hidden');
+  aResults.replaceChildren();
+  aGroupSearch.value = '';
+  setStatusEl(aWarn, '');
+  renderGroupChip(aPreview, a, aNameInput.value.trim());
+}
 async function onCopyLink() {
   if (!aLinkInput.value) return;
   try { await navigator.clipboard.writeText(aLinkInput.value); }
@@ -510,6 +563,10 @@ aNameInput.addEventListener('input', scheduleAdminPreview);
 groupSearch.addEventListener('input', () => {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => loadGroups(groupSearch.value.trim()), 300);
+});
+aGroupSearch.addEventListener('input', () => {
+  clearTimeout(adminSearchTimer);
+  adminSearchTimer = setTimeout(() => loadAdminGroups(aGroupSearch.value.trim()), 300);
 });
 
 selectTab('set');

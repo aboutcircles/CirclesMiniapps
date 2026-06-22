@@ -64,7 +64,11 @@
       </div>
 
       <div class="card form-card">
-        <label class="field-label" for="a-group-input">Your group address</label>
+        <label class="field-label" for="a-group-search">Find your group</label>
+        <input id="a-group-search" class="field" type="text" placeholder="Search groups by name…" autocomplete="off" spellcheck="false" />
+        <div id="a-group-results" class="group-list admin-results hidden"></div>
+
+        <label class="field-label" for="a-group-input">Group address <span class="muted">(or paste manually)</span></label>
         <input id="a-group-input" class="field mono" type="text" placeholder="0x…" autocomplete="off" spellcheck="false" />
 
         <label class="field-label" for="a-name-input">Display name <span class="muted">(optional)</span></label>
