@@ -1,9 +1,11 @@
 # Affiliate Link
 
-A Circles miniapp that turns "set your affiliate group" into something a group
-admin can **distribute**. The main wallet already lets a user pick an affiliate
-group (the star on a group's page), but admins can't drive members to it — so the
-revenue gets left on the table. This app closes that gap with a shareable link.
+A Circles miniapp where a human avatar sets their own **affiliate group** — and
+group admins can hand out a one-tap link to drive members to theirs. It runs
+**inside a Circles host** and uses the host wallet bridge for connect + signing.
+
+The Gnosis wallet app no longer lets users set an affiliate group, so this fills
+that gap: members search and pick a group here; admins get a shareable link + QR.
 
 ## What an affiliate group is
 
@@ -12,13 +14,16 @@ CRC the human mints** — a human mints 24 CRC/day, so it's roughly **2 CRC/day 
 affiliated member**. It costs the member nothing extra and they can change it any
 time. (You don't have to be a member of the group you affiliate with.)
 
-## Two modes, one app
+## Two tabs, one app
 
-- **Admin** (opened with no `?data=`): paste your group address → get a share
-  link + QR code. Optionally add a display name.
-- **Member** (opened via the share link, which carries the group in `?data=`):
-  see the group and tap **Set as my affiliate group**. Shows your current
-  affiliate first, and recognises when the group is already set.
+- **Set my affiliate** (default): search the live list of Circles groups
+  (`sdk.rpc.group.findGroups`), pick one, and tap **Set as my affiliate** — a
+  single on-chain call. Shows your current affiliate and flags one already set.
+- **Promote my group** (admin): paste a group address → get a shareable link +
+  QR. Opening that link **preselects** the group on the Set tab for a one-tap set.
+
+The app runs inside a Circles host and has no wallet of its own — connect and
+signing come from the host bridge (`@aboutcircles/miniapp-sdk`).
 
 ## On-chain mechanism
 

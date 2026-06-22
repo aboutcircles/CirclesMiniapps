@@ -17,47 +17,45 @@
         <span id="badge" class="badge badge-off">Not connected</span>
       </div>
       <p class="subtitle">
-        An affiliate group earns <strong>1/12 of the CRC you mint</strong> (~2 CRC a day) — at no cost to you, changeable any time.
+        Your affiliate group earns <strong>1/12 of the CRC you mint</strong> (~2 CRC a day) — at no cost to you, changeable any time.
       </p>
     </header>
 
-    <!-- ───────── MEMBER VIEW ───────── -->
-    <section id="member-view" class="hidden">
-      <div class="card group-card">
-        <div id="m-group-avatar" class="group-avatar">?</div>
-        <div class="group-meta">
-          <div class="group-label">Support this group</div>
-          <div id="m-group-name" class="group-name">Circles group</div>
-          <div id="m-group-addr" class="group-addr mono"></div>
-        </div>
+    <div id="host-warning" class="host-warning hidden">
+      This mini app runs inside a Circles host. Open it from a host (e.g. the Playground) to connect your wallet and set your affiliate group.
+    </div>
+
+    <nav class="tabs" role="tablist">
+      <button id="tab-set" class="tab active" role="tab" aria-selected="true">Set my affiliate</button>
+      <button id="tab-promote" class="tab" role="tab" aria-selected="false">Promote my group</button>
+    </nav>
+
+    <!-- ───────── SET MY AFFILIATE (member) ───────── -->
+    <section id="set-panel" class="panel" role="tabpanel">
+      <p id="current-affiliate" class="current-line hidden"></p>
+
+      <div class="search-wrap">
+        <input id="group-search" class="field" type="text" autocomplete="off" spellcheck="false"
+               placeholder="Search groups by name…" />
       </div>
 
-      <div class="card explainer">
-        <p>
-          Set this group as your <strong>affiliate group</strong> and it will receive
-          <strong>1/12 of the CRC you mint</strong> — roughly <strong>2 CRC a day</strong>.
-          It doesn't cost you anything extra, and you can change it whenever you like.
-        </p>
+      <div id="group-list" class="group-list">
+        <div class="list-hint">Loading groups…</div>
       </div>
-
-      <p id="m-current" class="current-line hidden"></p>
-      <button id="m-set-btn" class="btn-primary full" disabled>Set as my affiliate group</button>
-      <div id="m-status" class="status hidden"></div>
     </section>
 
-    <!-- ───────── ADMIN VIEW ───────── -->
-    <section id="admin-view" class="hidden">
+    <!-- ───────── PROMOTE MY GROUP (admin) ───────── -->
+    <section id="promote-panel" class="panel hidden" role="tabpanel">
       <div class="card explainer">
-        <h2>Share your group's affiliate link</h2>
         <p>
-          Paste your group address to get a link and QR code. When a member opens it and taps
-          <em>Set as my affiliate group</em>, your group starts receiving
-          <strong>1/12 of the CRC they mint</strong> (~2 CRC/day each). They can change it any time.
+          Share a link that drops members straight onto your group with one tap to affiliate.
+          When they confirm, your group starts receiving <strong>1/12 of the CRC they mint</strong>
+          (~2 CRC/day each).
         </p>
       </div>
 
       <div class="card form-card">
-        <label class="field-label" for="a-group-input">Group address</label>
+        <label class="field-label" for="a-group-input">Your group address</label>
         <input id="a-group-input" class="field mono" type="text" placeholder="0x…" autocomplete="off" spellcheck="false" />
 
         <label class="field-label" for="a-name-input">Display name <span class="muted">(optional)</span></label>
@@ -77,6 +75,18 @@
         <img id="a-qr" class="qr hidden" alt="Affiliate link QR code" />
       </div>
     </section>
+  </div>
+
+  <!-- Sticky action bar for the selected group (member flow) -->
+  <div id="set-bar" class="set-bar hidden">
+    <div class="set-bar-inner">
+      <div class="set-bar-info">
+        <span class="set-bar-label">Selected</span>
+        <span id="set-bar-name" class="set-bar-name"></span>
+      </div>
+      <button id="set-btn" class="btn-primary" disabled>Set as my affiliate</button>
+    </div>
+    <div id="set-status" class="status hidden"></div>
   </div>
 
   <script type="module" src="main.js"></script>
