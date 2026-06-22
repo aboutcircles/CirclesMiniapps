@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Affiliate Groups · Circles</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="title-row">
+        <h1>Affiliate Groups</h1>
+        <span id="badge" class="badge badge-off">Not connected</span>
+      </div>
+      <p class="subtitle">
+        An affiliate group earns <strong>1/12 of the CRC you mint</strong> (~2 CRC a day) — at no cost to you, changeable any time.
+      </p>
+    </header>
+
+    <!-- ───────── MEMBER VIEW ───────── -->
+    <section id="member-view" class="hidden">
+      <div class="card group-card">
+        <div id="m-group-avatar" class="group-avatar">?</div>
+        <div class="group-meta">
+          <div class="group-label">Support this group</div>
+          <div id="m-group-name" class="group-name">Circles group</div>
+          <div id="m-group-addr" class="group-addr mono"></div>
+        </div>
+      </div>
+
+      <div class="card explainer">
+        <p>
+          Set this group as your <strong>affiliate group</strong> and it will receive
+          <strong>1/12 of the CRC you mint</strong> — roughly <strong>2 CRC a day</strong>.
+          It doesn't cost you anything extra, and you can change it whenever you like.
+        </p>
+      </div>
+
+      <p id="m-current" class="current-line hidden"></p>
+      <button id="m-set-btn" class="btn-primary full" disabled>Set as my affiliate group</button>
+      <div id="m-status" class="status hidden"></div>
+    </section>
+
+    <!-- ───────── ADMIN VIEW ───────── -->
+    <section id="admin-view" class="hidden">
+      <div class="card explainer">
+        <h2>Share your group's affiliate link</h2>
+        <p>
+          Paste your group address to get a link and QR code. When a member opens it and taps
+          <em>Set as my affiliate group</em>, your group starts receiving
+          <strong>1/12 of the CRC they mint</strong> (~2 CRC/day each). They can change it any time.
+        </p>
+      </div>
+
+      <div class="card form-card">
+        <label class="field-label" for="a-group-input">Group address</label>
+        <input id="a-group-input" class="field mono" type="text" placeholder="0x…" autocomplete="off" spellcheck="false" />
+
+        <label class="field-label" for="a-name-input">Display name <span class="muted">(optional)</span></label>
+        <input id="a-name-input" class="field" type="text" placeholder="e.g. Gnosis" autocomplete="off" />
+
+        <div id="a-warn" class="status hidden"></div>
+        <button id="a-create-btn" class="btn-primary full">Create share link</button>
+      </div>
+
+      <div id="a-result" class="card result-card hidden">
+        <label class="field-label">Your affiliate link</label>
+        <input id="a-link-input" class="field mono" type="text" readonly />
+        <div class="result-actions">
+          <button id="a-copy-btn" class="btn-primary">Copy link</button>
+          <button id="a-preview-btn" class="btn-secondary">Preview</button>
+        </div>
+        <img id="a-qr" class="qr hidden" alt="Affiliate link QR code" />
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
