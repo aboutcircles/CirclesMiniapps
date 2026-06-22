@@ -61,6 +61,7 @@ const currentAffiliateEl = document.getElementById('current-affiliate');
 const groupSearch = document.getElementById('group-search');
 const groupListEl = document.getElementById('group-list');
 const setBar = document.getElementById('set-bar');
+const setBarAvatar = document.getElementById('set-bar-avatar');
 const setBarName = document.getElementById('set-bar-name');
 const setBtn = document.getElementById('set-btn');
 const setStatus = document.getElementById('set-status');
@@ -74,6 +75,8 @@ const aLinkInput = document.getElementById('a-link-input');
 const aCopyBtn = document.getElementById('a-copy-btn');
 const aPreviewBtn = document.getElementById('a-preview-btn');
 const aQr = document.getElementById('a-qr');
+const aPreview = document.getElementById('a-preview');
+const aResultPreview = document.getElementById('a-result-preview');
 
 // ─── State ──────────────────────────────────────────────────
 let connectedAddress = null;
@@ -111,6 +114,96 @@ function setStatusEl(el, text, type = 'info') {
   el.className = `status ${type}`;
 }
 
+// ─── Profiles: names + avatars, batched & cached ────────────
+// A single circles_getProfileByAddressBatch call hydrates a whole list of
+// rows at once. `previewImageUrl` is normally a ready-to-use data: URI; an
+// imageUrl / bare CID is routed through an IPFS gateway. Mirrors the way the
+// host (ps-board / kudos-ga) resolves Circles avatars.
+const profileCache = new Map(); // lowercased address -> { name, imageUrl }
+
+function normalizeImage(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  if (raw.startsWith('data:')) return raw;
+  if (raw.startsWith('ipfs://')) return `https://ipfs.io/ipfs/${raw.slice(7)}`;
+  if (raw.startsWith('http')) return raw;
+  if (/^Qm[1-9A-HJ-NP-Za-km-z]{44}/.test(raw) || /^bafy/.test(raw)) return `https://ipfs.io/ipfs/${raw}`;
+  return null;
+}
+
+async function fetchProfiles(addresses) {
+  const want = [];
+  const seen = new Set();
+  for (const a of addresses) {
+    if (!a || !isAddress(a)) continue;
+    const lc = a.toLowerCase();
+    if (seen.has(lc) || profileCache.has(lc)) continue;
+    seen.add(lc); want.push(getAddress(a));
+  }
+  if (!want.length) return;
+  // Mark in-flight so concurrent callers don't refetch the same addresses.
+  for (const a of want) profileCache.set(a.toLowerCase(), { name: null, imageUrl: null });
+  try {
+    const profiles = await getReadSdk().rpc.profile.getProfileByAddressBatch(want);
+    if (Array.isArray(profiles)) {
+      for (let i = 0; i < want.length; i++) {
+        const p = profiles[i];
+        profileCache.set(want[i].toLowerCase(), {
+          name: (p && p.name) || null,
+          imageUrl: normalizeImage((p && (p.previewImageUrl || p.imageUrl)) || null),
+        });
+      }
+    }
+  } catch { /* avatars are optional polish — keep placeholders, don't hammer the RPC */ }
+}
+
+function getProfile(addr) {
+  return (addr && profileCache.get(String(addr).toLowerCase())) || { name: null, imageUrl: null };
+}
+
+// Paint an `.avatar` element: real image when we have one, gradient initial
+// otherwise. A broken image quietly falls back to the initial.
+function paintAvatar(el, name, imageUrl) {
+  if (!el) return;
+  if (imageUrl) {
+    const img = document.createElement('img');
+    img.alt = ''; img.loading = 'lazy'; img.decoding = 'async'; img.referrerPolicy = 'no-referrer';
+    img.addEventListener('error', () => { el.classList.remove('has-img'); el.textContent = initialOf(name); });
+    el.classList.add('has-img');
+    el.replaceChildren(img);
+    img.src = imageUrl;
+  } else {
+    el.classList.remove('has-img');
+    el.textContent = initialOf(name);
+  }
+}
+
+// Compact group chip (avatar + name + short address). Paints from cache
+// immediately, then upgrades name/avatar once the profile resolves.
+function renderGroupChip(el, addr, name) {
+  if (!el) return;
+  if (!addr || !isAddress(addr)) { el.classList.add('hidden'); el.replaceChildren(); return; }
+  const a = getAddress(addr);
+  el.classList.remove('hidden');
+  el.innerHTML = `
+    <span class="gp-avatar avatar"></span>
+    <span class="gp-meta">
+      <span class="gp-name"></span>
+      <span class="gp-sub mono"></span>
+    </span>`;
+  const nameEl = el.querySelector('.gp-name');
+  const subEl = el.querySelector('.gp-sub');
+  const avEl = el.querySelector('.gp-avatar');
+  const paint = () => {
+    const p = getProfile(a);
+    const dn = (name && name.trim()) || p.name || shortAddress(a);
+    nameEl.textContent = dn;
+    subEl.textContent = shortAddress(a);
+    paintAvatar(avEl, dn, p.imageUrl);
+  };
+  paint();
+  fetchProfiles([a]).then(paint);
+}
+
 // ─── Reads ──────────────────────────────────────────────────
 async function readCurrentAffiliate(human) {
   try {
@@ -126,10 +219,8 @@ async function checkIsGroup(addr) {
   } catch { return null; }
 }
 async function getProfileName(address) {
-  try {
-    const p = await getReadSdk().rpc.profile.getProfileByAddress(getAddress(address));
-    return p?.name || p?.registeredName || null;
-  } catch { return null; }
+  try { await fetchProfiles([address]); return getProfile(address).name; }
+  catch { return null; }
 }
 
 // ─── Tabs ───────────────────────────────────────────────────
@@ -147,9 +238,20 @@ tabSet.addEventListener('click', () => selectTab('set'));
 tabPromote.addEventListener('click', () => selectTab('promote'));
 
 // ─── Group picker (member) ──────────────────────────────────
+function skeletonRows(n) {
+  let h = '';
+  for (let i = 0; i < n; i++) {
+    h += `<div class="group-row skeleton-row" aria-hidden="true">
+      <span class="sk sk-avatar"></span>
+      <span class="group-meta"><span class="sk sk-line sk-line-1"></span><span class="sk sk-line sk-line-2"></span></span>
+    </div>`;
+  }
+  return h;
+}
+
 async function loadGroups(query) {
   const seq = ++searchSeq;
-  groupListEl.innerHTML = '<div class="list-hint">Searching…</div>';
+  groupListEl.innerHTML = skeletonRows(6);
   let results = [];
   try {
     const params = query ? { nameStartsWith: query } : undefined;
@@ -170,24 +272,42 @@ function renderGroupList(groups) {
     return;
   }
   groupListEl.innerHTML = '';
+  const addrs = [];
   for (const g of groups) {
     const addr = getAddress(g.group);
-    const name = g.name || g.symbol || shortAddress(addr);
+    addrs.push(addr);
+    const cached = getProfile(addr);
+    const name = g.name || g.symbol || cached.name || shortAddress(addr);
     const row = document.createElement('button');
     row.className = 'group-row';
     row.dataset.addr = addr;
     if (selected && selected.group.toLowerCase() === addr.toLowerCase()) row.classList.add('selected');
     const isCurrent = currentAffiliate && currentAffiliate.toLowerCase() === addr.toLowerCase();
     row.innerHTML = `
-      <span class="group-avatar">${escapeHtml(initialOf(name))}</span>
+      <span class="group-avatar avatar"></span>
       <span class="group-meta">
         <span class="group-name">${escapeHtml(name)}</span>
         <span class="group-sub mono">${g.symbol ? escapeHtml(g.symbol) + ' · ' : ''}${shortAddress(addr)}</span>
       </span>
       ${isCurrent ? '<span class="group-tag">current</span>' : '<span class="group-pick">Select</span>'}
     `;
-    row.addEventListener('click', () => selectGroup(addr, name));
+    paintAvatar(row.querySelector('.group-avatar'), name, cached.imageUrl);
+    row.addEventListener('click', () => selectGroup(addr, row.querySelector('.group-name').textContent));
     groupListEl.appendChild(row);
+  }
+  hydrateGroupRows(addrs);
+}
+
+// Fill in real avatars (and upgrade bare-address names) once profiles resolve.
+async function hydrateGroupRows(addrs) {
+  await fetchProfiles(addrs);
+  for (const el of groupListEl.querySelectorAll('.group-row')) {
+    const addr = el.dataset.addr;
+    if (!addr) continue;
+    const p = getProfile(addr);
+    const nameEl = el.querySelector('.group-name');
+    if (nameEl && p.name && nameEl.textContent === shortAddress(addr)) nameEl.textContent = p.name;
+    paintAvatar(el.querySelector('.group-avatar'), nameEl ? nameEl.textContent : '', p.imageUrl);
   }
 }
 
@@ -197,10 +317,23 @@ function selectGroup(addr, name) {
   for (const el of groupListEl.querySelectorAll('.group-row')) {
     el.classList.toggle('selected', el.dataset.addr?.toLowerCase() === selected.group.toLowerCase());
   }
-  setBarName.textContent = name || shortAddress(selected.group);
+  const cached = getProfile(selected.group);
+  const dn = name || cached.name || shortAddress(selected.group);
+  setBarName.textContent = dn;
+  paintAvatar(setBarAvatar, dn, cached.imageUrl);
   setStatusEl(setStatus, '');
   refreshSetButton();
   setBar.classList.remove('hidden');
+  // Hydrate name + avatar from the profile (no-op once cached).
+  const target = selected.group;
+  fetchProfiles([target]).then(() => {
+    if (!selected || selected.group !== target) return; // selection moved on
+    const p = getProfile(target);
+    if (!selected.name && p.name) selected.name = p.name;
+    const n2 = selected.name || shortAddress(target);
+    setBarName.textContent = n2;
+    paintAvatar(setBarAvatar, n2, p.imageUrl);
+  });
 }
 
 function refreshSetButton() {
@@ -225,10 +358,14 @@ async function refreshCurrentAffiliate() {
   if (!connectedAddress) { currentAffiliateEl.classList.add('hidden'); return; }
   currentAffiliate = await readCurrentAffiliate(connectedAddress);
   if (currentAffiliate) {
-    const n = (await getProfileName(currentAffiliate)) || shortAddress(currentAffiliate);
-    currentAffiliateEl.innerHTML = `Current affiliate: <strong>${escapeHtml(n)}</strong>`;
+    await fetchProfiles([currentAffiliate]);
+    const p = getProfile(currentAffiliate);
+    const n = p.name || shortAddress(currentAffiliate);
+    currentAffiliateEl.innerHTML =
+      `Current affiliate: <span class="current-avatar avatar"></span> <strong>${escapeHtml(n)}</strong>`;
+    paintAvatar(currentAffiliateEl.querySelector('.current-avatar'), n, p.imageUrl);
   } else {
-    currentAffiliateEl.innerHTML = "You don't have an affiliate group yet.";
+    currentAffiliateEl.innerHTML = "You don't have an affiliate group yet — pick one below.";
   }
   currentAffiliateEl.classList.remove('hidden');
   refreshSetButton();
@@ -296,9 +433,21 @@ async function onCreateLink() {
   }
   const link = buildShareLink(group, name);
   aLinkInput.value = link;
+  renderGroupChip(aResultPreview, group, name);
   aResult.classList.remove('hidden');
   try { aQr.src = await QRCode.toDataURL(link, { margin: 1, width: 240 }); aQr.classList.remove('hidden'); }
   catch { aQr.classList.add('hidden'); }
+}
+
+// Live preview chip under the admin form, so the admin sees the exact group
+// (avatar + name) their link will point at before sharing it.
+let adminPreviewTimer = null;
+function scheduleAdminPreview() {
+  clearTimeout(adminPreviewTimer);
+  adminPreviewTimer = setTimeout(() => {
+    const raw = aGroupInput.value.trim();
+    renderGroupChip(aPreview, isAddress(raw) ? raw : null, aNameInput.value.trim());
+  }, 200);
 }
 async function onCopyLink() {
   if (!aLinkInput.value) return;
@@ -320,6 +469,7 @@ async function maybePrefillAdminGroup() {
     aGroupInput.value = connectedAddress;
     const n = await getProfileName(connectedAddress);
     if (n && !aNameInput.value.trim()) aNameInput.value = n;
+    renderGroupChip(aPreview, connectedAddress, aNameInput.value.trim());
   }
 }
 
@@ -342,12 +492,8 @@ onWalletChange((address) => {
 function applyDeepLink(payload) {
   if (!payload) return;
   selectTab('set');
+  // selectGroup already hydrates the name + avatar from the profile.
   selectGroup(payload.group, payload.name);
-  if (!payload.name) getProfileName(payload.group).then((n) => {
-    if (n && selected && selected.group.toLowerCase() === payload.group.toLowerCase()) {
-      selected.name = n; setBarName.textContent = n;
-    }
-  });
 }
 onAppData((data) => {
   const str = typeof data === 'string' ? data : (data && data.data) || null;
@@ -359,6 +505,8 @@ setBtn.addEventListener('click', onSetAffiliate);
 aCreateBtn.addEventListener('click', onCreateLink);
 aCopyBtn.addEventListener('click', onCopyLink);
 aPreviewBtn.addEventListener('click', onPreview);
+aGroupInput.addEventListener('input', scheduleAdminPreview);
+aNameInput.addEventListener('input', scheduleAdminPreview);
 groupSearch.addEventListener('input', () => {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => loadGroups(groupSearch.value.trim()), 300);

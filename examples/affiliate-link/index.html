@@ -13,7 +13,15 @@
   <div class="app-shell">
     <header class="app-header">
       <div class="title-row">
-        <h1>Affiliate Groups</h1>
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="9.5" cy="12" r="6" stroke="#fff" stroke-width="2" />
+              <circle cx="14.5" cy="12" r="6" stroke="#fff" stroke-width="2" stroke-opacity="0.7" />
+            </svg>
+          </span>
+          <h1>Affiliate Groups</h1>
+        </div>
         <span id="badge" class="badge badge-off">Not connected</span>
       </div>
       <p class="subtitle">
@@ -52,6 +60,7 @@
           When they confirm, your group starts receiving <strong>1/12 of the CRC they mint</strong>
           (~2 CRC/day each).
         </p>
+        <span class="reward-pill">+ ~2 CRC/day per member</span>
       </div>
 
       <div class="card form-card">
@@ -61,11 +70,15 @@
         <label class="field-label" for="a-name-input">Display name <span class="muted">(optional)</span></label>
         <input id="a-name-input" class="field" type="text" placeholder="e.g. Gnosis" autocomplete="off" />
 
+        <div id="a-preview" class="group-preview hidden"></div>
+
         <div id="a-warn" class="status hidden"></div>
         <button id="a-create-btn" class="btn-primary full">Create share link</button>
       </div>
 
       <div id="a-result" class="card result-card hidden">
+        <span class="result-caption">Members will land on</span>
+        <div id="a-result-preview" class="group-preview"></div>
         <label class="field-label">Your affiliate link</label>
         <input id="a-link-input" class="field mono" type="text" readonly />
         <div class="result-actions">
@@ -80,6 +93,7 @@
   <!-- Sticky action bar for the selected group (member flow) -->
   <div id="set-bar" class="set-bar hidden">
     <div class="set-bar-inner">
+      <span id="set-bar-avatar" class="set-bar-avatar avatar" aria-hidden="true"></span>
       <div class="set-bar-info">
         <span class="set-bar-label">Selected</span>
         <span id="set-bar-name" class="set-bar-name"></span>

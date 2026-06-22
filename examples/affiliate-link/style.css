@@ -52,6 +52,14 @@ h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
 .subtitle { color: var(--muted); font-size: 14px; line-height: 1.55; }
 .subtitle strong { color: var(--ink); font-weight: 600; }
 .muted { color: var(--muted); font-weight: 400; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.brand-mark {
+  width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(130deg, var(--accent), var(--accent-mid));
+  box-shadow: var(--shadow-card);
+}
+.brand-mark svg { width: 19px; height: 19px; display: block; }
 
 /* ── Badge ── */
 .badge {
@@ -112,16 +120,27 @@ h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
 .group-row {
   display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius-sm);
-  padding: 10px 12px; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
-  font-family: inherit;
+  padding: 10px 12px; cursor: pointer; font-family: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s, transform 0.12s;
 }
-.group-row:hover { border-color: var(--accent-mid); }
+.group-row:hover { border-color: var(--accent-mid); transform: translateY(-1px); box-shadow: 0 6px 18px rgba(5, 6, 26, 0.07); }
 .group-row.selected { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent); }
-.group-avatar {
-  width: 40px; height: 40px; border-radius: 11px; flex-shrink: 0;
+/* ── Avatars (shared: real image, else gradient initial) ── */
+.avatar {
+  flex-shrink: 0; overflow: hidden; line-height: 1;
   display: flex; align-items: center; justify-content: center;
-  font-size: 17px; font-weight: 700; color: #fff;
+  color: #fff; font-weight: 700;
   background: linear-gradient(130deg, var(--accent), var(--accent-mid));
+  box-shadow: inset 0 0 0 1px rgba(5, 6, 26, 0.06);
+}
+.avatar.has-img { background: var(--line-soft); }
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.group-avatar { width: 42px; height: 42px; border-radius: 12px; font-size: 17px; }
+.set-bar-avatar { width: 38px; height: 38px; border-radius: 10px; font-size: 15px; }
+.gp-avatar { width: 44px; height: 44px; border-radius: 12px; font-size: 18px; }
+.current-avatar {
+  width: 20px; height: 20px; border-radius: 6px; font-size: 10px;
+  display: inline-flex; vertical-align: -4px;
 }
 .group-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .group-name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -173,6 +192,41 @@ h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
 .set-bar-name { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .set-bar .btn-primary { flex-shrink: 0; }
 .set-bar .status { max-width: 480px; margin: 10px auto 0; }
+
+/* ── Reward pill ── */
+.reward-pill {
+  display: inline-block; margin-top: 12px;
+  background: var(--success-bg); color: var(--success-ink);
+  font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: var(--radius-pill);
+}
+
+/* ── Group preview chip (admin) ── */
+.result-caption {
+  display: block; font-size: 11px; font-family: var(--mono); text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px;
+}
+.group-preview {
+  display: flex; align-items: center; gap: 12px; margin-top: 14px;
+  padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+  background: var(--line-soft);
+}
+#a-result-preview { margin-top: 0; margin-bottom: 16px; }
+.gp-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.gp-name { font-size: 14.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gp-sub { font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Skeleton loading ── */
+.skeleton-row { pointer-events: none; border-color: var(--line-soft); }
+.sk {
+  display: block; border-radius: 7px;
+  background: linear-gradient(100deg, var(--line-soft) 30%, #fff 50%, var(--line-soft) 70%);
+  background-size: 200% 100%; animation: shimmer 1.25s ease-in-out infinite;
+}
+.sk-avatar { width: 42px; height: 42px; border-radius: 12px; flex-shrink: 0; }
+.sk-line { height: 11px; }
+.sk-line-1 { width: 55%; margin-bottom: 8px; }
+.sk-line-2 { width: 32%; }
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 
 /* ── Status ── */
 .status {
