@@ -1,11 +1,14 @@
 // Deep-link payload tests. Run: `node payload.test.mjs`
 // No test framework — just assertions, so it runs against the app's own deps.
 //
-// The critical thing under test is the round-trip through BOTH delivery paths:
-//   1. Host path:  host does atob(?data=) and posts the binary string to
-//      onAppData  → parseGroupPayload(str, true)
-//   2. URL path:   standalone/direct open reads ?data= (base64) off the URL
+// The generated share link is a Playground wrapper —
+// `/playground?url=<appUrl?data=base64>` — so the payload always reaches the app
+// via its OWN `?data=` query. parseGroupPayload must still handle BOTH delivery
+// paths, since a registered host would forward app_data instead:
+//   1. URL path:   app reads ?data= (base64) off its own URL
 //      → parseGroupPayload(str, false)
+//   2. app_data:   a host that forwards app_data atob()s it first
+//      → parseGroupPayload(str, true)
 
 import assert from 'node:assert/strict';
 import { getAddress } from 'viem';
@@ -26,58 +29,64 @@ function test(name, fn) {
 const GROUP_LOWER = '0xc19bc204eb1c1d5b3fe500e5e5dfabab625f286c';
 const GROUP_CHECKSUM = getAddress(GROUP_LOWER);
 
-// Simulate exactly what the host does with a generated link:
-// SvelteKit reads url.searchParams.get('data') (percent-decoded → base64),
-// then posts atob(base64) to the iframe, which onAppData hands to us.
-function hostDeliver(link) {
-  const dataParam = new URL(link).searchParams.get('data'); // percent-decoded base64
-  return atob(dataParam); // binary string the iframe receives
+// Pull the base64 payload back out of a generated share link. The link is a
+// Playground wrapper (`/playground?url=<appUrl>`), and the app reads the payload
+// off its OWN `?data=` query — exactly what new URLSearchParams does in main.js.
+function dataFromLink(link) {
+  const appUrl = new URL(link).searchParams.get('url'); // the iframe target
+  return new URL(appUrl).searchParams.get('data');      // base64 payload
 }
-function urlDeliver(link) {
-  return new URL(link).searchParams.get('data'); // base64 (URL fallback path)
+// The two delivery paths parseGroupPayload must handle:
+function viaUrl(link) {
+  return parseGroupPayload(dataFromLink(link), false); // app reads ?data= itself
+}
+function viaAppData(link) {
+  return parseGroupPayload(atob(dataFromLink(link)), true); // host forwards app_data
 }
 
 console.log('payload round-trip');
 
-test('host path recovers group + ascii name', () => {
+test('app_data path recovers group + ascii name', () => {
   const link = buildShareLink(GROUP_LOWER, 'Gnosis');
-  const out = parseGroupPayload(hostDeliver(link), true);
+  const out = viaAppData(link);
   assert.equal(out.group, GROUP_CHECKSUM);
   assert.equal(out.name, 'Gnosis');
 });
 
-test('url fallback path recovers group + ascii name', () => {
+test('url path recovers group + ascii name', () => {
   const link = buildShareLink(GROUP_LOWER, 'Gnosis');
-  const out = parseGroupPayload(urlDeliver(link), false);
+  const out = viaUrl(link);
   assert.equal(out.group, GROUP_CHECKSUM);
   assert.equal(out.name, 'Gnosis');
 });
 
 test('checksums a lowercase group address', () => {
   const link = buildShareLink(GROUP_LOWER, '');
-  const out = parseGroupPayload(hostDeliver(link), true);
+  const out = viaUrl(link);
   assert.equal(out.group, GROUP_CHECKSUM);
   assert.equal(out.name, null);
 });
 
-test('unicode name survives host path', () => {
+test('unicode name survives app_data path', () => {
   const link = buildShareLink(GROUP_LOWER, 'Gnösis 🌐 DAO');
-  const out = parseGroupPayload(hostDeliver(link), true);
+  const out = viaAppData(link);
   assert.equal(out.group, GROUP_CHECKSUM);
   assert.equal(out.name, 'Gnösis 🌐 DAO');
 });
 
 test('unicode name survives url path', () => {
   const link = buildShareLink(GROUP_LOWER, 'Gnösis 🌐 DAO');
-  const out = parseGroupPayload(urlDeliver(link), false);
+  const out = viaUrl(link);
   assert.equal(out.name, 'Gnösis 🌐 DAO');
 });
 
-test('buildShareLink never throws on emoji and stays a valid URL', () => {
+test('buildShareLink wraps the app in the host Playground and stays valid', () => {
   const link = buildShareLink(GROUP_LOWER, '🎉🎉🎉');
   const u = new URL(link);
-  assert.equal(u.pathname, '/miniapps/affiliate-link');
-  assert.ok(u.searchParams.get('data'));
+  assert.equal(u.pathname, '/playground');
+  const appUrl = u.searchParams.get('url');
+  assert.ok(appUrl, 'playground link carries a url= param');
+  assert.ok(new URL(appUrl).searchParams.get('data'), 'app url carries ?data=');
 });
 
 console.log('payload tolerance');

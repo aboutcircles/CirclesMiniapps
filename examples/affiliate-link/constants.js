@@ -23,10 +23,20 @@ export const AFFILIATE_GROUP_REGISTRY = '0xca8222e780d046707083f51377b5fd85e2866
 // admin gets a warning before sharing a link that points at a non-group.
 export const HUB_V2_ADDRESS = '0xc12c1e50abb450d6205ea2c3fa861b3b834d13e8';
 
-// Where the app is reachable inside the Mini Apps marketplace. The generated
-// share link is `${SHARE_BASE_URL}/miniapps/${SHARE_SLUG}?data=<base64>`.
-// Keep SHARE_SLUG in sync with the `slug` used in static/miniapps.json.
+// The share link wraps the app in a Circles host's Playground so it works
+// WITHOUT a marketplace catalog entry:
+//   `${SHARE_BASE_URL}/playground?url=<urlencoded(`${APP_BASE_URL}?data=<base64>`)>`
+// The Playground loads APP_BASE_URL directly in an iframe and does NOT forward
+// app_data, so the payload rides in the app's own `?data=` query (the
+// URL-fallback path in parseGroupPayload).
 export const SHARE_BASE_URL = 'https://circles.gnosis.io';
+
+// The app's own canonical deployment — the iframe target embedded in the host.
+export const APP_BASE_URL = 'https://affiliate-link-one.vercel.app/';
+
+// Reserved for a future marketplace listing: once an entry with this slug lives
+// in static/miniapps.json and the host redeploys, a cleaner
+// `${SHARE_BASE_URL}/miniapps/${SHARE_SLUG}?data=…` link becomes possible.
 export const SHARE_SLUG = 'affiliate-link';
 
 // The affiliate group receives 1/12 of the CRC a member mints. A human mints

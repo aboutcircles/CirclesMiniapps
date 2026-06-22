@@ -47,19 +47,25 @@ public RPC / the Circles SDK; the write path works without them.
 
 ## Deep-link contract
 
-The share link is:
+The share link wraps the app in a Circles host's **Playground** so it works
+without a marketplace listing:
 
 ```
-https://circles.gnosis.io/miniapps/affiliate-link?data=<base64(JSON)>
+https://circles.gnosis.io/playground?url=<urlencoded(
+  https://affiliate-link-one.vercel.app/?data=<base64(JSON)>
+)>
 ```
 
-where the payload is `base64({ "group": "0x…", "name": "Optional" })`. The host
-base64-**decodes** `?data=` and delivers the JSON string via the SDK's
-`onAppData`; the app also parses `?data=` straight off the URL for standalone /
-direct opens. A bare `0x…` address is accepted too.
+where the payload is `base64({ "group": "0x…", "name": "Optional" })`. The
+Playground loads the app URL directly and does **not** forward `app_data`, so the
+payload rides in the app's own `?data=` query, parsed straight off the URL. A
+bare `0x…` address is accepted too. (`parseGroupPayload` still also handles the
+`app_data` path — a registered host base64-**decodes** `?data=` and delivers the
+JSON string via the SDK's `onAppData`.)
 
-> Keep `SHARE_BASE_URL` / `SHARE_SLUG` in `constants.js` in sync with the `slug`
-> used in the marketplace's `static/miniapps.json` entry.
+> `SHARE_BASE_URL` + `APP_BASE_URL` in `constants.js` build the link. `SHARE_SLUG`
+> is reserved for a future `static/miniapps.json` listing, which would allow a
+> cleaner `…/miniapps/affiliate-link?data=…` link instead.
 
 ## Run locally
 

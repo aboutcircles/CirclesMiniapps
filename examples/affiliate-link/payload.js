@@ -3,7 +3,7 @@
 // the app's trickiest contract with the host, so it lives on its own.
 
 import { getAddress, isAddress } from 'viem';
-import { SHARE_BASE_URL, SHARE_SLUG } from './constants.js';
+import { SHARE_BASE_URL, APP_BASE_URL } from './constants.js';
 
 // base64 <-> UTF-8 helpers. btoa/atob are Latin1-only, so a group name with an
 // emoji/non-ASCII char would otherwise throw on encode — route through UTF-8.
@@ -54,5 +54,11 @@ export function buildShareLink(group, name) {
   const payload = { group: getAddress(group) };
   if (name && name.trim()) payload.name = name.trim();
   const b64 = b64encodeUtf8(JSON.stringify(payload));
-  return `${SHARE_BASE_URL}/miniapps/${SHARE_SLUG}?data=${encodeURIComponent(b64)}`;
+  // The host Playground loads the app URL directly and does NOT forward
+  // app_data, so the payload has to ride in the app's OWN `?data=` query (the
+  // URL-fallback path), with the whole app URL wrapped as the Playground's
+  // `url=` param. This works without a marketplace catalog entry. (A registered
+  // `/miniapps/<slug>?data=` link would be cleaner but needs the host listing.)
+  const appUrl = `${APP_BASE_URL}?data=${encodeURIComponent(b64)}`;
+  return `${SHARE_BASE_URL}/playground?url=${encodeURIComponent(appUrl)}`;
 }
