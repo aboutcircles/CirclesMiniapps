@@ -42,11 +42,8 @@ import {
   RPC_FALLBACKS,
   AFFILIATE_GROUP_REGISTRY,
   HUB_V2_ADDRESS,
-  SHARE_BASE_URL,
-  SHARE_SLUG,
-  AFFILIATE_SHARE_FRACTION,
-  AFFILIATE_SHARE_PER_DAY,
 } from './constants.js';
+import { parseGroupPayload, buildShareLink } from './payload.js';
 
 // ─── ABIs (minimal) ─────────────────────────────────────────
 const affiliateRegistryAbi = [
@@ -193,58 +190,6 @@ async function checkIsGroup(addr) {
   } catch {
     return null;
   }
-}
-
-// ─── Deep-link payload ──────────────────────────────────────
-// base64 <-> UTF-8 helpers. btoa/atob are Latin1-only, so a group name with an
-// emoji/non-ASCII char would otherwise throw on encode — route through UTF-8.
-function b64encodeUtf8(str) {
-  return btoa(unescape(encodeURIComponent(str)));
-}
-function utf8FromBinary(bin) {
-  // `bin` is an atob-style binary string (one byte per char code). For pure
-  // ASCII this is the identity; for UTF-8 it recovers the original characters.
-  try {
-    return decodeURIComponent(escape(bin));
-  } catch {
-    return bin;
-  }
-}
-
-// Admin link carries base64(JSON{ group, name }). The host base64-DECODES the
-// `?data=` param before delivering it via onAppData, so that path arrives as a
-// binary string (alreadyDecoded); the raw URL fallback (standalone/direct open)
-// is still base64. A bare 0x address is accepted too, for resilience.
-function parseGroupPayload(raw, alreadyDecoded) {
-  if (!raw) return null;
-  let s;
-  try {
-    s = alreadyDecoded ? utf8FromBinary(String(raw)) : utf8FromBinary(atob(String(raw).trim()));
-  } catch {
-    s = String(raw).trim();
-  }
-  try {
-    const obj = JSON.parse(s);
-    if (obj && obj.group && isAddress(obj.group)) {
-      return {
-        group: getAddress(obj.group),
-        name: typeof obj.name === 'string' && obj.name.trim() ? obj.name.trim() : null,
-      };
-    }
-  } catch {
-    /* not JSON */
-  }
-  if (isAddress(s)) return { group: getAddress(s), name: null };
-  const rawTrim = String(raw).trim();
-  if (isAddress(rawTrim)) return { group: getAddress(rawTrim), name: null };
-  return null;
-}
-
-function buildShareLink(group, name) {
-  const payload = { group: getAddress(group) };
-  if (name && name.trim()) payload.name = name.trim();
-  const b64 = b64encodeUtf8(JSON.stringify(payload));
-  return `${SHARE_BASE_URL}/miniapps/${SHARE_SLUG}?data=${encodeURIComponent(b64)}`;
 }
 
 // ─── View switching ─────────────────────────────────────────

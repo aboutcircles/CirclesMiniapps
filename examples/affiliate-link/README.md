@@ -69,6 +69,16 @@ Open with a group prefilled for member-mode testing:
 Wallet reads and the transaction only work when the app runs inside the Circles
 wallet host (standalone shows a banner).
 
+## Tests
+
+```sh
+npm test    # node payload.test.mjs — deep-link encode/decode round-trip
+```
+
+`payload.test.mjs` covers the riskiest custom logic: the share-link payload
+round-trip through both the host bridge (`atob` → `onAppData`) and the URL
+fallback, including unicode names and malformed input.
+
 ## Build & deploy
 
 ```sh
