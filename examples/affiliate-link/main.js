@@ -355,22 +355,34 @@ function selectGroup(addr, name) {
   });
 }
 
+// The set-bar shows a connect hint while no wallet is bridged in. Once the
+// host connects a wallet we must clear THAT hint — but not a success/error
+// message that might be showing — so we match on the known hint text.
+const HINT_STANDALONE = 'Open inside a Circles host to connect your wallet.';
+const HINT_SIGNIN = 'Sign in to your Circles account to set this affiliate.';
+const CONNECT_HINTS = new Set([HINT_STANDALONE, HINT_SIGNIN]);
+function clearConnectHint() {
+  if (CONNECT_HINTS.has(setStatus.textContent)) setStatusEl(setStatus, '');
+}
+
 function refreshSetButton() {
   if (!selected) { setBar.classList.add('hidden'); return; }
   if (!connectedAddress) {
     setBtn.disabled = true;
     setBtn.textContent = 'Set as my affiliate';
-    setStatusEl(setStatus, 'Open inside a Circles host to connect your wallet.', 'info');
+    // In a host but signed out → prompt sign-in; standalone → prompt a host.
+    setStatusEl(setStatus, isMiniappMode() ? HINT_SIGNIN : HINT_STANDALONE, 'info');
     return;
   }
   if (currentAffiliate && currentAffiliate.toLowerCase() === selected.group.toLowerCase()) {
     setBtn.disabled = true;
     setBtn.textContent = 'Already your affiliate';
-    setStatusEl(setStatus, '');
+    clearConnectHint();
     return;
   }
   setBtn.disabled = false;
   setBtn.textContent = 'Set as my affiliate';
+  clearConnectHint();
 }
 
 async function refreshCurrentAffiliate() {
