@@ -33,7 +33,9 @@ type EnvBag = Record<string, string | boolean | undefined> | undefined;
 
 function pick(bag: EnvBag, key: string): string | undefined {
 	const v = bag?.[key];
-	return typeof v === 'string' && v.length > 0 ? v : undefined;
+	if (typeof v !== 'string') return undefined;
+	const trimmed = v.trim();
+	return trimmed.length > 0 ? trimmed : undefined;
 }
 
 /**

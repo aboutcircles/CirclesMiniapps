@@ -30,6 +30,13 @@ describe('resolveEnv', () => {
     });
     expect(e.repBase).toBe(STAGING.rep);
     expect(e.rpcBase).toBe(STAGING.rpc);
+    expect(e.profileBase).toBe(STAGING.profile);
+  });
+
+  it('treats whitespace-only overrides as unset (falls back to defaults)', () => {
+    const e = resolveEnv({ VITE_REP_SCORE_BASE: '   ', VITE_REP_SCORE_GROUP_ID: '  ' });
+    expect(e.repBase).toBe(PROD.rep);
+    expect(e.groupId).toBe(DEFAULT_GROUP_ID);
   });
 
   it('disables search on false/0/off; default true otherwise', () => {

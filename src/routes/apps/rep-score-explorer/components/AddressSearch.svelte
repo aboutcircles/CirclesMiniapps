@@ -45,6 +45,7 @@
 			autocomplete="off"
 			spellcheck="false"
 			placeholder="Look up any 0x address…"
+			aria-label="Address to explore"
 			bind:value={input}
 			oninput={() => (touched = true)}
 			{onkeydown}

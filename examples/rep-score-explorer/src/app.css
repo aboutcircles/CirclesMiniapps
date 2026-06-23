@@ -71,7 +71,7 @@ body {
 	to { transform: rotate(360deg); }
 }
 
-@keyframes slideUp {
+@keyframes slide-up {
 	from { transform: translateY(100%); }
 	to { transform: translateY(0); }
 }

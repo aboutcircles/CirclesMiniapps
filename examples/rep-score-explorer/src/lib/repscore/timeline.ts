@@ -73,7 +73,8 @@ export function deriveTimeline(
 	opts?: { minDelta?: number }
 ): TimelineEvent[] {
 	const minDelta = opts?.minDelta ?? 1;
-	const gamma = cfg?.defaults?.boost?.delta?.gamma ?? 0;
+	const rawGamma = cfg?.defaults?.boost?.delta?.gamma;
+	const gamma = typeof rawGamma === 'number' && Number.isFinite(rawGamma) ? rawGamma : 0;
 	const sorted = items
 		.filter((it) => Number.isFinite(Date.parse(it.snapshot_at)))
 		.sort((a, b) => Date.parse(a.snapshot_at) - Date.parse(b.snapshot_at));

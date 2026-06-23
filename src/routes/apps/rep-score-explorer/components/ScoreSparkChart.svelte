@@ -68,9 +68,14 @@
 				<span class="now muted">—</span>
 			{/if}
 		</div>
-		<div class="tf">
+		<div class="tf" role="group" aria-label="History timeframe">
 			{#each timeframes as tf (tf)}
-				<button class:active={tf === timeframe} type="button" onclick={() => ontimeframe(tf)}>
+				<button
+					class:active={tf === timeframe}
+					type="button"
+					aria-pressed={tf === timeframe}
+					onclick={() => ontimeframe(tf)}
+				>
 					{tf}
 				</button>
 			{/each}

@@ -216,8 +216,11 @@
 		const unsub = onWalletChange((address) => {
 			if (address) {
 				const norm = normalizeAddress(address);
+				// Mode A auto-follow: if the user was viewing their own score, refresh
+				// to the new account when the host wallet switches.
+				const wasMine = target !== null && target === hostAddress;
 				hostAddress = norm;
-				if (norm && !target) loadForTarget(norm);
+				if (norm && (!target || wasMine)) loadForTarget(norm);
 			} else {
 				hostAddress = null;
 			}

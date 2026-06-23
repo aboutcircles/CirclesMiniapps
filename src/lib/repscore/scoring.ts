@@ -52,7 +52,7 @@ export function headlineScore(a: Pick<AvatarScore, 'reputation_score_live'>): nu
 
 function gammaOf(cfg: RepConfig): number {
 	const g = cfg?.defaults?.boost?.delta?.gamma;
-	return typeof g === 'number' ? g : 0;
+	return typeof g === 'number' && Number.isFinite(g) ? g : 0;
 }
 
 /**
