@@ -1,8 +1,8 @@
 /**
  * Rep Score Explorer — environment / base-URL resolution.
  *
- * Bases are env-switchable (staging default, prod via env). `resolveEnv` takes
- * an optional bag so it stays pure and testable; the route calls
+ * Bases are env-switchable (production default, staging via env). `resolveEnv`
+ * takes an optional bag so it stays pure and testable; the route calls
  * `resolveEnv(import.meta.env)`.
  */
 
@@ -46,15 +46,16 @@ function flag(bag: EnvBag, key: string, fallback: boolean): boolean {
 
 /**
  * Resolve runtime config from `import.meta.env` (or an injected bag for tests).
- * Recognised vars (all optional, staging defaults):
+ * Recognised vars (all optional, production defaults):
  *   VITE_REP_SCORE_BASE, VITE_REP_SCORE_RPC_BASE, VITE_REP_SCORE_PROFILE_BASE,
  *   VITE_REP_SCORE_GROUP_ID, VITE_REP_SCORE_SEARCH_ENABLED, VITE_REP_SCORE_DEBUG.
+ * Point the three base URLs at STAGING.* (see above) for the staging dataset.
  */
 export function resolveEnv(bag?: EnvBag): RepEnv {
 	return {
-		repBase: pick(bag, 'VITE_REP_SCORE_BASE') ?? STAGING.rep,
-		rpcBase: pick(bag, 'VITE_REP_SCORE_RPC_BASE') ?? STAGING.rpc,
-		profileBase: pick(bag, 'VITE_REP_SCORE_PROFILE_BASE') ?? STAGING.profile,
+		repBase: pick(bag, 'VITE_REP_SCORE_BASE') ?? PROD.rep,
+		rpcBase: pick(bag, 'VITE_REP_SCORE_RPC_BASE') ?? PROD.rpc,
+		profileBase: pick(bag, 'VITE_REP_SCORE_PROFILE_BASE') ?? PROD.profile,
 		groupId: pick(bag, 'VITE_REP_SCORE_GROUP_ID') ?? DEFAULT_GROUP_ID,
 		searchEnabled: flag(bag, 'VITE_REP_SCORE_SEARCH_ENABLED', true),
 		debug: flag(bag, 'VITE_REP_SCORE_DEBUG', false)
