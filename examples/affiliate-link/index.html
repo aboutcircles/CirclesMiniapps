@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Affiliate Groups · Circles</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="app-header">
+      <div class="title-row">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="9.5" cy="12" r="6" stroke="#fff" stroke-width="2" />
+              <circle cx="14.5" cy="12" r="6" stroke="#fff" stroke-width="2" stroke-opacity="0.7" />
+            </svg>
+          </span>
+          <h1>Affiliate Groups</h1>
+        </div>
+        <span id="badge" class="badge badge-off">Not connected</span>
+      </div>
+      <p class="subtitle">
+        Your affiliate group earns <strong>1/12 of the CRC you mint</strong> (~2 CRC a day) — at no cost to you, changeable any time.
+      </p>
+    </header>
+
+    <div id="host-warning" class="host-warning hidden">
+      This mini app runs inside a Circles host. Open it from a host (e.g. the Playground) to connect your wallet and set your affiliate group.
+    </div>
+
+    <nav class="tabs" role="tablist">
+      <button id="tab-set" class="tab active" role="tab" aria-selected="true">Set my affiliate</button>
+      <button id="tab-promote" class="tab" role="tab" aria-selected="false">Promote my group</button>
+    </nav>
+
+    <!-- ───────── SET MY AFFILIATE (member) ───────── -->
+    <section id="set-panel" class="panel" role="tabpanel">
+      <p id="current-affiliate" class="current-line hidden"></p>
+
+      <div class="search-wrap">
+        <input id="group-search" class="field" type="text" autocomplete="off" spellcheck="false"
+               placeholder="Search groups by name…" />
+      </div>
+
+      <div id="group-list" class="group-list">
+        <div class="list-hint">Loading groups…</div>
+      </div>
+    </section>
+
+    <!-- ───────── PROMOTE MY GROUP (admin) ───────── -->
+    <section id="promote-panel" class="panel hidden" role="tabpanel">
+      <div class="card explainer">
+        <p>
+          Share a link that drops members straight onto your group with one tap to affiliate.
+          When they confirm, your group starts receiving <strong>1/12 of the CRC they mint</strong>
+          (~2 CRC/day each).
+        </p>
+        <span class="reward-pill">+ ~2 CRC/day per member</span>
+      </div>
+
+      <div class="card form-card">
+        <label class="field-label" for="a-group-search">Find your group</label>
+        <input id="a-group-search" class="field" type="text" placeholder="Search groups by name…" autocomplete="off" spellcheck="false" />
+        <div id="a-group-results" class="group-list admin-results hidden"></div>
+
+        <label class="field-label" for="a-group-input">Group address <span class="muted">(or paste manually)</span></label>
+        <input id="a-group-input" class="field mono" type="text" placeholder="0x…" autocomplete="off" spellcheck="false" />
+
+        <label class="field-label" for="a-name-input">Display name <span class="muted">(optional)</span></label>
+        <input id="a-name-input" class="field" type="text" placeholder="e.g. Gnosis" autocomplete="off" />
+
+        <div id="a-preview" class="group-preview hidden"></div>
+
+        <div id="a-warn" class="status hidden"></div>
+        <button id="a-create-btn" class="btn-primary full">Create share link</button>
+      </div>
+
+      <div id="a-result" class="card result-card hidden">
+        <span class="result-caption">Members will land on</span>
+        <div id="a-result-preview" class="group-preview"></div>
+        <label class="field-label">Your affiliate link</label>
+        <input id="a-link-input" class="field mono" type="text" readonly />
+        <div class="result-actions">
+          <button id="a-copy-btn" class="btn-primary">Copy link</button>
+          <button id="a-preview-btn" class="btn-secondary">Preview</button>
+        </div>
+        <img id="a-qr" class="qr hidden" alt="Affiliate link QR code" />
+      </div>
+    </section>
+  </div>
+
+  <!-- Sticky action bar for the selected group (member flow) -->
+  <div id="set-bar" class="set-bar hidden">
+    <div class="set-bar-inner">
+      <span id="set-bar-avatar" class="set-bar-avatar avatar" aria-hidden="true"></span>
+      <div class="set-bar-info">
+        <span class="set-bar-label">Selected</span>
+        <span id="set-bar-name" class="set-bar-name"></span>
+      </div>
+      <button id="set-btn" class="btn-primary" disabled>Set as my affiliate</button>
+    </div>
+    <div id="set-status" class="status hidden"></div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
