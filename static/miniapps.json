@@ -239,16 +239,6 @@
     "category": "garage"
   },
   {
-    "slug": "dappcon-chat",
-    "name": "Dappcon Chat",
-    "logo": "https://dmdappcon.vercel.app/icon.svg",
-    "url": "https://dmdappcon.vercel.app/",
-    "description": "Trust-graph-filtered wall and DMs for Circles users at Dappcon 2026.",
-    "tags": ["internal"],
-    "category": "miniapp",
-    "isHidden": true
-  },
-  {
     "slug": "daily-chess-duel",
     "name": "Daily Chess Duel",
     "logo": "/app-logos/daily-chess-duel.png",
