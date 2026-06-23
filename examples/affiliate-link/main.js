@@ -144,6 +144,7 @@ async function fetchProfiles(addresses) {
   if (!want.length) return;
   // Mark in-flight so concurrent callers don't refetch the same addresses.
   for (const a of want) profileCache.set(a.toLowerCase(), { name: null, imageUrl: null });
+  let resolved = false;
   try {
     const profiles = await getReadSdk().rpc.profile.getProfileByAddressBatch(want);
     if (Array.isArray(profiles)) {
@@ -154,8 +155,12 @@ async function fetchProfiles(addresses) {
           imageUrl: normalizeImage((p && (p.previewImageUrl || p.imageUrl)) || null),
         });
       }
+      resolved = true;
     }
-  } catch { /* avatars are optional polish — keep placeholders, don't hammer the RPC */ }
+  } catch { /* avatars are optional polish — never throw */ }
+  // On a failed/garbled batch, drop the in-flight placeholders so a later call
+  // retries instead of caching nulls until reload (transient RPC outages).
+  if (!resolved) for (const a of want) profileCache.delete(a.toLowerCase());
 }
 
 function getProfile(addr) {

@@ -8,14 +8,21 @@ import { SHARE_BASE_URL, APP_BASE_URL } from './constants.js';
 // base64 <-> UTF-8 helpers. btoa/atob are Latin1-only, so a group name with an
 // emoji/non-ASCII char would otherwise throw on encode — route through UTF-8.
 export function b64encodeUtf8(str) {
-  return btoa(unescape(encodeURIComponent(str)));
+  // Encode to UTF-8 bytes, then to a binary string btoa can consume. (Avoids
+  // the legacy escape/unescape APIs while still handling non-ASCII names.)
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
 }
 
 export function utf8FromBinary(bin) {
   // `bin` is an atob-style binary string (one byte per char code). For pure
   // ASCII this is the identity; for UTF-8 it recovers the original characters.
+  // `fatal: true` makes a malformed sequence throw so we fall back to `bin`.
   try {
-    return decodeURIComponent(escape(bin));
+    const bytes = Uint8Array.from(String(bin), (c) => c.charCodeAt(0));
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
   } catch {
     return bin;
   }
