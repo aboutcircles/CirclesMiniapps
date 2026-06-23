@@ -276,5 +276,14 @@
     "tags": ["internal", "events"],
     "category": "miniapp",
     "isHidden": true
+  },
+  {
+    "slug": "rep-score-explorer",
+    "name": "Rep Score Explorer",
+    "logo": "/app-logos/rep-score-explorer.svg",
+    "url": "https://circles.gnosis.io/apps/rep-score-explorer",
+    "description": "Explore any Circles avatar's reputation score, its history over time, trust neighbourhood and economic snapshot — in plain language. Read-only.",
+    "tags": ["reputation", "analytics", "identity", "tools"],
+    "category": "miniapp"
   }
 ]
