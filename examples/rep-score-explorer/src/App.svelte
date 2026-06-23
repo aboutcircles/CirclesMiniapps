@@ -1,15 +1,16 @@
 <script lang="ts">
 	/**
-	 * Rep Score Explorer — Circles miniapp embedded route.
+	 * Rep Score Explorer — standalone (Vercel-hosted) root component.
 	 *
-	 * Lives at /apps/rep-score-explorer; loaded inside an iframe by the host page
-	 * /miniapps/rep-score-explorer. Read-only: it uses the miniapp-sdk bridge only
-	 * to learn the connected wallet (Mode A); a search box looks up any address
-	 * (Mode B). No transactions, no signing.
+	 * Mounted by main.ts. This is the hosted build: deployed to Vercel and surfaced
+	 * in the Circles wallet at /admin/rep-score-explorer, which iframes the deployed
+	 * URL. Read-only: it uses the miniapp-sdk bridge only to learn the connected
+	 * wallet (Mode A); a search box looks up any address (Mode B). No transactions,
+	 * no signing.
 	 *
-	 * All data access + maths live in the framework-agnostic $lib/repscore layer
-	 * (reused by the future standalone build and phase-2 flagging tool). This file
-	 * is purely orchestration + layout.
+	 * Mirrors the embedded route src/routes/apps/rep-score-explorer/+page.svelte.
+	 * All data access + maths live in the framework-agnostic $lib/repscore layer,
+	 * copied verbatim from the embedded route; this file is orchestration + layout.
 	 */
 	import { onMount } from 'svelte';
 	import { onWalletChange, isMiniappMode } from '@aboutcircles/miniapp-sdk';

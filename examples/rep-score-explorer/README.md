@@ -13,6 +13,14 @@ builds only this directory), the framework-agnostic data layer
 verbatim** from the embedded route. If you change scoring/UI logic in one place,
 mirror it in the other.
 
+> **Why TypeScript here (a deliberate exemption).** `examples/` apps are
+> JavaScript by convention (see `AGENTS.md`). This app is the exception: it shares
+> the embedded route's framework-agnostic **TypeScript** data layer
+> (`src/lib/repscore/`) verbatim, so keeping it TS lets the two copies stay
+> byte-identical and diffable. Converting to JS would fork ~12 typed modules and
+> invite drift between the hosted and embedded builds. It stays a standard Vite
+> app — the only extra tooling is `tsconfig.json`.
+
 ## Develop
 
 ```bash
