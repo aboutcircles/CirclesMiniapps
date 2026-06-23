@@ -276,5 +276,14 @@
     "tags": ["internal", "events"],
     "category": "miniapp",
     "isHidden": true
+  },
+  {
+    "slug": "iqilify",
+    "name": "IQlify",
+    "logo": "/app-logos/iqilify.svg",
+    "url": "https://iqilify-circles.vercel.app/",
+    "description": "AI interview prep on Circles — practice technical, behavioral, and builder tracks, get scored, earn CRC rewards, and unlock debriefs.",
+    "tags": ["education", "ai", "interviews"],
+    "category": "garage"
   }
 ]
