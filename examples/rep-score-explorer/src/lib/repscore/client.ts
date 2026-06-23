@@ -50,7 +50,11 @@ export class RepScoreClient {
 
 	constructor(opts: RepScoreClientOptions) {
 		this.env = opts.env;
-		this.fetchImpl = opts.fetchImpl ?? fetch;
+		// Wrap the global fetch. Calling a stored `this.fetchImpl(...)` passes the
+		// client instance as `this`, which native fetch rejects with "Illegal
+		// invocation". The bare call inside the arrow keeps fetch bound to the
+		// global. An injected fetchImpl (tests) is used as-is.
+		this.fetchImpl = opts.fetchImpl ?? ((input, init) => fetch(input, init));
 	}
 
 	private async getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
