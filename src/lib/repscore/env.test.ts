@@ -2,13 +2,20 @@ import { describe, it, expect } from 'vitest';
 import { resolveEnv, STAGING, PROD, DEFAULT_GROUP_ID } from './env';
 
 describe('resolveEnv', () => {
-  it('defaults to staging with search enabled', () => {
+  it('defaults to staging with search enabled and debug off', () => {
     const e = resolveEnv({});
     expect(e.repBase).toBe(STAGING.rep);
     expect(e.rpcBase).toBe(STAGING.rpc);
     expect(e.profileBase).toBe(STAGING.profile);
     expect(e.groupId).toBe(DEFAULT_GROUP_ID);
     expect(e.searchEnabled).toBe(true);
+    expect(e.debug).toBe(false);
+  });
+
+  it('enables debug only on explicit "true"', () => {
+    expect(resolveEnv({ VITE_REP_SCORE_DEBUG: 'true' }).debug).toBe(true);
+    expect(resolveEnv({ VITE_REP_SCORE_DEBUG: 'false' }).debug).toBe(false);
+    expect(resolveEnv({}).debug).toBe(false);
   });
 
   it('applies prod overrides', () => {

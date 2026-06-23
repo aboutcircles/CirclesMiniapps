@@ -51,6 +51,7 @@
 	import TrustNeighbourhood from './components/TrustNeighbourhood.svelte';
 	import EconomicSnapshot from './components/EconomicSnapshot.svelte';
 	import AdvancedDisclosure from './components/AdvancedDisclosure.svelte';
+	import DebugPanel from './components/DebugPanel.svelte';
 
 	const env = resolveEnv(import.meta.env);
 	const client = getRepScoreClient(env);
@@ -71,14 +72,18 @@
 	let groupInfo = $state<GroupInfo | null>(null);
 	let timeframe = $state<Timeframe>('7d');
 
-	type TabKey = 'overview' | 'breakdown' | 'trust' | 'advanced';
+	type TabKey = 'overview' | 'breakdown' | 'trust' | 'economic' | 'advanced' | 'debug';
 	let tab = $state<TabKey>('overview');
-	const TABS = [
+	let urlDebug = $state(false);
+	const debugEnabled = $derived(env.debug || urlDebug);
+	const TABS = $derived([
 		{ key: 'overview', label: 'Overview' },
 		{ key: 'breakdown', label: 'Breakdown' },
 		{ key: 'trust', label: 'Trust' },
-		{ key: 'advanced', label: 'Advanced' }
-	];
+		{ key: 'economic', label: 'Economic' },
+		{ key: 'advanced', label: 'Advanced' },
+		...(debugEnabled ? [{ key: 'debug', label: 'Debug' }] : [])
+	]);
 
 	// ─── Derived view-models ────────────────────────────────────
 	const cfg = $derived(cfgCell.kind === 'ok' ? cfgCell.value : null);
@@ -205,6 +210,8 @@
 
 	onMount(() => {
 		inHost = isMiniappMode();
+		const dbg = new URLSearchParams(window.location.search).get('debug');
+		urlDebug = dbg === '1' || dbg === 'true';
 		loadConfig();
 		const unsub = onWalletChange((address) => {
 			if (address) {
@@ -318,13 +325,14 @@
 							loading={historyCell.kind === 'loading' || historyCell.kind === 'idle'}
 						/>
 					</SectionCard>
-					<div class="grid-2">
-						<SectionCard title="What changed" subtitle="Recent score movements and why">
-							<EventTimeline
-								events={timeline}
-								loading={historyCell.kind === 'loading' || historyCell.kind === 'idle'}
-							/>
-						</SectionCard>
+					<SectionCard title="What changed" subtitle="Recent score movements and why">
+						<EventTimeline
+							events={timeline}
+							loading={historyCell.kind === 'loading' || historyCell.kind === 'idle'}
+						/>
+					</SectionCard>
+				{:else if tab === 'economic'}
+					<div class="tab-narrow">
 						<SectionCard title="Economic snapshot">
 							<EconomicSnapshot
 								gate={comp.gate.live}
@@ -365,6 +373,17 @@
 							<p class="plain">Scoring configuration is unavailable right now.</p>
 						</SectionCard>
 					{/if}
+				{:else if tab === 'debug'}
+					<DebugPanel
+						{env}
+						address={target}
+						cfg={cfgCell.kind === 'ok' ? cfgCell.value : null}
+						{avatar}
+						history={historyItems}
+						neighbours={neighboursCell.kind === 'ok' ? neighboursCell.value.data : null}
+						{profile}
+						score={derivedScore}
+					/>
 				{/if}
 			</div>
 		{/if}
@@ -430,16 +449,9 @@
 	.tab-panel {
 		min-height: 40vh;
 	}
-	.grid-2 {
-		display: grid;
-		grid-template-columns: 1fr;
-		column-gap: 14px;
-	}
-	@media (min-width: 880px) {
-		.grid-2 {
-			grid-template-columns: 1fr 1fr;
-			align-items: start;
-		}
+	.tab-narrow {
+		max-width: 640px;
+		margin: 0 auto;
 	}
 	.app-head {
 		margin-bottom: 16px;

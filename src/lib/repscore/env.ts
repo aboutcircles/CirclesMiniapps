@@ -26,6 +26,7 @@ export interface RepEnv {
 	profileBase: string;
 	groupId: string;
 	searchEnabled: boolean;
+	debug: boolean;
 }
 
 type EnvBag = Record<string, string | boolean | undefined> | undefined;
@@ -47,7 +48,7 @@ function flag(bag: EnvBag, key: string, fallback: boolean): boolean {
  * Resolve runtime config from `import.meta.env` (or an injected bag for tests).
  * Recognised vars (all optional, staging defaults):
  *   VITE_REP_SCORE_BASE, VITE_REP_SCORE_RPC_BASE, VITE_REP_SCORE_PROFILE_BASE,
- *   VITE_REP_SCORE_GROUP_ID, VITE_REP_SCORE_SEARCH_ENABLED.
+ *   VITE_REP_SCORE_GROUP_ID, VITE_REP_SCORE_SEARCH_ENABLED, VITE_REP_SCORE_DEBUG.
  */
 export function resolveEnv(bag?: EnvBag): RepEnv {
 	return {
@@ -55,6 +56,7 @@ export function resolveEnv(bag?: EnvBag): RepEnv {
 		rpcBase: pick(bag, 'VITE_REP_SCORE_RPC_BASE') ?? STAGING.rpc,
 		profileBase: pick(bag, 'VITE_REP_SCORE_PROFILE_BASE') ?? STAGING.profile,
 		groupId: pick(bag, 'VITE_REP_SCORE_GROUP_ID') ?? DEFAULT_GROUP_ID,
-		searchEnabled: flag(bag, 'VITE_REP_SCORE_SEARCH_ENABLED', true)
+		searchEnabled: flag(bag, 'VITE_REP_SCORE_SEARCH_ENABLED', true),
+		debug: flag(bag, 'VITE_REP_SCORE_DEBUG', false)
 	};
 }

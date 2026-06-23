@@ -51,6 +51,17 @@
 		display: flex;
 		flex-direction: column;
 	}
+	/* Desktop: flow the event list into two columns to use the width. */
+	@media (min-width: 880px) {
+		.list {
+			display: block;
+			column-count: 2;
+			column-gap: 28px;
+		}
+		.ev {
+			break-inside: avoid;
+		}
+	}
 	.ev {
 		display: flex;
 		align-items: center;
