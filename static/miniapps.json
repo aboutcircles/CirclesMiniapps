@@ -127,6 +127,19 @@
     "category": "admin"
   },
   {
+    "slug": "trust-explorer",
+    "name": "Trust Explorer",
+    "logo": "https://trust-explorer-miniapp.vercel.app/favicon.ico",
+    "url": "https://trust-explorer-miniapp.vercel.app/",
+    "description": "Explore the Circles trust network — send & convert tokens, replay flows, color by group.",
+    "tags": [
+      "admin",
+      "trust",
+      "tools"
+    ],
+    "category": "admin"
+  },
+  {
     "slug": "self-demo",
     "name": "Self Onboarding App",
     "logo": "https://example.com/logo.svg",
