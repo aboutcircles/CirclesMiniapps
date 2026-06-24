@@ -17,6 +17,7 @@
 		resolveEnv,
 		getRepScoreClient,
 		fetchFocalProfile,
+		searchProfiles,
 		fetchProfilesBatch,
 		deriveScore,
 		deriveStages,
@@ -204,6 +205,7 @@
 	function onSearch(addr: Address) {
 		loadForTarget(addr);
 	}
+	const doSearch = (q: string) => searchProfiles(env, q);
 	function viewMine() {
 		if (hostAddress) loadForTarget(hostAddress);
 	}
@@ -247,6 +249,7 @@
 		<div class="search-area">
 			<AddressSearch
 				onsubmit={onSearch}
+					onsearch={doSearch}
 				busy={avatarCell.kind === 'loading'}
 				canUseMine={!!hostAddress && target !== hostAddress}
 				onmine={viewMine}
