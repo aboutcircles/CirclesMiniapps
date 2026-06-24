@@ -82,24 +82,44 @@ export async function searchProfiles(
 ): Promise<ResolvedProfile[]> {
 	const q = query.trim();
 	if (q.length === 0) return [];
+
+	let rows: Profile[] = [];
 	try {
 		const url = `${searchEndpoint(env.profileBase)}?name=${encodeURIComponent(q)}&limit=${limit}`;
 		const res = await fetchImpl(url, { headers: { Accept: 'application/json' } });
 		if (!res.ok) return [];
 		const json = await res.json();
-		const rows: Profile[] = Array.isArray(json) ? json : [];
-		const out: ResolvedProfile[] = [];
-		const seen = new Set<string>();
-		for (const row of rows) {
-			const a = (row?.address ?? '').toLowerCase();
-			if (!a || seen.has(a) || !isValidAddress(a)) continue;
-			seen.add(a);
-			out.push(resolveProfile(a as Address, row));
-		}
-		return out;
+		rows = Array.isArray(json) ? json : [];
 	} catch {
 		return [];
 	}
+
+	// Keep valid, unique addresses in match order.
+	const picked: { row: Profile; address: Address }[] = [];
+	const seen = new Set<string>();
+	for (const row of rows) {
+		const a = (row?.address ?? '').toLowerCase();
+		if (!a || seen.has(a) || !isValidAddress(a)) continue;
+		seen.add(a);
+		picked.push({ row, address: a as Address });
+	}
+	if (picked.length === 0) return [];
+
+	// The search endpoint omits avatar images; enrich with a single batch RPC
+	// call that returns previewImageUrl (the same source neighbour avatars use).
+	const images = await fetchProfilesBatch(
+		env,
+		picked.map((p) => p.address),
+		fetchImpl
+	);
+	return picked.map(({ row, address }) => {
+		const enriched = images.get(address);
+		const raw: Profile = {
+			...row,
+			previewImageUrl: enriched?.hasRealImage ? enriched.imageUrl : row.previewImageUrl
+		};
+		return resolveProfile(address, raw);
+	});
 }
 
 /**

@@ -3,6 +3,7 @@
 		isValidAddress,
 		normalizeAddress,
 		shortAddress,
+		identiconDataUri,
 		type Address,
 		type ResolvedProfile
 	} from '$lib/repscore';
@@ -164,7 +165,7 @@
 		{#if open}
 			<ul class="suggest" id="rs-suggest" role="listbox" aria-label="Avatar matches">
 				{#if searching && results.length === 0}
-					<li class="hint">Searching…</li>
+					<li class="hint"><span class="spin" aria-hidden="true"></span>Searching…</li>
 				{:else if results.length === 0}
 					<li class="hint">No avatars match “{trimmed}”.</li>
 				{:else}
@@ -180,7 +181,14 @@
 								onmousemove={() => (highlight = i)}
 								onclick={() => pick(p)}
 							>
-								<img class="av" src={p.imageUrl} alt="" loading="lazy" decoding="async" />
+								<img
+									class="av"
+									src={p.imageUrl}
+									alt=""
+									loading="lazy"
+									decoding="async"
+									onerror={(e) => ((e.currentTarget as HTMLImageElement).src = identiconDataUri(p.address))}
+								/>
 								<span class="meta">
 									<span class="nm">{p.name}</span>
 									<span class="ad">{shortAddress(p.address)}</span>
@@ -295,10 +303,27 @@
 		overflow-y: auto;
 	}
 	.hint {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 7px;
 		font-size: 12px;
 		color: var(--muted);
-		padding: 10px 8px;
+		padding: 12px 8px;
 		text-align: center;
+	}
+	.spin {
+		width: 12px;
+		height: 12px;
+		border: 2px solid var(--line);
+		border-top-color: var(--accent-mid);
+		border-radius: 50%;
+		animation: rs-spin 0.7s linear infinite;
+	}
+	@keyframes rs-spin {
+		to {
+			transform: rotate(360deg);
+		}
 	}
 	.opt {
 		display: flex;
@@ -308,21 +333,23 @@
 		border: none;
 		background: transparent;
 		border-radius: 10px;
-		padding: 7px 8px;
+		padding: 8px;
 		cursor: pointer;
 		text-align: left;
 		font-family: inherit;
+		transition: background 0.12s;
 	}
 	.opt.active {
 		background: var(--accent-soft);
 	}
 	.av {
-		width: 30px;
-		height: 30px;
+		width: 32px;
+		height: 32px;
 		border-radius: 50%;
 		object-fit: cover;
 		flex-shrink: 0;
 		background: var(--bg-b);
+		border: 1px solid var(--line);
 	}
 	.meta {
 		display: flex;

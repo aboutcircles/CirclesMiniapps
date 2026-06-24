@@ -7,12 +7,20 @@ const A = '0x0004df58332be821ebd0a2f498c211873e3b8f2c' as Address;
 
 const env = resolveEnv({}); // prod defaults → profileBase .../profiles/profile
 
-/** Fake fetch capturing the URL and returning a canned JSON body. */
-function fakeFetch(body: unknown, ok = true) {
-  const calls: string[] = [];
-  const impl = ((input: RequestInfo | URL) => {
-    calls.push(String(input));
-    return Promise.resolve({ ok, json: async () => body } as Response);
+/** Fake fetch: GET /search → searchBody; POST (batch RPC) → { result: batchResult }. */
+function fakeFetch(searchBody: unknown, batchResult: unknown[] = [], ok = true) {
+  const calls: { url: string; method: string }[] = [];
+  const impl = ((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    const method = init?.method ?? 'GET';
+    calls.push({ url, method });
+    if (method === 'POST') {
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ jsonrpc: '2.0', id: 1, result: batchResult })
+      } as Response);
+    }
+    return Promise.resolve({ ok, json: async () => searchBody } as Response);
   }) as typeof fetch;
   return { impl, calls };
 }
@@ -68,22 +76,37 @@ describe('searchProfiles', () => {
   it('hits the /search endpoint (derived from profileBase) with an encoded name', async () => {
     const { impl, calls } = fakeFetch([]);
     await searchProfiles(env, 'Martin Keller', impl);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toContain('/profiles/search?');
-    expect(calls[0]).not.toContain('/profile/search');
-    expect(calls[0]).toContain('name=Martin%20Keller');
+    const search = calls.find((c) => c.url.includes('/profiles/search'));
+    expect(search).toBeTruthy();
+    expect(search!.url).toContain('/profiles/search?');
+    expect(search!.url).not.toContain('/profile/search');
+    expect(search!.url).toContain('name=Martin%20Keller');
   });
 
-  it('maps rows to resolved profiles (lowercased address, identicon fallback)', async () => {
-    const { impl } = fakeFetch([
-      { name: 'gerva7', address: A.toUpperCase(), avatarType: 'human' }
-    ]);
+  it('enriches results with the batch previewImageUrl', async () => {
+    const img = 'data:image/jpeg;base64,REALIMAGE';
+    const { impl, calls } = fakeFetch(
+      [{ name: 'gerva7', address: A.toUpperCase(), avatarType: 'human' }],
+      [{ address: A, name: 'gerva7', previewImageUrl: img, avatarType: 'human' }]
+    );
     const out = await searchProfiles(env, 'gerva7', impl);
     expect(out).toHaveLength(1);
     expect(out[0].address).toBe(A); // lowercased
     expect(out[0].name).toBe('gerva7');
-    expect(out[0].avatarType).toBe('human');
-    expect(out[0].imageUrl.startsWith('data:image/svg+xml,')).toBe(true); // no image → identicon
+    expect(out[0].imageUrl).toBe(img);
+    expect(out[0].hasRealImage).toBe(true);
+    // one search GET + one batch-enrichment POST
+    expect(calls.filter((c) => c.method === 'POST')).toHaveLength(1);
+  });
+
+  it('falls back to an identicon when the batch has no image', async () => {
+    const { impl } = fakeFetch(
+      [{ name: 'Martin Keller', address: A, avatarType: 'human' }],
+      [{ address: A, name: 'Martin Keller', previewImageUrl: '', avatarType: 'human' }]
+    );
+    const out = await searchProfiles(env, 'martin', impl);
+    expect(out[0].hasRealImage).toBe(false);
+    expect(out[0].imageUrl.startsWith('data:image/svg+xml,')).toBe(true);
   });
 
   it('drops invalid and duplicate addresses', async () => {
@@ -103,8 +126,8 @@ describe('searchProfiles', () => {
     expect(calls).toHaveLength(0);
   });
 
-  it('returns [] on a non-ok response', async () => {
-    const { impl } = fakeFetch({ error: 'nope' }, false);
+  it('returns [] on a non-ok search response', async () => {
+    const { impl } = fakeFetch({ error: 'nope' }, [], false);
     expect(await searchProfiles(env, 'gerva7', impl)).toEqual([]);
   });
 });
