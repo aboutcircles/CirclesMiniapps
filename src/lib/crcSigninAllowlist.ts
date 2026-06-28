@@ -40,7 +40,7 @@ export const ALLOWED_EMBEDDER_ORIGINS: string[] = [
 	'http://127.0.0.1',
 
 	'https://recipe-circles.vercel.app',
-	'http://card-circles.vercel.app'
+	'https://card-circles.vercel.app'
 ];
 
 /**
