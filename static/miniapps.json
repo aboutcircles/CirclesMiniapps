@@ -286,5 +286,14 @@
     "tags": ["admin", "reputation", "analytics", "tools"],
     "category": "admin",
     "isHidden": true
+  },
+  {
+    "slug": "golazo",
+    "name": "Golazo",
+    "logo": "/app-logos/golazo.png",
+    "url": "https://golazo-ball.vercel.app/",
+    "description": "Parimutuel World Cup 2026 and Football pools in CRC. Back Home, Draw or Away on a knockout fixture — everyone's stake flows into one pool and the crowd that called it right splits the pot.",
+    "tags": ["game", "sports", "predictions"],
+    "category": "miniapp"
   }
 ]
