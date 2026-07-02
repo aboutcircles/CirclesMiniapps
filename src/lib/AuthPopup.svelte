@@ -6,12 +6,16 @@
 	let {
 		mode,
 		onclose,
-		app
+		app,
+		fullPage = false
 	}: {
 		mode: 'login' | 'signup';
 		onclose: () => void;
 		/** Attribution tag (miniapp origin) forwarded to the invite backend. */
 		app?: string;
+		/** When true (the /crc-signin popup iframe window), fill the whole window
+		 *  instead of rendering as a bottom sheet. */
+		fullPage?: boolean;
 	} = $props();
 
 	type Step = 'idle' | 'working' | 'success' | 'error';
@@ -190,8 +194,8 @@
      so a password-manager / passkey native dialog losing focus can't kill the
      popup mid-flow. The × closes when idle; while working it's briefly disabled
      (grace period) then becomes a cancel so a hung passkey can't trap the user. -->
-<div class="backdrop">
-	<div class="popup" role="dialog" aria-modal="true" aria-label={title}>
+<div class="backdrop" class:full-page={fullPage}>
+	<div class="popup" class:full-page={fullPage} role="dialog" aria-modal="true" aria-label={title}>
 		<div class="head">
 			<h3>{title}</h3>
 			<button
@@ -302,6 +306,22 @@
 		animation: slideUp 0.25s cubic-bezier(0.35, 0.15, 0, 1);
 		box-shadow: 0 -8px 40px rgba(6, 10, 64, 0.18);
 		box-sizing: border-box;
+	}
+
+	/* Full-page mode (/crc-signin popup window): the card IS the window. */
+	.backdrop.full-page {
+		align-items: stretch;
+		background: #faf5f1;
+	}
+
+	.popup.full-page {
+		max-width: none;
+		max-height: none;
+		min-height: 100vh;
+		border-radius: 0;
+		box-shadow: none;
+		animation: none;
+		padding: 28px 22px;
 	}
 
 	@keyframes slideUp {

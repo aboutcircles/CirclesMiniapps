@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount, type Snippet } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
+	import { page } from '$app/state';
 	import { getAddress } from 'viem';
 	import OfflineNotice from '$lib/OfflineNotice.svelte';
 	import ChildSafePicker from '$lib/ChildSafePicker.svelte';
@@ -13,6 +14,11 @@
 	}
 
 	const { children }: Props = $props();
+
+	// The /crc-signin connector runs as the sole content of a popup iframe window,
+	// so its shared overlays (the account picker) fill the whole window with no
+	// close affordance. Every other route keeps the default bottom-sheet treatment.
+	const isCrcSignin = $derived(page.url.pathname === '/crc-signin');
 
 	// Run synchronously so localStorage is set before any onMount (including child pages) calls autoConnect.
 	if (typeof window !== 'undefined') {
@@ -37,5 +43,5 @@
 </script>
 
 <OfflineNotice />
-<ChildSafePicker />
+<ChildSafePicker fullPage={isCrcSignin} />
 {@render children()}
