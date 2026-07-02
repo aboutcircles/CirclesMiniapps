@@ -1,6 +1,14 @@
 <script lang="ts">
 	import { wallet } from '$lib/wallet.svelte.ts';
 
+	let {
+		// When true (the /crc-signin popup iframe window), the picker fills the whole
+		// window and hides the close cross — there's nothing behind it to dismiss to.
+		fullPage = false,
+	}: {
+		fullPage?: boolean;
+	} = $props();
+
 	function truncateAddr(addr: string): string {
 		return addr.slice(0, 6) + '...' + addr.slice(-4);
 	}
@@ -31,22 +39,25 @@
 {#if wallet.pickerVisible}
 	<div
 		class="picker-overlay"
+		class:full-page={fullPage}
 		role="dialog"
 		aria-modal="true"
 		aria-label="Select account"
-		onclick={(e) => { if (e.target === e.currentTarget) wallet.resolveChildSafePick(null); }}
-		onkeydown={(e) => { if (e.key === 'Escape') wallet.resolveChildSafePick(null); }}
+		onclick={(e) => { if (!fullPage && e.target === e.currentTarget) wallet.resolveChildSafePick(null); }}
+		onkeydown={(e) => { if (!fullPage && e.key === 'Escape') wallet.resolveChildSafePick(null); }}
 		tabindex="-1"
 	>
-		<div class="picker-sheet">
+		<div class="picker-sheet" class:full-page={fullPage}>
 			<div class="picker-header">
 				<h2 class="picker-title">Select account</h2>
 				<p class="picker-sub">You control multiple accounts.</p>
-				<button
-					class="picker-close"
-					aria-label="Close"
-					onclick={() => wallet.resolveChildSafePick(null)}
-				>&#215;</button>
+				{#if !fullPage}
+					<button
+						class="picker-close"
+						aria-label="Close"
+						onclick={() => wallet.resolveChildSafePick(null)}
+					>&#215;</button>
+				{/if}
 			</div>
 			<div class="picker-list">
 				<!-- Primary safe -->
@@ -109,6 +120,25 @@
 		box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
 		display: flex;
 		flex-direction: column;
+	}
+
+	/* Full-page mode (/crc-signin popup window): the picker IS the window. */
+	.picker-overlay.full-page {
+		align-items: stretch;
+		padding: 0;
+		background: var(--bg, #fff);
+	}
+
+	.picker-sheet.full-page {
+		max-width: none;
+		max-height: 100vh;
+		min-height: 100vh;
+		border-radius: 0;
+		box-shadow: none;
+	}
+
+	.picker-sheet.full-page .picker-header {
+		padding: 24px 20px 14px;
 	}
 
 	.picker-header {

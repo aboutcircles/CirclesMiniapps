@@ -285,5 +285,47 @@
     "description": "AI interview prep on Circles — practice technical, behavioral, and builder tracks, get scored, earn CRC rewards, and unlock debriefs.",
     "tags": ["education", "ai", "interviews"],
     "category": "garage"
+    "slug": "roebel-inviter",
+    "name": "Röbel Circles",
+    "logo": "https://circles-inviter.vercel.app/logo.svg",
+    "url": "https://circles-inviter.vercel.app/",
+    "description": "Invite verified citizens into Circles and visualize a town's on-chain economy — trust graph, supply, transfers, and the network of towns.",
+    "tags": [
+      "town",
+      "internal"
+    ],
+    "category": "miniapp",
+    "isHidden": true
+    "slug": "crchours",
+    "name": "crchours",
+    "logo": "https://crchours.vercel.app/logo.svg",
+    "url": "https://crchours.vercel.app/",
+    "description": "Monthly uniform-price call auction for labor-time, priced in CRC. Sellers offer hours, buyers bid, and each category/tier market clears at a single market price.",
+    "tags": ["marketplace", "auction", "labor", "crc", "hours"],
+    "category": "garage"
+    "slug": "rep-score-explorer",
+    "name": "Rep Score Explorer",
+    "logo": "/app-logos/rep-score-explorer.svg",
+    "url": "https://rep-score-explorer.vercel.app/",
+    "description": "Explore any Circles avatar's reputation score, its history over time, trust neighbourhood and economic snapshot — in plain language. Read-only.",
+    "tags": ["admin", "reputation", "analytics", "tools"],
+    "category": "admin",
+    "isHidden": true
+  },
+  {
+    "slug": "toolkit",
+    "name": "Toolkit",
+    "logo": "/app-logos/toolkit.png",
+    "url": "https://tool-circles.vercel.app",
+    "description": "A toolkit of utilities for Circles users.",
+    "tags": ["tools"],
+    "category": "garage"
+    "slug": "golazo",
+    "name": "Golazo",
+    "logo": "/app-logos/golazo.png",
+    "url": "https://golazo-ball.vercel.app/",
+    "description": "Parimutuel World Cup 2026 and Football pools in CRC. Back Home, Draw or Away on a knockout fixture — everyone's stake flows into one pool and the crowd that called it right splits the pot.",
+    "tags": ["game", "sports", "predictions"],
+    "category": "miniapp"
   }
 ]
