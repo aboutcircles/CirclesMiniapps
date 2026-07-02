@@ -288,6 +288,13 @@
     "isHidden": true
   },
   {
+    "slug": "toolkit",
+    "name": "Toolkit",
+    "logo": "/app-logos/toolkit.png",
+    "url": "https://tool-circles.vercel.app",
+    "description": "A toolkit of utilities for Circles users.",
+    "tags": ["tools"],
+    "category": "garage"
     "slug": "golazo",
     "name": "Golazo",
     "logo": "/app-logos/golazo.png",
