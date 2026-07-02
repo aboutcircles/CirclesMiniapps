@@ -248,7 +248,9 @@
     "logo": "/app-logos/card-circles.png",
     "url": "https://card-circles.vercel.app/",
     "description": "Card games on Circles network. Play classic card games — Cribbage, Golf Solitaire, Blackjack, Pyramid and more to come — 1 CRC per game with seasonal leader board distributions.",
-    "tags": ["game"],
+    "tags": [
+      "game"
+    ],
     "category": "garage"
   },
   {
@@ -257,7 +259,9 @@
     "logo": "https://dmdappcon.vercel.app/icon.svg",
     "url": "https://dmdappcon.vercel.app/",
     "description": "Trust-graph-filtered wall and DMs for Circles users at Dappcon 2026.",
-    "tags": ["internal"],
+    "tags": [
+      "internal"
+    ],
     "category": "miniapp",
     "isHidden": true
   },
@@ -267,7 +271,10 @@
     "logo": "/app-logos/daily-chess-duel.png",
     "url": "https://dailychess-five.vercel.app/",
     "description": "Solve the daily chess puzzle as fast as you can — pay to enter in Circles, fastest solve wins the daily pot.",
-    "tags": ["game", "chess"],
+    "tags": [
+      "game",
+      "chess"
+    ],
     "category": "garage"
   },
   {
@@ -276,7 +283,10 @@
     "logo": "/app-logos/stakemate.png",
     "url": "https://chess-wager-pauls-projects-c98ee56d.vercel.app/",
     "description": "Stakemate — challenge a friend to a staked 1v1 game on Lichess; both stake, winner takes the pot.",
-    "tags": ["game", "chess"],
+    "tags": [
+      "game",
+      "chess"
+    ],
     "category": "garage",
     "isHidden": true
   },
@@ -286,7 +296,10 @@
     "logo": "https://boost-mini-app-h464h.ondigitalocean.app/icon.svg",
     "url": "https://boost-mini-app-h464h.ondigitalocean.app/",
     "description": "Scan. Sign. You're in the DappCon26 circle.",
-    "tags": ["internal", "events"],
+    "tags": [
+      "internal",
+      "events"
+    ],
     "category": "miniapp",
     "isHidden": true
   },
@@ -296,8 +309,14 @@
     "logo": "/app-logos/iqilify.svg",
     "url": "https://iqilify-circles.vercel.app/",
     "description": "AI interview prep on Circles — practice technical, behavioral, and builder tracks, get scored, earn CRC rewards, and unlock debriefs.",
-    "tags": ["education", "ai", "interviews"],
+    "tags": [
+      "education",
+      "ai",
+      "interviews"
+    ],
     "category": "garage"
+  },
+  {
     "slug": "roebel-inviter",
     "name": "Röbel Circles",
     "logo": "https://circles-inviter.vercel.app/logo.svg",
@@ -309,19 +328,34 @@
     ],
     "category": "miniapp",
     "isHidden": true
+  },
+  {
     "slug": "crchours",
     "name": "crchours",
     "logo": "https://crchours.vercel.app/logo.svg",
     "url": "https://crchours.vercel.app/",
     "description": "Monthly uniform-price call auction for labor-time, priced in CRC. Sellers offer hours, buyers bid, and each category/tier market clears at a single market price.",
-    "tags": ["marketplace", "auction", "labor", "crc", "hours"],
+    "tags": [
+      "marketplace",
+      "auction",
+      "labor",
+      "crc",
+      "hours"
+    ],
     "category": "garage"
+  },
+  {
     "slug": "rep-score-explorer",
     "name": "Rep Score Explorer",
     "logo": "/app-logos/rep-score-explorer.svg",
     "url": "https://rep-score-explorer.vercel.app/",
     "description": "Explore any Circles avatar's reputation score, its history over time, trust neighbourhood and economic snapshot — in plain language. Read-only.",
-    "tags": ["admin", "reputation", "analytics", "tools"],
+    "tags": [
+      "admin",
+      "reputation",
+      "analytics",
+      "tools"
+    ],
     "category": "admin",
     "isHidden": true
   },
@@ -331,14 +365,22 @@
     "logo": "/app-logos/toolkit.png",
     "url": "https://tool-circles.vercel.app",
     "description": "A toolkit of utilities for Circles users.",
-    "tags": ["tools"],
-    "category": "garage"
+    "tags": [
+      "tools"
+    ],
+    "category": "admin"
+  },
+  {
     "slug": "golazo",
     "name": "Golazo",
     "logo": "/app-logos/golazo.png",
     "url": "https://golazo-ball.vercel.app/",
     "description": "Parimutuel World Cup 2026 and Football pools in CRC. Back Home, Draw or Away on a knockout fixture — everyone's stake flows into one pool and the crowd that called it right splits the pot.",
-    "tags": ["game", "sports", "predictions"],
-    "category": "miniapp"
+    "tags": [
+      "game",
+      "sports",
+      "predictions"
+    ],
+    "category": "garage"
   }
 ]
