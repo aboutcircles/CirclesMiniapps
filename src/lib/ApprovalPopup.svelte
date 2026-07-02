@@ -29,10 +29,15 @@
 		request,
 		onapprove,
 		onreject,
+		fullPage = false,
 	}: {
 		request: ApprovalRequest;
 		onapprove: () => Promise<string>;
 		onreject: () => void;
+		// When embedded as the sole content of a popup iframe window (e.g. /crc-signin),
+		// render the approval UI filling the whole page instead of as a bottom sheet
+		// overlaying a host app.
+		fullPage?: boolean;
 	} = $props();
 
 	let phase: Phase = $state('review');
@@ -110,8 +115,8 @@
 
 <!-- svelte-ignore a11y_click_events_have_key_events -->
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="backdrop" onclick={handleBackdropClick}>
-	<div class="popup" onclick={(e) => e.stopPropagation()}>
+<div class="backdrop" class:full-page={fullPage} onclick={handleBackdropClick}>
+	<div class="popup" class:full-page={fullPage} onclick={(e) => e.stopPropagation()}>
 		{#if phase === 'review'}
 			<h3>{request.kind === 'tx' ? 'Approve Transaction' : request.signatureType === 'raw' ? 'Sign Message (Raw)' : 'Sign Message'}</h3>
 
@@ -472,6 +477,34 @@
 		padding: 22px;
 		animation: slideUp 0.25s cubic-bezier(0.35, 0.15, 0, 1);
 		box-shadow: var(--shadow-card);
+	}
+
+	/* Full-page mode: the approval UI is the sole content of a popup iframe window,
+	   so it fills the entire viewport rather than floating as a bottom sheet. */
+	.backdrop.full-page {
+		align-items: stretch;
+		background: var(--bg, #fff);
+	}
+
+	.popup.full-page {
+		max-width: none;
+		max-height: none;
+		min-height: 100vh;
+		border-radius: 0;
+		border-top: none;
+		box-shadow: none;
+		backdrop-filter: none;
+		background: transparent;
+		display: flex;
+		flex-direction: column;
+		padding: 24px 20px;
+		animation: none;
+	}
+
+	/* Push the action buttons to the bottom of the page so they sit consistently
+	   at the foot of the popup window regardless of content height. */
+	.popup.full-page .button-row {
+		margin-top: auto;
 	}
 
 	h3 {

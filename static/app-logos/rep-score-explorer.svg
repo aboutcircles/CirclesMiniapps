@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none" role="img" aria-label="Rep Score Explorer">
+  <!-- dashed orbit -->
+  <g transform="rotate(-10 256 262)">
+    <ellipse cx="256" cy="262" rx="206" ry="190" fill="none" stroke="#2622cf"
+      stroke-width="6" stroke-linecap="round" stroke-dasharray="2 27"/>
+  </g>
+
+  <!-- orbit accent dots -->
+  <circle cx="448" cy="226" r="13" fill="#2622cf"/>
+  <circle cx="86" cy="346" r="11" fill="#fb6a1c"/>
+
+  <!-- sparkles -->
+  <path d="M135 96 Q138.8 116.2 159 120 Q138.8 123.8 135 144 Q131.2 123.8 111 120 Q131.2 116.2 135 96 Z" fill="#fb6a1c"/>
+  <path d="M408 366 Q411.2 382.8 428 386 Q411.2 389.2 408 406 Q404.8 389.2 388 386 Q404.8 382.8 408 366 Z" fill="#2622cf"/>
+  <path d="M92 248 Q94.1 258.9 105 261 Q94.1 263.1 92 274 Q89.9 263.1 79 261 Q89.9 258.9 92 248 Z" fill="#2622cf"/>
+
+  <!-- reputation star (orange accent) -->
+  <path d="M380 82 L394 121 L435 122 L402 147 L414 187 L380 163 L346 187 L358 147 L325 122 L367 121 Z" fill="#fb6a1c"/>
+
+  <!-- score token: blue circle with a rising chart -->
+  <circle cx="214" cy="300" r="126" fill="#2622cf"/>
+  <path d="M152 362 H286" stroke="#ffffff" stroke-width="6" stroke-linecap="round" opacity="0.28"/>
+  <path d="M156 350 L196 316 L236 332 L284 252" fill="none" stroke="#ffffff"
+    stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="156" cy="350" r="11" fill="#ffffff"/>
+  <circle cx="196" cy="316" r="11" fill="#ffffff"/>
+  <circle cx="236" cy="332" r="11" fill="#ffffff"/>
+  <!-- peak node: orange with a white halo -->
+  <circle cx="284" cy="252" r="19" fill="#ffffff"/>
+  <circle cx="284" cy="252" r="12" fill="#fb6a1c"/>
+</svg>
