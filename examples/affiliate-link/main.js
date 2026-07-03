@@ -213,11 +213,11 @@ function renderGroupChip(el, addr, name) {
 
 // ─── Reads ──────────────────────────────────────────────────
 async function readCurrentAffiliate(human) {
-  try {
-    const a = await readAny({ address: getAddress(AFFILIATE_GROUP_REGISTRY), abi: affiliateRegistryAbi,
-      functionName: 'affiliateGroup', args: [getAddress(human)] });
-    return a && a !== zeroAddress ? getAddress(a) : null;
-  } catch { return null; }
+  // Throws on a read failure so the caller can tell it apart from a genuine
+  // "no affiliate set" (null) result.
+  const a = await readAny({ address: getAddress(AFFILIATE_GROUP_REGISTRY), abi: affiliateRegistryAbi,
+    functionName: 'affiliateGroup', args: [getAddress(human)] });
+  return a && a !== zeroAddress ? getAddress(a) : null;
 }
 async function checkIsGroup(addr) {
   try {
@@ -399,7 +399,18 @@ async function refreshCurrentAffiliate() {
     refreshSetButton();
     return;
   }
-  currentAffiliate = await readCurrentAffiliate(connectedAddress);
+  let current;
+  try {
+    current = await readCurrentAffiliate(connectedAddress);
+  } catch {
+    // A read failure isn't the same as "no affiliate" — don't mislead the user.
+    currentAffiliate = null;
+    currentAffiliateEl.textContent = "Couldn't load your current affiliate (network issue).";
+    currentAffiliateEl.classList.remove('hidden');
+    refreshSetButton();
+    return;
+  }
+  currentAffiliate = current;
   if (currentAffiliate) {
     await fetchProfiles([currentAffiliate]);
     const p = getProfile(currentAffiliate);
@@ -473,6 +484,9 @@ async function onCreateLink() {
   if (isGroup === false) {
     aWarn.textContent = "Heads up: this address isn't a registered Circles group, so setting it as an affiliate will fail.";
     aWarn.className = 'status error';
+  } else if (isGroup === null) {
+    aWarn.textContent = "Couldn't verify this is a Circles group (network issue) — double-check the address before sharing.";
+    aWarn.className = 'status info';
   }
   const link = buildShareLink(group, name);
   aLinkInput.value = link;
@@ -536,7 +550,10 @@ async function onCopyLink() {
 }
 function onPreview() {
   const raw = aGroupInput.value.trim();
-  if (!isAddress(raw)) return;
+  if (!isAddress(raw)) {
+    setStatusEl(aWarn, 'Enter a valid group address first.', 'error');
+    return;
+  }
   selectTab('set');
   selectGroup(getAddress(raw), aNameInput.value.trim() || null);
 }

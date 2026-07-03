@@ -34,12 +34,12 @@
     </div>
 
     <nav class="tabs" role="tablist">
-      <button id="tab-set" class="tab active" role="tab" aria-selected="true">Set my affiliate</button>
-      <button id="tab-promote" class="tab" role="tab" aria-selected="false">Promote my group</button>
+      <button id="tab-set" class="tab active" role="tab" aria-selected="true" aria-controls="set-panel">Set my affiliate</button>
+      <button id="tab-promote" class="tab" role="tab" aria-selected="false" aria-controls="promote-panel">Promote my group</button>
     </nav>
 
     <!-- ───────── SET MY AFFILIATE (member) ───────── -->
-    <section id="set-panel" class="panel" role="tabpanel">
+    <section id="set-panel" class="panel" role="tabpanel" aria-labelledby="tab-set">
       <p id="current-affiliate" class="current-line hidden"></p>
 
       <div class="search-wrap">
@@ -53,7 +53,7 @@
     </section>
 
     <!-- ───────── PROMOTE MY GROUP (admin) ───────── -->
-    <section id="promote-panel" class="panel hidden" role="tabpanel">
+    <section id="promote-panel" class="panel hidden" role="tabpanel" aria-labelledby="tab-promote">
       <div class="card explainer">
         <p>
           Share a link that drops members straight onto your group with one tap to affiliate.
