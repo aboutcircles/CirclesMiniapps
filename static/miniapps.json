@@ -304,6 +304,19 @@
     "isHidden": true
   },
   {
+    "slug": "affiliate-link",
+    "name": "Affiliate Groups",
+    "logo": "/app-logos/affiliate-link.svg",
+    "url": "https://affiliate-link-one.vercel.app/",
+    "description": "Set a Circles group as your affiliate to send 1/12 of the CRC you mint (~2 CRC/day) their way — free to you, changeable anytime. Group admins share a one-tap invite link.",
+    "tags": [
+      "groups",
+      "affiliate",
+      "tools"
+    ],
+    "category": "admin"
+  },
+  {
     "slug": "iqilify",
     "name": "IQlify",
     "logo": "/app-logos/iqilify.svg",
