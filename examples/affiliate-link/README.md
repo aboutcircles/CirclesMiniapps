@@ -97,8 +97,9 @@ npm run build   # → dist/
 ```
 
 Deploy `dist/` to any HTTPS host that allows iframing (the included `vercel.json`
-sets `X-Frame-Options: ALLOWALL` and `frame-ancestors *`). **Disable Vercel
-Deployment Protection** or the app will 401 inside the wallet iframe.
+sets `Content-Security-Policy: frame-ancestors *` — the standards-compliant way to
+allow embedding; hosts don't send a framing-blocking `X-Frame-Options` by default).
+**Disable Vercel Deployment Protection** or the app will 401 inside the wallet iframe.
 
 To list it, add an entry to `static/miniapps.json` with `"category": "admin"`
 pointing at the deployed URL (or `/miniapps/affiliate-link` once embedded).
