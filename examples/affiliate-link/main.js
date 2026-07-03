@@ -391,7 +391,14 @@ function refreshSetButton() {
 }
 
 async function refreshCurrentAffiliate() {
-  if (!connectedAddress) { currentAffiliateEl.classList.add('hidden'); return; }
+  if (!connectedAddress) {
+    // Disconnected: forget the previous session's affiliate and reset the
+    // set-bar button so no stale "current"/enabled state lingers.
+    currentAffiliate = null;
+    currentAffiliateEl.classList.add('hidden');
+    refreshSetButton();
+    return;
+  }
   currentAffiliate = await readCurrentAffiliate(connectedAddress);
   if (currentAffiliate) {
     await fetchProfiles([currentAffiliate]);
