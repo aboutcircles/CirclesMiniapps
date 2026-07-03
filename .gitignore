@@ -29,3 +29,6 @@ Thumbs.db
 # llm files
 .claude/
 .agents/
+
+# mounted task context
+_context/

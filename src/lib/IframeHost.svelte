@@ -51,7 +51,7 @@
 		src,
 		iframeTitle,
 		sandbox = 'allow-scripts allow-forms allow-same-origin',
-		allow = 'clipboard-write; web-share',
+		allow = 'clipboard-write; web-share; microphone; autoplay',
 		backLabel = 'back',
 		onBack,
 		title,
