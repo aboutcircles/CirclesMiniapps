@@ -21,7 +21,6 @@
 	import {
 		SHOPS,
 		resolveShop,
-		offerSentence,
 		activeOffers,
 		SIGNUP_OFFER,
 		DEFAULT_OFFER,
@@ -753,7 +752,8 @@
 								<div class="coin coin-sm"></div>
 								<div class="shop-card-text">
 									<p class="shop-name">{s.name}</p>
-									<p class="shop-offer">{offerSentence(SIGNUP_OFFER)}</p>
+									<p class="shop-offer">{SIGNUP_OFFER.discountEuro}€ off on welcome offer</p>
+									<p class="shop-offer">{s.offer.discountEuro}€ off for {s.offer.amountDams} dAMS</p>
 								</div>
 							</div>
 						{/each}
@@ -923,42 +923,25 @@
 
 				<div class="block">
 					<h2 class="eyebrow">Available offers</h2>
-					{#if offersPending}
-						<!-- Don't flash a possibly-outdated welcome offer while the on-chain
-						     history check is still running. -->
-						<div class="offers-loading">
-							<div class="spinner"></div>
-							<p class="muted small">Checking your offers…</p>
-						</div>
-					{:else}
-						<ul class="shop-list">
-							{#each SHOPS as s (s.address)}
-								<li>
-									<button class="shop-row" onclick={() => (selectedShop = s.address)}>
-										<span>
-											<span class="shop-name">{s.name}</span>
-											{#if welcomeStage}
-												<span class="shop-offer"
-													>{SIGNUP_OFFER.discountEuro}€ off on welcome offer</span
-												>
-												<span class="shop-offer"
-													>{s.offer.discountEuro}€ off for {s.offer.amountDams} dAMS</span
-												>
-											{:else}
-												<!-- Just the headline deal, short form — the full choice
-												     opens on the shop screen. -->
-												{@const first = activeOffers(s, false)[0]}
-												<span class="shop-offer"
-													>{first.discountEuro}€ off for {first.amountDams} dAMS</span
-												>
-											{/if}
-										</span>
-										<span class="chev" aria-hidden="true">›</span>
-									</button>
-								</li>
-							{/each}
-						</ul>
-					{/if}
+					<!-- Signed-in home shows just the shop's headline follow-up deal (the
+					     welcome-offer pitch lives on the logged-out landing page); the full
+					     choice — including the welcome offer when still unused — opens on
+					     the shop screen. -->
+					<ul class="shop-list">
+						{#each SHOPS as s (s.address)}
+							<li>
+								<button class="shop-row" onclick={() => (selectedShop = s.address)}>
+									<span>
+										<span class="shop-name">{s.name}</span>
+										<span class="shop-offer"
+											>{s.offer.discountEuro}€ off for {s.offer.amountDams} dAMS</span
+										>
+									</span>
+									<span class="chev" aria-hidden="true">›</span>
+								</button>
+							</li>
+						{/each}
+					</ul>
 				</div>
 			</section>
 		{/if}
