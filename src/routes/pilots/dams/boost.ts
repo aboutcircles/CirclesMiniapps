@@ -1,13 +1,15 @@
 /**
- * "Boost" — convert an existing user's broader Circles balance into as many dAMS
- * as possible via the pathfinder.
+ * "Boost" — convert the user's own personal CRC into dAMS via the pathfinder.
  *
  * Max-flow from the user into the group's BASE_MINT_HANDLER (which mints group
  * tokens back to the sender) gives the ceiling; constructAdvancedTransfer builds
- * the flow-matrix path that realizes a chosen amount; we then wrap the minted
- * dAMS into demurraged ERC20 so it lands in the headline "Your dAMS" balance.
+ * the flow-matrix path that realizes a chosen amount. The DEMURRAGE_MINT_DATA
+ * payload makes the handler return demurraged ERC20 directly.
  *
- * Mirrors the approach used by the `kudos` pilot's group-currency send.
+ * Both calls restrict the flow with `fromTokens: [user]` — ONLY the user's own
+ * personal CRC may be routed. Without it the pathfinder pulls in everything the
+ * trust network can reach (verified: 16k dAMS for one GA user vs 0 restricted),
+ * which would put long-time Circles holders at an unfair advantage in the pilot.
  */
 import { createPublicClient, http, hexToBytes, type Address } from 'viem';
 import { gnosis } from 'viem/chains';
@@ -61,24 +63,26 @@ async function mintHandler(): Promise<Address> {
 	return cachedMintHandler;
 }
 
-// The most dAMS (wei) the user can mint by routing all trust-reachable Circles
-// (including their wrapped balances) into the group.
+// The most dAMS (wei) the user can mint by routing their OWN personal CRC
+// (including wrapped forms of it) into the group — never other tokens they hold.
 export async function maxConvertibleToDams(user: Address): Promise<bigint> {
 	const sink = await mintHandler();
 	const MAX_UINT256 = (1n << 256n) - 1n;
 	const targetFlow = CirclesConverter.truncateToSixDecimals(MAX_UINT256).toString();
 	const res = (await jsonRpc('circlesV2_findPath', [
-		{ source: user, sink, targetFlow, withWrap: true, quantizedMode: false }
+		{ source: user, sink, targetFlow, fromTokens: [user], withWrap: true, quantizedMode: false }
 	])) as { maxFlow?: string };
 	return BigInt(res.maxFlow ?? '0');
 }
 
-// Build the path that mints `amountWei` dAMS to the user. The DEMURRAGE_MINT_DATA
-// payload makes the mint handler return it as demurraged ERC20 directly.
+// Build the path that mints `amountWei` dAMS to the user from their own personal
+// CRC only. The DEMURRAGE_MINT_DATA payload makes the mint handler return it as
+// demurraged ERC20 directly.
 export async function buildBoostTxs(user: Address, amountWei: bigint): Promise<Transaction[]> {
 	const sink = await mintHandler();
 	const pathTxs = (await transferBuilder.constructAdvancedTransfer(user, sink, amountWei, {
 		useWrappedBalances: true,
+		fromTokens: [user],
 		txData: hexToBytes(DEMURRAGE_MINT_DATA)
 	})) as Array<{ to: string; data?: string; value?: bigint }>;
 

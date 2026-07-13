@@ -6,6 +6,7 @@
 	import {
 		readUserState,
 		buildClaimTxs,
+		buildConvertTxs,
 		deliverableWholeDams,
 		fetchProfileName,
 		fetchShopPayments,
@@ -23,7 +24,6 @@
 		SECOND_OFFER,
 		type Offer
 	} from './shops';
-	import { maxConvertibleToDams, buildBoostTxs } from './boost';
 	import {
 		addOrder,
 		readOrders,
@@ -32,6 +32,7 @@
 		isFirstPurchase,
 		type Order
 	} from './orders';
+	import { maxConvertibleToDams, buildBoostTxs } from './boost';
 
 	// Server (service EOA) that adds new users to the Circles Amsterdam group so
 	// they can mint dAMS. Defaults to the deployed pilot endpoint; override with
@@ -56,22 +57,21 @@
 	let showReceipt = $state(false);
 	let menuOpen = $state(false);
 
-	// Boost ("secret" route): convert existing Circles into max dAMS.
-	let showBoostHint = $state(false);
-	let boostPhase = $state<'idle' | 'computing' | 'choose' | 'converting'>('idle');
-	let boostMax = $state(0); // whole dAMS the user can convert
-	let boostAmount = $state(0); // whole dAMS the user chose
-	let boostError = $state('');
-	let boostDone = $state(0); // whole dAMS converted in the last run (for the toast)
+	// Whole dAMS the pathfinder can route from the user's OWN personal CRC into
+	// the group (fromTokens-restricted). For members the claim batch converts
+	// personal CRC directly (exact), so only the pathfinder SURPLUS beyond that
+	// (e.g. wrapped personal CRC) is added to the balance — see pathfinderExtra.
+	// Refreshed per account, after membership lands, and after spends.
+	let convertiblePersonal = $state(0);
 
 	// Signup bonus: collect the 48-CRC welcome bonus as dAMS (one tap).
 	let bonusPhase = $state<'idle' | 'offer' | 'collecting'>('idle');
 	let bonusAmount = $state(0);
 	let bonusError = $state('');
+	let collectedToast = $state(0); // whole dAMS collected — drives the success toast
 
 	let membershipTried = '';
 	let loadedFor = '';
-	let lastCoinTap = 0;
 
 	// True until the connected account has redeemed at least once. Drives the
 	// two-stage offer: first purchase shows the 48-dAMS signup offer, then the
@@ -123,50 +123,9 @@
 	// offer: it's reserved for fresh signups that haven't redeemed yet.
 	let signupDevice = $state(false);
 
-	// ----- Conditions of Participation (Pilot Terms) -----
-	// Acceptance is stored per terms version (the date at the top of the terms);
-	// bumping TERMS_VERSION re-prompts everyone after a material update.
-	const TERMS_KEY = 'dams.terms.accepted';
-	const TERMS_VERSION = '2026-07-03';
-	let showTerms = $state(false);
-	// The action (signup/login) the user was attempting, resumed after acceptance.
-	let termsNext: (() => void) | null = null;
-
-	function termsAccepted(): boolean {
-		try {
-			return localStorage.getItem(TERMS_KEY) === TERMS_VERSION;
-		} catch {
-			return false;
-		}
-	}
-
-	// Run `next` immediately if the terms are already accepted, otherwise show
-	// the consent sheet and run it once the user taps Continue.
-	function requireTerms(next: () => void) {
-		if (termsAccepted()) {
-			next();
-			return;
-		}
-		termsNext = next;
-		showTerms = true;
-	}
-
-	function acceptTerms() {
-		try {
-			localStorage.setItem(TERMS_KEY, TERMS_VERSION);
-		} catch {
-			/* private mode — they'll be asked again next time */
-		}
-		showTerms = false;
-		const next = termsNext;
-		termsNext = null;
-		next?.();
-	}
-
-	function dismissTerms() {
-		showTerms = false;
-		termsNext = null;
-	}
+	// Conditions of Participation: no gating popup — the landing page states
+	// "By signing up, you agree…" with a link to /pilots/dams-terms, and per the
+	// terms themselves, signing up / connecting constitutes acceptance.
 
 	// URL marker mirroring the localStorage flag. Recording "already registered" in
 	// the URL means a returning user who reopens/shares the link — even with no
@@ -243,12 +202,29 @@
 	);
 	const offer = $derived<Offer>(offers[Math.min(selectedOfferIdx, offers.length - 1)]);
 	// Balance comes straight from chain — never synthesized. It counts everything
-	// redeemable as dAMS: held dAMS, personal Circles convertible 1:1 via group-mint
-	// (this is where the 48-CRC signup bonus lives), and what's mintable right now.
-	// Uses the same flooring as the claim batch so the number matches what "Redeem"
-	// can actually deliver. The counter ticks down to the next top-of-hour mint.
-	const availableWhole = $derived(userState ? deliverableWholeDams(userState) : 0);
+	// redeemable as dAMS: held dAMS + mintable issuance + (for members) personal
+	// CRC via direct group-mint (deliverableWholeDams — this is where the 48-CRC
+	// signup bonus lives), plus any pathfinder-only surplus from the user's own
+	// personal token. Uses the same flooring as the claim batch so the number
+	// matches what "Redeem" delivers.
+	const directPersonalWhole = $derived(
+		userState?.isMember ? Math.floor(Number(userState.personalCrc) / 1e18) : 0
+	);
+	const pathfinderExtra = $derived(Math.max(0, convertiblePersonal - directPersonalWhole));
+	const availableWhole = $derived(
+		(userState ? deliverableWholeDams(userState) : 0) + pathfinderExtra
+	);
 	const nextMint = $derived(mintCountdown(now));
+	// The Hub caps unclaimed issuance at two weeks (MAX_CLAIM_DURATION; the
+	// demurraged ceiling is ≈335.5 CRC). At the ceiling the balance stops
+	// growing — each new hour just pushes the oldest one out of the claim
+	// window — so warn instead of showing an hourly countdown that won't land.
+	// Redeeming always mints (personalMint is part of the claim batch), which
+	// restarts the clock.
+	const MINT_CAP_WARN_DAMS = 335;
+	const mintCapped = $derived(
+		userState ? Math.floor(Number(userState.mintable) / 1e18) >= MINT_CAP_WARN_DAMS : false
+	);
 	const elig = $derived(userState ? eligibility(availableWhole, now, offer.amountDams) : null);
 	const enough = $derived(
 		userState && selectedShop ? isEnoughDeliver(userState, selectedShop, offer.amountDams) : false
@@ -272,7 +248,22 @@
 
 	function isEnoughDeliver(s: UserState, shop: Address, amountDams: number): boolean {
 		const amountWei = BigInt(amountDams) * ONE;
-		return buildClaimTxs(shop, s, shop, amountWei).deliverableErc20 >= amountWei;
+		const extraWei = BigInt(pathfinderExtra) * ONE;
+		return buildClaimTxs(shop, s, shop, amountWei).deliverableErc20 + extraWei >= amountWei;
+	}
+
+	// Refresh how much of the user's own personal CRC the pathfinder can route
+	// into dAMS. The pathfinder projects demurrage and reports a hair under the
+	// actual balance (e.g. 47.999952 for an exact 48), so tolerate 0.05% before
+	// flooring — the claim batch converts members' personal CRC directly and
+	// exactly anyway. Failures read as 0 (balance degrades to the direct parts).
+	async function refreshConvertible(a: Address) {
+		try {
+			const whole = Number(await maxConvertibleToDams(a)) / 1e18;
+			convertiblePersonal = Math.floor(whole * 1.0005);
+		} catch {
+			convertiblePersonal = 0;
+		}
 	}
 
 	// Whole CRCs mint at the top of each UTC hour (issuance is hour-aligned to the
@@ -373,20 +364,19 @@
 			// Group must trust the user before their welcome bonus can be converted.
 			const member = await waitForMembership(a);
 			await loadState(a);
+			// The account effect fetched the convertible amount before the group
+			// trusted the user (it read 0) — re-read now so the 48-CRC bonus shows.
+			await refreshConvertible(a);
 			// Offer the 48-CRC welcome bonus as collectable dAMS (needs a fresh
 			// passkey gesture, so it's a tap — surfaced as a celebratory modal).
+			// Sized from the direct group-mint capacity (exact), not the pathfinder.
 			let shownBonus = false;
-			if (member) {
-				try {
-					const max = Math.floor(Number(await maxConvertibleToDams(a)) / 1e18);
-					// The signup offer is 48 dAMS — never gift more than that here.
-					bonusAmount = Math.min(SIGNUP_BONUS_DAMS, max);
-					if (bonusAmount > 0) {
-						bonusPhase = 'offer';
-						shownBonus = true;
-					}
-				} catch {
-					/* bonus is optional — never block sign-up on it */
+			if (member && userState) {
+				// The signup offer is 48 dAMS — never gift more than that here.
+				bonusAmount = Math.min(SIGNUP_BONUS_DAMS, deliverableWholeDams(userState));
+				if (bonusAmount > 0) {
+					bonusPhase = 'offer';
+					shownBonus = true;
 				}
 			}
 			// Registration succeeded — invite them to install the app. If the welcome
@@ -424,11 +414,24 @@
 			const s = await loadState(a);
 			if (!s.isMember) await ensureMembership(a);
 			const amountWei = BigInt(amount) * ONE;
-			const plan = buildClaimTxs(a, s, shop, amountWei);
+			let plan = buildClaimTxs(a, s, shop, amountWei);
+			let boostTxs: typeof plan.txs = [];
 			if (plan.deliverableErc20 < amountWei) {
-				throw new Error(`Not enough dAMS yet — you need ${amount}.`);
+				// Held dAMS + fresh issuance don't cover the offer — route the shortfall
+				// from the user's own personal CRC via the pathfinder (this is how the
+				// 48-CRC signup bonus pays for the welcome offer). The pathfinder txs run
+				// first and deliver demurraged ERC20, so the claim batch is re-planned as
+				// if that ERC20 were already held.
+				const shortfallWei = amountWei - plan.deliverableErc20;
+				boostTxs = await buildBoostTxs(a, shortfallWei);
+				plan = buildClaimTxs(
+					a,
+					{ ...s, damsDemurraged: s.damsDemurraged + shortfallWei },
+					shop,
+					amountWei
+				);
 			}
-			const hash = await wallet.sendTransactions(plan.txs);
+			const hash = await wallet.sendTransactions([...boostTxs, ...plan.txs]);
 			const data: ReceiptData = {
 				amount,
 				shop,
@@ -445,6 +448,7 @@
 			orders = addOrder(a, data);
 			firstPurchase = isFirstPurchase(a);
 			await loadState(a);
+			refreshConvertible(a);
 		} catch (e: any) {
 			const m = e?.message ?? 'Payment failed.';
 			errorMsg = /reject|cancel|denied|rejected/i.test(m) ? 'Payment cancelled.' : m;
@@ -469,70 +473,24 @@
 		orders = [];
 		firstPurchase = true;
 		showHistory = false;
-	}
-
-	// ----- Boost: double-tap the coin to convert existing Circles into dAMS -----
-	function handleCoinTap() {
-		const t = Date.now();
-		if (t - lastCoinTap < 400) {
-			lastCoinTap = 0;
-			startBoost();
-		} else {
-			lastCoinTap = t;
-		}
-	}
-
-	async function startBoost() {
-		const a = connectedAddress;
-		if (!a || boostPhase !== 'idle') return;
-		showBoostHint = false;
-		boostError = '';
-		boostPhase = 'computing';
-		try {
-			const max = await maxConvertibleToDams(a);
-			boostMax = Math.floor(Number(max) / 1e18);
-			boostAmount = boostMax;
-			boostPhase = 'choose';
-		} catch (e: any) {
-			boostError = e?.message ?? 'Could not check your balance.';
-			boostPhase = 'idle';
-		}
-	}
-
-	async function confirmBoost() {
-		const a = connectedAddress;
-		if (!a || boostAmount <= 0) return;
-		boostError = '';
-		boostPhase = 'converting';
-		try {
-			const txs = await buildBoostTxs(a, BigInt(boostAmount) * ONE);
-			await wallet.sendTransactions(txs);
-			boostDone = boostAmount;
-			await loadState(a);
-			boostPhase = 'idle';
-		} catch (e: any) {
-			const m = e?.message ?? 'Conversion failed.';
-			boostError = /reject|cancel|denied|rejected/i.test(m) ? 'Cancelled.' : m;
-			boostPhase = 'choose';
-		}
-	}
-
-	function closeBoost() {
-		boostPhase = 'idle';
-		boostError = '';
+		convertiblePersonal = 0;
 	}
 
 	// ----- Signup bonus -----
+	// Collect converts the member's personal CRC to held dAMS via the direct
+	// groupMint → wrap route (exact — the pathfinder shaves a margin and would
+	// fail on the full 48).
 	async function collectBonus() {
 		const a = connectedAddress;
-		if (!a || bonusAmount <= 0) return;
+		if (!a || bonusAmount <= 0 || !userState) return;
 		bonusError = '';
 		bonusPhase = 'collecting';
 		try {
-			const txs = await buildBoostTxs(a, BigInt(bonusAmount) * ONE);
+			const txs = buildConvertTxs(a, userState, BigInt(bonusAmount) * ONE);
 			await wallet.sendTransactions(txs);
 			await loadState(a);
-			boostDone = bonusAmount; // reuse the success toast
+			refreshConvertible(a);
+			collectedToast = bonusAmount;
 			bonusPhase = 'idle';
 			offerInstall(); // now that the bonus sheet is gone, offer install
 		} catch (e: any) {
@@ -626,17 +584,13 @@
 		window.addEventListener('appinstalled', onInstalled);
 
 		if (wallet.getSavedSafeAddress()) {
-			// Silent session restore — a Safe is already saved locally. Users from
-			// before the Pilot Terms existed still owe one acceptance: surface the
-			// consent sheet over the restored session (Continue just records it).
+			// Silent session restore — a Safe is already saved locally.
 			wallet.autoConnect();
-			if (!termsAccepted()) showTerms = true;
 		} else if (accountAlreadyCreated) {
 			// Known returning user (URL/flag says registered) but no saved Safe on this
 			// device — prompt the passkey to log them in rather than let them create a
 			// second account. handleLogin() surfaces any error and loads their state.
-			// The Pilot Terms sheet comes first if they haven't accepted yet.
-			requireTerms(handleLogin);
+			handleLogin();
 		}
 		// Otherwise it's a genuine cold landing for a newcomer — show the explicit
 		// Join / "I already have an account" buttons; never auto-prompt the passkey.
@@ -700,8 +654,15 @@
 					/* RPC down/offline — the local cache keeps working */
 				});
 			loadState(a).then((s) => {
-				if (!s.isMember) ensureMembership(a).then(() => loadState(a));
+				if (!s.isMember)
+					ensureMembership(a).then(() => {
+						loadState(a);
+						// Group trust just landed — the pathfinder amount read before it
+						// was 0; personal CRC only routes once the group trusts the user.
+						refreshConvertible(a);
+					});
 			});
+			refreshConvertible(a);
 		}
 	});
 
@@ -796,22 +757,23 @@
 					{#if accountAlreadyCreated}
 						<!-- Already registered (local flag or ?registered=1 in the URL) —
 						     log in with the passkey instead of creating a second account. -->
-						<button class="btn-primary stacked" onclick={() => requireTerms(handleLogin)}>
+						<button class="btn-primary stacked" onclick={handleLogin}>
 							<span>{wallet.connecting ? 'Connecting…' : 'Log in'}</span>
 							<span class="sub">welcome back</span>
 						</button>
 					{:else}
-						<button class="btn-primary stacked" onclick={() => requireTerms(handleSignup)}>
+						<button class="btn-primary stacked" onclick={handleSignup}>
 							<span>Join the community</span>
 							<span class="sub">no email required</span>
 						</button>
-						<button class="btn-text" onclick={() => requireTerms(handleLogin)}>
+						<button class="btn-text" onclick={handleLogin}>
 							{wallet.connecting ? 'Connecting…' : 'I already have an account'}
 						</button>
 					{/if}
 				</div>
 
 				<p class="legal-link">
+					By signing up, you agree to the
 					<a href="/pilots/dams-terms">Conditions of Participation</a>
 				</p>
 			</section>
@@ -910,36 +872,51 @@
 			<!-- Home -->
 		{:else}
 			<section class="screen">
-				<button class="coin coin-lg" onclick={handleCoinTap} aria-label="Your dAMS balance">
+				<!-- The balance ball: display only, not interactive. -->
+				<div class="coin coin-lg" role="img" aria-label="Your dAMS balance: {availableWhole}">
 					<div class="coin-num">
 						<span class="num big">{availableWhole}</span>
 						<span class="unit">Your dAMS</span>
 					</div>
-				</button>
-
-				<div class="countdown">
-					<div class="countdown-row">
-						<span aria-hidden="true">⏳</span>
-						<span>Next dAMS in <strong>{nextMint.label}</strong></span>
-						<button
-							class="helper"
-							aria-label="Can I have more dAMS?"
-							onclick={() => (showBoostHint = true)}>?</button
-						>
-					</div>
-					<div class="meter"><div class="meter-fill" style="width:{nextMint.progressPct}%"></div></div>
 				</div>
+
+				{#if mintCapped}
+					<!-- Unclaimed issuance is at the two-week ceiling — the hourly countdown
+					     would promise a dAMS that never lands, so show the stall warning
+					     instead. Redeeming mints (personalMint is always in the batch),
+					     which restarts the clock. -->
+					<div class="cap-warning" role="status">
+						<span aria-hidden="true">⚠️</span>
+						<span>
+							Your dAMS stopped accumulating — you haven't redeemed for over two weeks. Redeem an
+							offer to restart the clock.
+						</span>
+					</div>
+				{:else}
+					<div class="countdown">
+						<div class="countdown-row">
+							<span aria-hidden="true">⏳</span>
+							<span>Next dAMS in <strong>{nextMint.label}</strong></span>
+						</div>
+						<div class="meter"><div class="meter-fill" style="width:{nextMint.progressPct}%"></div></div>
+					</div>
+					<p class="cap-note">
+						dAMS stop accumulating after two weeks without redeeming — use them on offers.
+					</p>
+				{/if}
 
 				<div class="block">
 					<h2 class="eyebrow">Available offers</h2>
 					<ul class="shop-list">
 						{#each SHOPS as s (s.address)}
+							<!-- Just the headline deal, short form — the full choice opens on
+							     the shop screen. -->
+							{@const first = activeOffers(s, welcomeStage)[0]}
 							<li>
 								<button class="shop-row" onclick={() => (selectedShop = s.address)}>
 									<span>
 										<span class="shop-name">{s.name}</span>
-										<!-- Just the headline deal — the full choice opens on the shop screen. -->
-										<span class="shop-offer">{offerSentence(activeOffers(s, welcomeStage)[0])}</span>
+										<span class="shop-offer">{first.discountEuro}€ off for {first.amountDams} dAMS</span>
 									</span>
 									<span class="chev" aria-hidden="true">›</span>
 								</button>
@@ -1039,40 +1016,6 @@
 		</div>
 	{/if}
 
-	<!-- Pilot Terms consent -->
-	{#if showTerms}
-		<button class="sheet-backdrop" aria-label="Close" onclick={dismissTerms}></button>
-		<div class="sheet" role="dialog" aria-modal="true">
-			<div class="grab"></div>
-			<h2 class="sheet-title">Conditions of Participation</h2>
-			<p class="muted small">Amsterdam Pilot · 3.7.2026</p>
-			<p class="sheet-body">
-				The Amsterdam Pilot is an experimental programme by Gnosis. Before you continue, please
-				note:
-			</p>
-			<ul class="terms-points">
-				<li>
-					Gnosis only provides this interface — it offers no redemption, exchange, brokerage or
-					cash-out service for CRC or dAMS.
-				</li>
-				<li>CRC and dAMS have no guaranteed value.</li>
-				<li>
-					Participation gives no right to fiat, reimbursement or compensation from Gnosis;
-					discounts are offered by the merchants themselves.
-				</li>
-				<li>Any use of CRC or dAMS outside the Pilot is at your own risk.</li>
-			</ul>
-			<p class="muted small">
-				By tapping Continue or connecting your wallet you confirm that you have read and agree to
-				the full <a class="terms-link" href="/pilots/dams-terms" target="_blank"
-					>Conditions of Participation</a
-				>.
-			</p>
-			<button class="btn-primary" onclick={acceptTerms}>Continue</button>
-			<button class="btn-text" onclick={dismissTerms}>Not now</button>
-		</div>
-	{/if}
-
 	<!-- Signup bonus -->
 	{#if bonusPhase !== 'idle'}
 		<button class="sheet-backdrop" aria-label="Close" onclick={dismissBonus}></button>
@@ -1100,70 +1043,10 @@
 		</div>
 	{/if}
 
-	<!-- Boost: hint -->
-	{#if showBoostHint}
-		<button class="sheet-backdrop" aria-label="Close" onclick={() => (showBoostHint = false)}></button>
-		<div class="sheet" role="dialog" aria-modal="true">
-			<div class="grab"></div>
-			<p class="sheet-body">
-				Already had an account for a while and think it should be more? Tap the red ball twice to
-				see whether you can increase your balance.
-			</p>
-			<button class="btn-secondary wide" onclick={() => (showBoostHint = false)}>Got it</button>
-		</div>
-	{/if}
-
-	<!-- Boost: computing / choose / converting -->
-	{#if boostPhase !== 'idle'}
-		<button class="sheet-backdrop" aria-label="Close" onclick={closeBoost}></button>
-		<div class="sheet" role="dialog" aria-modal="true">
-			<div class="grab"></div>
-			{#if boostPhase === 'computing'}
-				<div class="sheet-center">
-					<div class="spinner"></div>
-					<p class="muted">Checking how much you can convert…</p>
-				</div>
-			{:else if boostPhase === 'choose'}
-				{#if boostMax <= 0}
-					<h2 class="sheet-title">Nothing extra to convert</h2>
-					<p class="muted">Your balance is already as high as it can go right now.</p>
-					<button class="btn-secondary wide" onclick={closeBoost}>Close</button>
-				{:else}
-					<h2 class="sheet-title">Increase your balance</h2>
-					<p class="muted">
-						You can convert your other Circles into up to <strong>{boostMax} dAMS</strong>.
-					</p>
-					<div class="boost-amount">
-						<span class="boost-num">{boostAmount}</span>
-						<span class="boost-unit">dAMS</span>
-					</div>
-					<input
-						class="slider"
-						type="range"
-						min="1"
-						max={boostMax}
-						bind:value={boostAmount}
-						aria-label="Amount to convert"
-					/>
-					<div class="slider-ends"><span>1</span><span>{boostMax} (max)</span></div>
-					{#if boostError}<p class="error">{boostError}</p>{/if}
-					<button class="btn-primary" onclick={confirmBoost}>Convert {boostAmount} dAMS</button>
-					<button class="btn-text" onclick={closeBoost}>Cancel</button>
-				{/if}
-			{:else if boostPhase === 'converting'}
-				<div class="sheet-center">
-					<div class="spinner"></div>
-					<p class="muted">Converting…</p>
-					<p class="muted small">Confirm with your device when prompted.</p>
-				</div>
-			{/if}
-		</div>
-	{/if}
-
-	<!-- Boost: success toast -->
-	{#if boostDone > 0 && boostPhase === 'idle'}
-		<button class="toast" onclick={() => (boostDone = 0)}>
-			✅ Added {boostDone} dAMS to your balance
+	<!-- Bonus collected: success toast -->
+	{#if collectedToast > 0}
+		<button class="toast" onclick={() => (collectedToast = 0)}>
+			✅ Added {collectedToast} dAMS to your balance
 		</button>
 	{/if}
 
@@ -1336,12 +1219,6 @@
 	}
 
 	/* Coin orb */
-	button.coin {
-		border: none;
-		font: inherit;
-		color: inherit;
-		cursor: pointer;
-	}
 	.coin {
 		background-image: radial-gradient(
 			circle at 35% 30%,
@@ -1450,9 +1327,11 @@
 		font-size: 0.88rem;
 		color: #76cd9c;
 	}
-	/* Keep the offer line on the carousel card to a single line. */
+	/* The offer line must wrap inside the card — nowrap overflowed it on
+	   narrow phones ("2€ off for 48 dAMS on your first purchase"). */
 	.shop-card .shop-offer {
-		white-space: nowrap;
+		white-space: normal;
+		overflow-wrap: anywhere;
 	}
 
 	.shop-list {
@@ -1564,6 +1443,29 @@
 	.countdown {
 		width: 176px;
 		margin-top: 18px;
+	}
+	/* Two-week accrual notices */
+	.cap-note {
+		margin: 10px 0 0;
+		max-width: 300px;
+		text-align: center;
+		font-size: 0.78rem;
+		line-height: 1.4;
+		color: rgba(255, 255, 255, 0.5);
+	}
+	.cap-warning {
+		display: flex;
+		align-items: flex-start;
+		gap: 10px;
+		margin-top: 18px;
+		max-width: 320px;
+		padding: 12px 16px;
+		border-radius: 16px;
+		background: rgba(246, 97, 30, 0.14);
+		border: 1px solid rgba(246, 97, 30, 0.5);
+		font-size: 0.88rem;
+		line-height: 1.45;
+		color: rgba(255, 255, 255, 0.92);
 	}
 	.countdown-row {
 		display: flex;
@@ -1780,20 +1682,6 @@
 		color: rgba(255, 255, 255, 0.55);
 	}
 
-	/* Boost */
-	.helper {
-		width: 20px;
-		height: 20px;
-		border-radius: 999px;
-		border: 1px solid rgba(255, 255, 255, 0.3);
-		background: transparent;
-		color: rgba(255, 255, 255, 0.7);
-		font-size: 0.7rem;
-		font-weight: 700;
-		line-height: 1;
-		cursor: pointer;
-		padding: 0;
-	}
 	.sheet-backdrop {
 		position: fixed;
 		inset: 0;
@@ -1824,12 +1712,6 @@
 		background: rgba(255, 255, 255, 0.25);
 		margin: 0 auto 16px;
 	}
-	.sheet-body {
-		font-size: 1.05rem;
-		line-height: 1.5;
-		color: rgba(255, 255, 255, 0.85);
-		margin: 4px 0 18px;
-	}
 	.sheet-title {
 		font-family: 'Poppins', sans-serif;
 		font-size: 1.3rem;
@@ -1844,24 +1726,12 @@
 		padding: 24px 0 8px;
 	}
 
-	/* Pilot Terms consent + links */
-	.terms-points {
-		margin: 0 0 14px;
-		padding-left: 20px;
-		font-size: 0.92rem;
-		line-height: 1.45;
-		color: rgba(255, 255, 255, 0.85);
-	}
-	.terms-points li {
-		margin-bottom: 6px;
-	}
-	.terms-link {
-		color: #b7aaff;
-	}
+	/* Conditions of Participation links */
 	.legal-link {
 		margin: 18px 0 0;
 		text-align: center;
 		font-size: 0.85rem;
+		color: rgba(255, 255, 255, 0.55);
 	}
 	.legal-link a,
 	.menu-legal a {
@@ -1975,36 +1845,6 @@
 	}
 	.install-steps li {
 		margin-bottom: 4px;
-	}
-	.boost-amount {
-		display: flex;
-		align-items: baseline;
-		justify-content: center;
-		gap: 8px;
-		margin: 18px 0 6px;
-	}
-	.boost-num {
-		font-family: 'Archivo', sans-serif;
-		font-weight: 900;
-		font-size: 3rem;
-		line-height: 1;
-	}
-	.boost-unit {
-		font-family: 'Poppins', sans-serif;
-		font-weight: 600;
-		color: #9991ef;
-	}
-	.slider {
-		width: 100%;
-		accent-color: #f26e2e;
-		margin: 6px 0 2px;
-	}
-	.slider-ends {
-		display: flex;
-		justify-content: space-between;
-		font-size: 0.8rem;
-		color: rgba(255, 255, 255, 0.5);
-		margin-bottom: 16px;
 	}
 	.sheet .btn-primary {
 		margin-top: 6px;
