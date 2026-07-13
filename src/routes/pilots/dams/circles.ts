@@ -355,28 +355,6 @@ export function buildClaimTxs(
 	return { txs, deliverableErc20 };
 }
 
-// Convert `amountWei` of the member's own holdings into held dAMS ERC20 without
-// paying anyone: personalMint (if due) → groupMint → wrap. Used to collect the
-// signup bonus. Direct and exact — no pathfinder involved.
-export function buildConvertTxs(user: Address, s: UserState, amountWei: bigint): Transaction[] {
-	const txs: Transaction[] = [];
-	if (s.mintable > 0n) {
-		txs.push({
-			to: HUB_V2,
-			data: encodeFunctionData({ abi: hubAbi, functionName: 'personalMint', args: [] })
-		});
-	}
-	txs.push({
-		to: HUB_V2,
-		data: encodeFunctionData({
-			abi: hubAbi,
-			functionName: 'groupMint',
-			args: [GROUP, [user], [amountWei], '0x' as Hex]
-		})
-	});
-	txs.push(wrapTx(amountWei));
-	return txs;
-}
 
 export function isEnough(s: UserState, shop: Address, amountDams: number): boolean {
 	const amountWei = BigInt(amountDams) * ONE;

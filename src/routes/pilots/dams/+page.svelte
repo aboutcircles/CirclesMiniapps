@@ -6,7 +6,6 @@
 	import {
 		readUserState,
 		buildClaimTxs,
-		buildConvertTxs,
 		deliverableWholeDams,
 		fetchProfileName,
 		fetchShopPayments,
@@ -64,11 +63,6 @@
 	// Refreshed per account, after membership lands, and after spends.
 	let convertiblePersonal = $state(0);
 
-	// Signup bonus: collect the 48-CRC welcome bonus as dAMS (one tap).
-	let bonusPhase = $state<'idle' | 'offer' | 'collecting'>('idle');
-	let bonusAmount = $state(0);
-	let bonusError = $state('');
-	let collectedToast = $state(0); // whole dAMS collected — drives the success toast
 
 	let membershipTried = '';
 	let loadedFor = '';
@@ -114,8 +108,6 @@
 	// (Cleared only by an explicit sign-out is NOT desired: the point is to stop
 	// a single device from farming multiple welcome bonuses.)
 	const ACCOUNT_CREATED_KEY = 'dams.account.created';
-	// The signup welcome offer: 48 dAMS, per the pilot spec.
-	const SIGNUP_BONUS_DAMS = 48;
 	let accountAlreadyCreated = $state(false);
 	// True only when THIS device created the account (the localStorage flag is set
 	// exclusively during signup — the ?registered=1 URL marker doesn't count).
@@ -361,28 +353,16 @@
 			signupNote = 'Joining Circles Amsterdam…';
 			const a = getAddress(safeAddress) as Address;
 			await ensureMembership(a);
-			// Group must trust the user before their welcome bonus can be converted.
-			const member = await waitForMembership(a);
+			// Group must trust the user before their 48-CRC bonus counts as dAMS.
+			await waitForMembership(a);
 			await loadState(a);
 			// The account effect fetched the convertible amount before the group
 			// trusted the user (it read 0) — re-read now so the 48-CRC bonus shows.
+			// No collect prompt: the bonus simply appears in the balance, and it's
+			// converted inside the redeem batch when an offer is used.
 			await refreshConvertible(a);
-			// Offer the 48-CRC welcome bonus as collectable dAMS (needs a fresh
-			// passkey gesture, so it's a tap — surfaced as a celebratory modal).
-			// Sized from the direct group-mint capacity (exact), not the pathfinder.
-			let shownBonus = false;
-			if (member && userState) {
-				// The signup offer is 48 dAMS — never gift more than that here.
-				bonusAmount = Math.min(SIGNUP_BONUS_DAMS, deliverableWholeDams(userState));
-				if (bonusAmount > 0) {
-					bonusPhase = 'offer';
-					shownBonus = true;
-				}
-			}
-			// Registration succeeded — invite them to install the app. If the welcome
-			// bonus sheet is up, defer the install prompt until that's closed so the
-			// two sheets never stack.
-			if (!shownBonus) offerInstall();
+			// Registration succeeded — invite them to install the app.
+			offerInstall();
 		} catch (e: any) {
 			errorMsg = e?.message ?? String(e);
 		} finally {
@@ -474,36 +454,6 @@
 		firstPurchase = true;
 		showHistory = false;
 		convertiblePersonal = 0;
-	}
-
-	// ----- Signup bonus -----
-	// Collect converts the member's personal CRC to held dAMS via the direct
-	// groupMint → wrap route (exact — the pathfinder shaves a margin and would
-	// fail on the full 48).
-	async function collectBonus() {
-		const a = connectedAddress;
-		if (!a || bonusAmount <= 0 || !userState) return;
-		bonusError = '';
-		bonusPhase = 'collecting';
-		try {
-			const txs = buildConvertTxs(a, userState, BigInt(bonusAmount) * ONE);
-			await wallet.sendTransactions(txs);
-			await loadState(a);
-			refreshConvertible(a);
-			collectedToast = bonusAmount;
-			bonusPhase = 'idle';
-			offerInstall(); // now that the bonus sheet is gone, offer install
-		} catch (e: any) {
-			const m = e?.message ?? 'Could not collect your bonus.';
-			bonusError = /reject|cancel|denied|rejected/i.test(m) ? 'Cancelled.' : m;
-			bonusPhase = 'offer';
-		}
-	}
-
-	function dismissBonus() {
-		bonusPhase = 'idle';
-		bonusError = '';
-		offerInstall(); // offer install after the bonus sheet is dismissed
 	}
 
 	// ----- PWA install -----
@@ -1014,40 +964,6 @@
 			{/if}
 			<button class="btn-secondary wide" onclick={() => (showHistory = false)}>Close</button>
 		</div>
-	{/if}
-
-	<!-- Signup bonus -->
-	{#if bonusPhase !== 'idle'}
-		<button class="sheet-backdrop" aria-label="Close" onclick={dismissBonus}></button>
-		<div class="sheet" role="dialog" aria-modal="true">
-			<div class="grab"></div>
-			<div class="bonus">
-				<div class="coin coin-md drift"></div>
-				<h2 class="sheet-title">Welcome — here's your bonus 🎉</h2>
-				<p class="muted">
-					You've been gifted Circles to get started. Collect them as
-					<strong>{bonusAmount} dAMS</strong>.
-				</p>
-				{#if bonusError}<p class="error">{bonusError}</p>{/if}
-				{#if bonusPhase === 'collecting'}
-					<div class="sheet-center">
-						<div class="spinner"></div>
-						<p class="muted">Collecting…</p>
-						<p class="muted small">Confirm with your device when prompted.</p>
-					</div>
-				{:else}
-					<button class="btn-primary" onclick={collectBonus}>Collect {bonusAmount} dAMS</button>
-					<button class="btn-text" onclick={dismissBonus}>Maybe later</button>
-				{/if}
-			</div>
-		</div>
-	{/if}
-
-	<!-- Bonus collected: success toast -->
-	{#if collectedToast > 0}
-		<button class="toast" onclick={() => (collectedToast = 0)}>
-			✅ Added {collectedToast} dAMS to your balance
-		</button>
 	{/if}
 
 	<!-- Add to home screen -->
@@ -1718,14 +1634,6 @@
 		font-weight: 600;
 		margin: 0 0 4px;
 	}
-	.sheet-center {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 12px;
-		padding: 24px 0 8px;
-	}
-
 	/* Conditions of Participation links */
 	.legal-link {
 		margin: 18px 0 0;
@@ -1807,20 +1715,6 @@
 		font-size: 0.8rem;
 		color: #9991ef;
 	}
-	.bonus {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		text-align: center;
-		gap: 6px;
-	}
-	.bonus .coin-md {
-		margin: 4px 0 10px;
-	}
-	.bonus .btn-primary {
-		margin-top: 14px;
-	}
-
 	/* Install / add-to-home-screen sheet */
 	.install {
 		display: flex;
@@ -1849,23 +1743,6 @@
 	.sheet .btn-primary {
 		margin-top: 6px;
 	}
-	.toast {
-		position: fixed;
-		left: 50%;
-		bottom: 24px;
-		transform: translateX(-50%);
-		z-index: 47;
-		border: 1px solid rgba(118, 205, 156, 0.5);
-		background: rgba(46, 31, 140, 0.96);
-		color: #fff;
-		border-radius: 999px;
-		padding: 12px 20px;
-		font-weight: 600;
-		cursor: pointer;
-		box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
-		animation: riseIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
-	}
-
 	/* Animations */
 	@keyframes spin {
 		to {
