@@ -109,6 +109,51 @@
 	const SIGNUP_BONUS_DAMS = 48;
 	let accountAlreadyCreated = $state(false);
 
+	// ----- Conditions of Participation (Pilot Terms) -----
+	// Acceptance is stored per terms version (the date at the top of the terms);
+	// bumping TERMS_VERSION re-prompts everyone after a material update.
+	const TERMS_KEY = 'dams.terms.accepted';
+	const TERMS_VERSION = '2026-07-03';
+	let showTerms = $state(false);
+	// The action (signup/login) the user was attempting, resumed after acceptance.
+	let termsNext: (() => void) | null = null;
+
+	function termsAccepted(): boolean {
+		try {
+			return localStorage.getItem(TERMS_KEY) === TERMS_VERSION;
+		} catch {
+			return false;
+		}
+	}
+
+	// Run `next` immediately if the terms are already accepted, otherwise show
+	// the consent sheet and run it once the user taps Continue.
+	function requireTerms(next: () => void) {
+		if (termsAccepted()) {
+			next();
+			return;
+		}
+		termsNext = next;
+		showTerms = true;
+	}
+
+	function acceptTerms() {
+		try {
+			localStorage.setItem(TERMS_KEY, TERMS_VERSION);
+		} catch {
+			/* private mode — they'll be asked again next time */
+		}
+		showTerms = false;
+		const next = termsNext;
+		termsNext = null;
+		next?.();
+	}
+
+	function dismissTerms() {
+		showTerms = false;
+		termsNext = null;
+	}
+
 	// URL marker mirroring the localStorage flag. Recording "already registered" in
 	// the URL means a returning user who reopens/shares the link — even with no
 	// localStorage (incognito, cleared storage, another browser) — is prompted for
@@ -546,13 +591,17 @@
 		window.addEventListener('appinstalled', onInstalled);
 
 		if (wallet.getSavedSafeAddress()) {
-			// Silent session restore — a Safe is already saved locally.
+			// Silent session restore — a Safe is already saved locally. Users from
+			// before the Pilot Terms existed still owe one acceptance: surface the
+			// consent sheet over the restored session (Continue just records it).
 			wallet.autoConnect();
+			if (!termsAccepted()) showTerms = true;
 		} else if (accountAlreadyCreated) {
 			// Known returning user (URL/flag says registered) but no saved Safe on this
 			// device — prompt the passkey to log them in rather than let them create a
 			// second account. handleLogin() surfaces any error and loads their state.
-			handleLogin();
+			// The Pilot Terms sheet comes first if they haven't accepted yet.
+			requireTerms(handleLogin);
 		}
 		// Otherwise it's a genuine cold landing for a newcomer — show the explicit
 		// Join / "I already have an account" buttons; never auto-prompt the passkey.
@@ -681,20 +730,24 @@
 					{#if accountAlreadyCreated}
 						<!-- Already registered (local flag or ?registered=1 in the URL) —
 						     log in with the passkey instead of creating a second account. -->
-						<button class="btn-primary stacked" onclick={handleLogin}>
+						<button class="btn-primary stacked" onclick={() => requireTerms(handleLogin)}>
 							<span>{wallet.connecting ? 'Connecting…' : 'Log in'}</span>
 							<span class="sub">welcome back</span>
 						</button>
 					{:else}
-						<button class="btn-primary stacked" onclick={handleSignup}>
+						<button class="btn-primary stacked" onclick={() => requireTerms(handleSignup)}>
 							<span>Join the community</span>
 							<span class="sub">no email required</span>
 						</button>
-						<button class="btn-text" onclick={handleLogin}>
+						<button class="btn-text" onclick={() => requireTerms(handleLogin)}>
 							{wallet.connecting ? 'Connecting…' : 'I already have an account'}
 						</button>
 					{/if}
 				</div>
+
+				<p class="legal-link">
+					<a href="/pilots/dams-terms">Conditions of Participation</a>
+				</p>
 			</section>
 
 			<!-- Signing up -->
@@ -859,6 +912,9 @@
 				<button class="btn-secondary wide" onclick={openInstall}>Add to home screen</button>
 			{/if}
 			<button class="btn-secondary wide" onclick={signOut}>Sign out</button>
+			<p class="menu-legal">
+				<a href="/pilots/dams-terms">Conditions of Participation</a>
+			</p>
 		</div>
 	{/if}
 
@@ -888,6 +944,40 @@
 				</ul>
 			{/if}
 			<button class="btn-secondary wide" onclick={() => (showHistory = false)}>Close</button>
+		</div>
+	{/if}
+
+	<!-- Pilot Terms consent -->
+	{#if showTerms}
+		<button class="sheet-backdrop" aria-label="Close" onclick={dismissTerms}></button>
+		<div class="sheet" role="dialog" aria-modal="true">
+			<div class="grab"></div>
+			<h2 class="sheet-title">Conditions of Participation</h2>
+			<p class="muted small">Amsterdam Pilot · 3.7.2026</p>
+			<p class="sheet-body">
+				The Amsterdam Pilot is an experimental programme by Gnosis. Before you continue, please
+				note:
+			</p>
+			<ul class="terms-points">
+				<li>
+					Gnosis only provides this interface — it offers no redemption, exchange, brokerage or
+					cash-out service for CRC or dAMS.
+				</li>
+				<li>CRC and dAMS have no guaranteed value.</li>
+				<li>
+					Participation gives no right to fiat, reimbursement or compensation from Gnosis;
+					discounts are offered by the merchants themselves.
+				</li>
+				<li>Any use of CRC or dAMS outside the Pilot is at your own risk.</li>
+			</ul>
+			<p class="muted small">
+				By tapping Continue or connecting your wallet you confirm that you have read and agree to
+				the full <a class="terms-link" href="/pilots/dams-terms" target="_blank"
+					>Conditions of Participation</a
+				>.
+			</p>
+			<button class="btn-primary" onclick={acceptTerms}>Continue</button>
+			<button class="btn-text" onclick={dismissTerms}>Not now</button>
 		</div>
 	{/if}
 
@@ -1628,6 +1718,36 @@
 		align-items: center;
 		gap: 12px;
 		padding: 24px 0 8px;
+	}
+
+	/* Pilot Terms consent + links */
+	.terms-points {
+		margin: 0 0 14px;
+		padding-left: 20px;
+		font-size: 0.92rem;
+		line-height: 1.45;
+		color: rgba(255, 255, 255, 0.85);
+	}
+	.terms-points li {
+		margin-bottom: 6px;
+	}
+	.terms-link {
+		color: #b7aaff;
+	}
+	.legal-link {
+		margin: 18px 0 0;
+		text-align: center;
+		font-size: 0.85rem;
+	}
+	.legal-link a,
+	.menu-legal a {
+		color: rgba(255, 255, 255, 0.55);
+		text-decoration: underline;
+	}
+	.menu-legal {
+		margin: 10px 0 0;
+		text-align: center;
+		font-size: 0.85rem;
 	}
 
 	/* Order history */
