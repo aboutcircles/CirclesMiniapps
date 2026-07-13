@@ -20,14 +20,14 @@
 	// close affordance. Every other route keeps the default bottom-sheet treatment.
 	const isCrcSignin = $derived(page.url.pathname === '/crc-signin');
 
-	// Each page's manifest link is rendered here (not in app.html) so it lands in
-	// the prerendered HTML: the browser evaluates installability from the initial
-	// head, and a client-side href swap comes too late — installing the dAMS
-	// pilot would otherwise pin the Miniapps manifest (start_url "/") to the
-	// home-screen shortcut.
-	const manifestHref = $derived(
-		page.url.pathname === '/pilots/dams' ? '/pilots/dams.webmanifest' : '/manifest.webmanifest'
-	);
+	// The per-page manifest link is baked into the prerendered HTML by
+	// hooks.server.ts (%manifest% in app.html). This keeps it correct across
+	// client-side navigations too — must mirror manifestFor() in hooks.server.ts.
+	function updateManifestLink(pathname: string) {
+		const href =
+			pathname === '/pilots/dams' ? '/pilots/dams.webmanifest' : '/manifest.webmanifest';
+		document.querySelector('link[rel="manifest"]')?.setAttribute('href', href);
+	}
 
 	// Run synchronously so localStorage is set before any onMount (including child pages) calls autoConnect.
 	if (typeof window !== 'undefined') {
@@ -47,13 +47,12 @@
 	});
 
 	afterNavigate((nav) => {
-		if (nav.to?.url) trackPageView(nav.to.url.pathname);
+		if (nav.to?.url) {
+			trackPageView(nav.to.url.pathname);
+			updateManifestLink(nav.to.url.pathname);
+		}
 	});
 </script>
-
-<svelte:head>
-	<link rel="manifest" href={manifestHref} />
-</svelte:head>
 
 <OfflineNotice />
 <ChildSafePicker fullPage={isCrcSignin} />
