@@ -82,6 +82,11 @@
 	// two-stage offer: first purchase shows the 48-dAMS signup offer, then the
 	// 100-dAMS follow-up. Kept in sync with the order history on load + redeem.
 	let firstPurchase = $state(true);
+	// The local cache can be stale (new device / cleared storage): until the
+	// on-chain history read settles, a user who already redeemed elsewhere would
+	// briefly see the outdated 48-dAMS welcome offer. While unresolved and the
+	// welcome offer WOULD show, the offer areas show a loader instead.
+	let historyResolved = $state(false);
 	// Recent orders for the connected account (newest first) — the history sheet.
 	let orders = $state<Order[]>([]);
 	let showHistory = $state(false);
@@ -193,6 +198,10 @@
 	// created on this device — logging in with an existing account goes straight
 	// to the follow-up offers.
 	const welcomeStage = $derived(firstPurchase && signupDevice);
+	// The 48-dAMS welcome offer must not flash for someone who already redeemed
+	// elsewhere — hold the offer areas behind a loader until the on-chain history
+	// confirms (only needed when the welcome offer would show).
+	const offersPending = $derived(welcomeStage && !historyResolved);
 	// Past the welcome stage there are two offers to pick from (1€/100 and
 	// 2€/200); the index selects which one the Redeem button acts on.
 	let selectedOfferIdx = $state(0);
@@ -463,6 +472,7 @@
 		receipt = null;
 		orders = [];
 		firstPurchase = true;
+		historyResolved = false;
 		showHistory = false;
 		convertiblePersonal = 0;
 	}
@@ -613,6 +623,7 @@
 		const a = connectedAddress;
 		if (a && a !== loadedFor) {
 			loadedFor = a;
+			historyResolved = false;
 			// Rehydrate this account's history + offer stage from local storage for an
 			// instant render; the on-chain read below corrects it.
 			orders = readOrders(a);
@@ -642,9 +653,12 @@
 					orders = mergeOrders(readOrders(a), chainOrders);
 					writeOrders(a, orders);
 					firstPurchase = orders.length === 0;
+					historyResolved = true;
 				})
 				.catch(() => {
-					/* RPC down/offline — the local cache keeps working */
+					// RPC down/offline — the local cache keeps working; stop holding
+					// the offer areas behind the loader.
+					if (loadedFor === a) historyResolved = true;
 				});
 			loadState(a).then((s) => {
 				if (!s.isMember)
@@ -796,7 +810,14 @@
 					</div>
 				</div>
 				<h1 class="display sm">{shopName ?? shortAddress(selectedShop)}</h1>
-				{#if offers.length > 1}
+				{#if offersPending}
+					<!-- Don't flash a possibly-outdated welcome offer while the on-chain
+					     history check is still running. -->
+					<div class="offers-loading">
+						<div class="spinner"></div>
+						<p class="muted small">Checking your offers…</p>
+					</div>
+				{:else if offers.length > 1}
 					<!-- Follow-up stage: two offers to pick from — tap a card to select. -->
 					<div class="offer-select" role="radiogroup" aria-label="Choose an offer">
 						{#each offers as o, i (o.amountDams)}
@@ -838,28 +859,30 @@
 					</div>
 				{/if}
 
-				<div class="actions">
-					<button class="btn-primary" disabled={claiming || !enough} onclick={handleRedeem}>
-						{#if claiming}
-							Sending…
-						{:else if enough}
-							Redeem this offer
-						{:else if elig?.eligible}
-							Almost there…
-						{:else}
-							Eligible in {elig?.label}
-						{/if}
-					</button>
-					{#if !enough && !claiming}
-						<p class="muted small center-text">
-							{#if elig?.eligible}
-								Try again in a moment.
+				{#if !offersPending}
+					<div class="actions">
+						<button class="btn-primary" disabled={claiming || !enough} onclick={handleRedeem}>
+							{#if claiming}
+								Sending…
+							{:else if enough}
+								Redeem this offer
+							{:else if elig?.eligible}
+								Almost there…
 							{:else}
-								You have {availableWhole} of {offer.amountDams} dAMS. They grow by one every hour.
+								Eligible in {elig?.label}
 							{/if}
-						</p>
-					{/if}
-				</div>
+						</button>
+						{#if !enough && !claiming}
+							<p class="muted small center-text">
+								{#if elig?.eligible}
+									Try again in a moment.
+								{:else}
+									You have {availableWhole} of {offer.amountDams} dAMS. They grow by one every hour.
+								{/if}
+							</p>
+						{/if}
+					</div>
+				{/if}
 			</section>
 
 			<!-- Home -->
@@ -900,22 +923,42 @@
 
 				<div class="block">
 					<h2 class="eyebrow">Available offers</h2>
-					<ul class="shop-list">
-						{#each SHOPS as s (s.address)}
-							<!-- Just the headline deal, short form — the full choice opens on
-							     the shop screen. -->
-							{@const first = activeOffers(s, welcomeStage)[0]}
-							<li>
-								<button class="shop-row" onclick={() => (selectedShop = s.address)}>
-									<span>
-										<span class="shop-name">{s.name}</span>
-										<span class="shop-offer">{first.discountEuro}€ off for {first.amountDams} dAMS</span>
-									</span>
-									<span class="chev" aria-hidden="true">›</span>
-								</button>
-							</li>
-						{/each}
-					</ul>
+					{#if offersPending}
+						<!-- Don't flash a possibly-outdated welcome offer while the on-chain
+						     history check is still running. -->
+						<div class="offers-loading">
+							<div class="spinner"></div>
+							<p class="muted small">Checking your offers…</p>
+						</div>
+					{:else}
+						<ul class="shop-list">
+							{#each SHOPS as s (s.address)}
+								<li>
+									<button class="shop-row" onclick={() => (selectedShop = s.address)}>
+										<span>
+											<span class="shop-name">{s.name}</span>
+											{#if welcomeStage}
+												<span class="shop-offer"
+													>{SIGNUP_OFFER.discountEuro}€ off on welcome offer</span
+												>
+												<span class="shop-offer"
+													>{s.offer.discountEuro}€ off for {s.offer.amountDams} dAMS</span
+												>
+											{:else}
+												<!-- Just the headline deal, short form — the full choice
+												     opens on the shop screen. -->
+												{@const first = activeOffers(s, false)[0]}
+												<span class="shop-offer"
+													>{first.discountEuro}€ off for {first.amountDams} dAMS</span
+												>
+											{/if}
+										</span>
+										<span class="chev" aria-hidden="true">›</span>
+									</button>
+								</li>
+							{/each}
+						</ul>
+					{/if}
 				</div>
 			</section>
 		{/if}
@@ -1708,6 +1751,15 @@
 		font-weight: 600;
 		margin: 0 0 4px;
 	}
+	/* Offer areas while the on-chain history check runs */
+	.offers-loading {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 10px;
+		padding: 26px 0;
+	}
+
 	/* Change-name sheet */
 	.name-input {
 		width: 100%;
