@@ -23,11 +23,22 @@
 		<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
 		<link rel="icon" type="image/svg+xml" href="/circles-token.svg" />
 		<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-		<!-- The web-app manifest link is injected per page after the build by
-		     scripts/inject-manifests.mjs, so pilot pages (e.g. /pilots/dams)
-		     install as their own app instead of Miniapps. It must be in the
-		     initial HTML: with ssr=false a svelte:head link appears only after
-		     hydration, too late for the browser's install evaluation. -->
+		<!-- The web-app manifest is chosen per URL, synchronously at parse time,
+		     so pilot pages (e.g. /pilots/dams) install as their own app instead
+		     of Miniapps. It can't be a static link: the server answers clean
+		     URLs with the SPA fallback shell (one file for every route), and a
+		     svelte:head link lands only after hydration — too late for the
+		     browser's install evaluation. Keep in sync with updateManifestLink()
+		     in src/routes/+layout.svelte. -->
+		<script>
+			(function () {
+				var link = document.createElement('link');
+				link.rel = 'manifest';
+				link.href =
+					location.pathname === '/pilots/dams' ? '/pilots/dams.webmanifest' : '/manifest.webmanifest';
+				document.head.appendChild(link);
+			})();
+		</script>
 		<meta name="theme-color" content="#0e00a8" />
 		%sveltekit.head%
 	</head>
