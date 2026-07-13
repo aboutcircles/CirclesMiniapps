@@ -23,11 +23,11 @@
 		<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
 		<link rel="icon" type="image/svg+xml" href="/circles-token.svg" />
 		<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-		<!-- %manifest% is resolved per page at prerender time (hooks.server.ts) so
-		     pilot pages (e.g. /pilots/dams) install as their own app, not as
-		     Miniapps. It must be in the initial HTML: with ssr=false a svelte:head
-		     link appears only after hydration, too late for install evaluation. -->
-		<link rel="manifest" href="%manifest%" />
+		<!-- The web-app manifest link is injected per page after the build by
+		     scripts/inject-manifests.mjs, so pilot pages (e.g. /pilots/dams)
+		     install as their own app instead of Miniapps. It must be in the
+		     initial HTML: with ssr=false a svelte:head link appears only after
+		     hydration, too late for the browser's install evaluation. -->
 		<meta name="theme-color" content="#0e00a8" />
 		%sveltekit.head%
 	</head>
