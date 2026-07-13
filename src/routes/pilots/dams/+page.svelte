@@ -124,11 +124,6 @@
 	// a single device from farming multiple welcome bonuses.)
 	const ACCOUNT_CREATED_KEY = 'dams.account.created';
 	let accountAlreadyCreated = $state(false);
-	// True only when THIS device created the account (the localStorage flag is set
-	// exclusively during signup — the ?registered=1 URL marker doesn't count).
-	// Users who log in with "I already have an account" never see the welcome
-	// offer: it's reserved for fresh signups that haven't redeemed yet.
-	let signupDevice = $state(false);
 
 	// Conditions of Participation: no gating popup — the landing page states
 	// "By signing up, you agree…" with a link to /pilots/dams-terms, and per the
@@ -178,25 +173,17 @@
 		}
 		markRegisteredInUrl();
 		accountAlreadyCreated = true;
-		signupDevice = true;
-	}
-
-	function createdAccountLocally(): boolean {
-		try {
-			return localStorage.getItem(ACCOUNT_CREATED_KEY) === '1';
-		} catch {
-			return false;
-		}
 	}
 
 	// ----- Derived -----
 	const connectedAddress = $derived(
 		wallet.connected && wallet.address ? (getAddress(wallet.address) as Address) : null
 	);
-	// The welcome offer shows only while the account has never redeemed AND was
-	// created on this device — logging in with an existing account goes straight
-	// to the follow-up offers.
-	const welcomeStage = $derived(firstPurchase && signupDevice);
+	// The welcome offer shows while the account has never redeemed — an on-chain
+	// fact (dAMS transfer history), so it follows the account across devices and
+	// logins. The offersPending loader keeps a stale local cache from flashing it
+	// for someone who already redeemed elsewhere.
+	const welcomeStage = $derived(firstPurchase);
 	// The 48-dAMS welcome offer must not flash for someone who already redeemed
 	// elsewhere — hold the offer areas behind a loader until the on-chain history
 	// confirms (only needed when the welcome offer would show).
@@ -553,7 +540,6 @@
 		if (amt && Number(amt) > 0) amountOverride = Number(amt);
 
 		accountAlreadyCreated = hasCreatedAccount();
-		signupDevice = createdAccountLocally();
 
 		// ----- PWA install wiring -----
 		// The pilot's own manifest link is prerendered by the root layout (a JS
