@@ -235,6 +235,11 @@ async function fetchAvatarInfo(safeAddress: string) {
 	}
 }
 
+/** Re-read the connected avatar's Circles profile (e.g. after a rename). */
+async function refreshAvatarProfile() {
+	if (address) await fetchAvatarInfo(address);
+}
+
 /** Wrap a transaction as a Safe.execTransaction call to be sent from the primary safe. */
 function buildSafeExecTx(ownerAddress: string, safeAddress: string, tx: { to: string; data?: string; value?: string }) {
 	// Prevalidated signature bytes for a single owner with threshold=1: ownerPadded(32) || zeros(32) || 0x01
@@ -657,6 +662,7 @@ export const wallet = {
 	get pickerSafes() { return pickerSafes; },
 	get pickerProfiles() { return pickerProfiles; },
 	getSavedSafeAddress,
+	refreshAvatarProfile,
 	connect,
 	adoptSmartAccount,
 	connectWithPasskey,

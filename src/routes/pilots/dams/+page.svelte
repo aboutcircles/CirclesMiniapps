@@ -2,7 +2,12 @@
 	import { onMount } from 'svelte';
 	import { getAddress, isAddress, type Address } from 'viem';
 	import { wallet } from '$lib/wallet.svelte';
-	import { createPasskeySafe, inviteAccount, confirmRegistered } from '$lib/onboarding.svelte';
+	import {
+		createPasskeySafe,
+		inviteAccount,
+		confirmRegistered,
+		buildUpdateNameTx
+	} from '$lib/onboarding.svelte';
 	import {
 		readUserState,
 		buildClaimTxs,
@@ -63,6 +68,12 @@
 	// Refreshed per account, after membership lands, and after spends.
 	let convertiblePersonal = $state(0);
 
+
+	// Change-name sheet (opened from the avatar menu).
+	let showNameEdit = $state(false);
+	let nameDraft = $state('');
+	let nameSaving = $state(false);
+	let nameError = $state('');
 
 	let membershipTried = '';
 	let loadedFor = '';
@@ -454,6 +465,38 @@
 		firstPurchase = true;
 		showHistory = false;
 		convertiblePersonal = 0;
+	}
+
+	// ----- Change name -----
+	function openNameEdit() {
+		menuOpen = false;
+		nameDraft = wallet.avatarName || '';
+		nameError = '';
+		showNameEdit = true;
+	}
+
+	async function saveName() {
+		const next = nameDraft.trim();
+		if (!next || nameSaving) return;
+		nameError = '';
+		nameSaving = true;
+		try {
+			// Pin the new profile, then update the NameRegistry digest from the Safe.
+			const tx = await buildUpdateNameTx(next);
+			await wallet.sendTransactions([tx]);
+			// The indexer lags the chain by a moment — poll until the new name lands.
+			for (let i = 0; i < 6; i++) {
+				await wallet.refreshAvatarProfile();
+				if (wallet.avatarName === next) break;
+				await new Promise((r) => setTimeout(r, 2000));
+			}
+			showNameEdit = false;
+		} catch (e: any) {
+			const m = e?.message ?? 'Could not update your name.';
+			nameError = /reject|cancel|denied|rejected/i.test(m) ? 'Cancelled.' : m;
+		} finally {
+			nameSaving = false;
+		}
 	}
 
 	// ----- PWA install -----
@@ -918,6 +961,7 @@
 		<div class="menu">
 			<p class="menu-name">{wallet.avatarName || 'Your account'}</p>
 			{#if connectedAddress}<p class="menu-addr">{shortAddress(connectedAddress)}</p>{/if}
+			<button class="btn-secondary wide" onclick={openNameEdit}>Change name</button>
 			<button
 				class="btn-secondary wide"
 				onclick={() => {
@@ -963,6 +1007,36 @@
 				</ul>
 			{/if}
 			<button class="btn-secondary wide" onclick={() => (showHistory = false)}>Close</button>
+		</div>
+	{/if}
+
+	<!-- Change name -->
+	{#if showNameEdit}
+		<button class="sheet-backdrop" aria-label="Close" onclick={() => (showNameEdit = false)}
+		></button>
+		<div class="sheet" role="dialog" aria-modal="true">
+			<div class="grab"></div>
+			<h2 class="sheet-title">Change your name</h2>
+			<p class="muted small">Shown to other participants. Names aren't unique.</p>
+			<input
+				class="name-input"
+				type="text"
+				maxlength="48"
+				bind:value={nameDraft}
+				disabled={nameSaving}
+				placeholder="Your name"
+				aria-label="New name"
+			/>
+			{#if nameError}<p class="error">{nameError}</p>{/if}
+			{#if nameSaving}
+				<div class="name-saving">
+					<div class="spinner"></div>
+					<p class="muted small">Saving… confirm with your device when prompted.</p>
+				</div>
+			{:else}
+				<button class="btn-primary" disabled={!nameDraft.trim()} onclick={saveName}>Save</button>
+				<button class="btn-text" onclick={() => (showNameEdit = false)}>Cancel</button>
+			{/if}
 		</div>
 	{/if}
 
@@ -1634,6 +1708,33 @@
 		font-weight: 600;
 		margin: 0 0 4px;
 	}
+	/* Change-name sheet */
+	.name-input {
+		width: 100%;
+		margin: 12px 0 14px;
+		padding: 14px 16px;
+		border-radius: 14px;
+		border: 1px solid rgba(255, 255, 255, 0.25);
+		background: rgba(255, 255, 255, 0.08);
+		color: #fff;
+		font: inherit;
+		font-size: 1.05rem;
+	}
+	.name-input:focus {
+		outline: none;
+		border-color: #76cd9c;
+	}
+	.name-input::placeholder {
+		color: rgba(255, 255, 255, 0.4);
+	}
+	.name-saving {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 10px;
+		padding: 12px 0 6px;
+	}
+
 	/* Conditions of Participation links */
 	.legal-link {
 		margin: 18px 0 0;

@@ -135,6 +135,26 @@ async function pinProfileDigest(name: string): Promise<Hex> {
 }
 
 /**
+ * Build the transaction that renames an existing avatar: pins a fresh profile
+ * (name only) and returns the NameRegistry.updateMetadataDigest call, to be sent
+ * from the user's Safe (e.g. via wallet.sendTransactions).
+ */
+export async function buildUpdateNameTx(
+	name: string
+): Promise<{ to: string; data: string; value: string }> {
+	const metadataDigest = await pinProfileDigest(name);
+	return {
+		to: NAME_REGISTRY,
+		value: '0',
+		data: encodeFunctionData({
+			abi: NAME_REGISTRY_ABI,
+			functionName: 'updateMetadataDigest',
+			args: [metadataDigest]
+		})
+	};
+}
+
+/**
  * Create a new passkey-controlled Safe, enable the Circles invitation module, and
  * set the user's profile metadata digest (name) on the NameRegistry.
  * Triggers the WebAuthn passkey prompt. Sponsored by Pimlico.
