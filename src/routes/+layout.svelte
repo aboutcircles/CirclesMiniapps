@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, type Snippet } from 'svelte';
 	import { afterNavigate } from '$app/navigation';
-	import { page } from '$app/state';
+	import { page, updated } from '$app/state';
 	import { getAddress } from 'viem';
 	import OfflineNotice from '$lib/OfflineNotice.svelte';
 	import ChildSafePicker from '$lib/ChildSafePicker.svelte';
@@ -44,6 +44,15 @@
 
 	onMount(() => {
 		initAnalytics();
+		// A long-lived tab or installed PWA keeps running old code after a deploy
+		// (client-rendered app, nothing forces a reload). When version polling has
+		// flagged an update, reload as the app returns to the foreground — never
+		// mid-use, so in-flight flows aren't interrupted.
+		const reloadIfUpdated = () => {
+			if (document.visibilityState === 'visible' && updated.current) location.reload();
+		};
+		document.addEventListener('visibilitychange', reloadIfUpdated);
+		return () => document.removeEventListener('visibilitychange', reloadIfUpdated);
 	});
 
 	afterNavigate((nav) => {
