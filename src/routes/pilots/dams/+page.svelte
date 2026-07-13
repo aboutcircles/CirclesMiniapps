@@ -519,7 +519,7 @@
 		try {
 			document
 				.querySelectorAll('link[rel="manifest"]')
-				.forEach((el) => el.setAttribute('href', '/pilots/dams/manifest.webmanifest'));
+				.forEach((el) => el.setAttribute('href', '/pilots/dams.webmanifest'));
 			const themeMeta = document.querySelector('meta[name="theme-color"]');
 			if (themeMeta) themeMeta.setAttribute('content', '#4428d4');
 		} catch {
