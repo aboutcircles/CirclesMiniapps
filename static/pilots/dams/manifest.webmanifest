@@ -1,0 +1,29 @@
+{
+	"name": "Circles Amsterdam",
+	"short_name": "Circles AMS",
+	"description": "Create your own community currency (dAMS) and spend it for discounts at local Amsterdam shops.",
+	"start_url": "/pilots/dams?source=pwa",
+	"scope": "/pilots/dams",
+	"display": "standalone",
+	"orientation": "portrait",
+	"background_color": "#2e1f8c",
+	"theme_color": "#4428d4",
+	"icons": [
+		{
+			"src": "/icons/icon-192.png",
+			"sizes": "192x192",
+			"type": "image/png"
+		},
+		{
+			"src": "/icons/icon-512.png",
+			"sizes": "512x512",
+			"type": "image/png"
+		},
+		{
+			"src": "/icons/icon-maskable-512.png",
+			"sizes": "512x512",
+			"type": "image/png",
+			"purpose": "maskable"
+		}
+	]
+}

@@ -6,14 +6,23 @@
 	import {
 		readUserState,
 		buildClaimTxs,
-		totalAvailableWei,
+		deliverableWholeDams,
 		fetchProfileName,
 		shortAddress,
 		ONE,
 		type UserState
 	} from './circles';
-	import { SHOPS, resolveShop, offerSentence, DEFAULT_OFFER, type Offer } from './shops';
+	import {
+		SHOPS,
+		resolveShop,
+		offerSentence,
+		activeOffer,
+		SIGNUP_OFFER,
+		DEFAULT_OFFER,
+		type Offer
+	} from './shops';
 	import { maxConvertibleToDams, buildBoostTxs } from './boost';
+	import { addOrder, readOrders, isFirstPurchase, type Order } from './orders';
 
 	// Server (service EOA) that adds new users to the Circles Amsterdam group so
 	// they can mint dAMS. Defaults to the deployed pilot endpoint; override with
@@ -22,13 +31,7 @@
 		(import.meta.env.VITE_DAMS_MEMBERSHIP_URL as string | undefined) ??
 		'https://amsterdam-ashy.vercel.app/api/add-member';
 
-	interface ReceiptData {
-		amount: number;
-		shop: string;
-		shopName: string;
-		txHash: string;
-		at: number;
-	}
+	type ReceiptData = Order;
 
 	// ----- State -----
 	let userState = $state<UserState | null>(null);
@@ -36,7 +39,6 @@
 	let selectedShop = $state<Address | null>(null);
 	let shopName = $state<string | null>(null);
 	let amountOverride = $state<number | null>(null);
-	let username = $state('');
 	let signingUp = $state(false);
 	let signupNote = $state('');
 	let claiming = $state(false);
@@ -44,7 +46,6 @@
 	let receipt = $state<ReceiptData | null>(null);
 	let showReceipt = $state(false);
 	let menuOpen = $state(false);
-	let showNameField = $state(false); // username field appears only after the CTA tap
 
 	// Boost ("secret" route): convert existing Circles into max dAMS.
 	let showBoostHint = $state(false);
@@ -63,17 +64,110 @@
 	let loadedFor = '';
 	let lastCoinTap = 0;
 
+	// True until the connected account has redeemed at least once. Drives the
+	// two-stage offer: first purchase shows the 48-dAMS signup offer, then the
+	// 100-dAMS follow-up. Kept in sync with the order history on load + redeem.
+	let firstPurchase = $state(true);
+	// Recent orders for the connected account (newest first) — the history sheet.
+	let orders = $state<Order[]>([]);
+	let showHistory = $state(false);
+
+	// ----- PWA install -----
+	// The captured beforeinstallprompt event (Chromium). Present → we can trigger
+	// the native install prompt; absent on iOS/other browsers (manual instructions).
+	let installEvent = $state<any>(null);
+	let showInstall = $state(false);
+	let isIos = $state(false);
+	// Already running as an installed PWA? Then never nag to install.
+	let isStandalone = $state(false);
+	// The add-to-home-screen prompt is shown once per device, remembered in a cookie.
+	const INSTALL_COOKIE = 'dams_install_prompted';
+
+	function getCookie(name: string): string | null {
+		try {
+			const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+			return m ? decodeURIComponent(m[1]) : null;
+		} catch {
+			return null;
+		}
+	}
+	function setCookie(name: string, value: string, days = 365) {
+		try {
+			const maxAge = days * 24 * 60 * 60;
+			document.cookie = `${name}=${encodeURIComponent(value)}; path=/pilots/dams; max-age=${maxAge}; SameSite=Lax`;
+		} catch {
+			/* ignore */
+		}
+	}
+
+	// One-account-per-device guard. Once this device has created an account we
+	// never let it create a second one — the "Join" CTA routes to login instead.
+	// (Cleared only by an explicit sign-out is NOT desired: the point is to stop
+	// a single device from farming multiple welcome bonuses.)
+	const ACCOUNT_CREATED_KEY = 'dams.account.created';
+	// The signup welcome offer: 48 dAMS, per the pilot spec.
+	const SIGNUP_BONUS_DAMS = 48;
+	let accountAlreadyCreated = $state(false);
+
+	// URL marker mirroring the localStorage flag. Recording "already registered" in
+	// the URL means a returning user who reopens/shares the link — even with no
+	// localStorage (incognito, cleared storage, another browser) — is prompted for
+	// their passkey to log in, instead of being offered a brand-new account.
+	const REGISTERED_PARAM = 'registered';
+
+	function urlSaysRegistered(): boolean {
+		try {
+			return new URL(window.location.href).searchParams.get(REGISTERED_PARAM) === '1';
+		} catch {
+			return false;
+		}
+	}
+
+	// Persist "registered" into the URL (without a navigation) so it survives reloads
+	// and travels when the link is copied.
+	function markRegisteredInUrl() {
+		try {
+			const url = new URL(window.location.href);
+			if (url.searchParams.get(REGISTERED_PARAM) === '1') return;
+			url.searchParams.set(REGISTERED_PARAM, '1');
+			history.replaceState(history.state, '', url);
+		} catch {
+			/* ignore */
+		}
+	}
+
+	function hasCreatedAccount(): boolean {
+		try {
+			if (localStorage.getItem(ACCOUNT_CREATED_KEY) === '1') return true;
+		} catch {
+			/* ignore */
+		}
+		// The URL marker is the cross-storage fallback.
+		return urlSaysRegistered();
+	}
+	function markAccountCreated() {
+		try {
+			localStorage.setItem(ACCOUNT_CREATED_KEY, '1');
+		} catch {
+			/* ignore */
+		}
+		markRegisteredInUrl();
+		accountAlreadyCreated = true;
+	}
+
 	// ----- Derived -----
 	const connectedAddress = $derived(
 		wallet.connected && wallet.address ? (getAddress(wallet.address) as Address) : null
 	);
-	const offer = $derived<Offer>(selectedShop ? offerFor(selectedShop) : DEFAULT_OFFER);
-	// Balance comes straight from chain (held dAMS + Hub mintable) — never
-	// synthesized. The counter just ticks down to the next top-of-hour, when the
-	// next whole dAMS is minted.
-	const availableWhole = $derived(
-		userState ? Math.floor(Number(totalAvailableWei(userState)) / 1e18) : 0
+	const offer = $derived<Offer>(
+		selectedShop ? offerFor(selectedShop) : firstPurchase ? SIGNUP_OFFER : DEFAULT_OFFER
 	);
+	// Balance comes straight from chain — never synthesized. It counts everything
+	// redeemable as dAMS: held dAMS, personal Circles convertible 1:1 via group-mint
+	// (this is where the 48-CRC signup bonus lives), and what's mintable right now.
+	// Uses the same flooring as the claim batch so the number matches what "Redeem"
+	// can actually deliver. The counter ticks down to the next top-of-hour mint.
+	const availableWhole = $derived(userState ? deliverableWholeDams(userState) : 0);
 	const nextMint = $derived(mintCountdown(now));
 	const elig = $derived(userState ? eligibility(availableWhole, now, offer.amountDams) : null);
 	const enough = $derived(
@@ -88,12 +182,10 @@
 		const n = NOUN[Math.floor(Math.random() * NOUN.length)];
 		return `${a}${n}${Math.floor(Math.random() * 90 + 10)}`;
 	}
-	function shuffleUsername() {
-		username = randomUsername();
-	}
 
 	function offerFor(shop: Address): Offer {
-		const base = resolveShop(shop).offer;
+		// Two-stage: first purchase → 48-dAMS signup offer, then the shop's follow-up.
+		const base = activeOffer(resolveShop(shop), firstPurchase);
 		return amountOverride ? { ...base, amountDams: amountOverride } : base;
 	}
 
@@ -122,10 +214,6 @@
 		const h = Math.floor(totalMins / 60);
 		const m = totalMins % 60;
 		return { eligible: false, label: h > 0 ? `${h}h ${m}m` : `${m}m` };
-	}
-
-	function receiptKey(addr: string) {
-		return `dams.receipt.${addr.toLowerCase()}`;
 	}
 
 	async function loadState(addr: Address): Promise<UserState> {
@@ -167,7 +255,14 @@
 
 	// ----- Actions -----
 	async function handleSignup() {
-		const name = username.trim() || randomUsername();
+		// One account per device: if this device already made one, log in instead
+		// of minting a second Safe (and a second welcome bonus).
+		if (hasCreatedAccount()) {
+			await handleLogin();
+			return;
+		}
+		// Always auto-register with a random name — no user-chosen username.
+		const name = randomUsername();
 		errorMsg = '';
 		signingUp = true;
 		signupNote = 'Creating your account…';
@@ -186,6 +281,9 @@
 			if (!registered) {
 				throw new Error('Almost there — your account is still registering. Try again in a moment.');
 			}
+			// From here on the account exists on-chain — block this device from
+			// creating another one, even if the bonus/membership steps below fail.
+			markAccountCreated();
 			// Log in by adopting the client we already built (no second passkey prompt).
 			wallet.adoptSmartAccount(smartAccountClient, safeAddress);
 			signupNote = 'Joining Circles Amsterdam…';
@@ -196,15 +294,24 @@
 			await loadState(a);
 			// Offer the 48-CRC welcome bonus as collectable dAMS (needs a fresh
 			// passkey gesture, so it's a tap — surfaced as a celebratory modal).
+			let shownBonus = false;
 			if (member) {
 				try {
-					const max = await maxConvertibleToDams(a);
-					bonusAmount = Math.floor(Number(max) / 1e18);
-					if (bonusAmount > 0) bonusPhase = 'offer';
+					const max = Math.floor(Number(await maxConvertibleToDams(a)) / 1e18);
+					// The signup offer is 48 dAMS — never gift more than that here.
+					bonusAmount = Math.min(SIGNUP_BONUS_DAMS, max);
+					if (bonusAmount > 0) {
+						bonusPhase = 'offer';
+						shownBonus = true;
+					}
 				} catch {
 					/* bonus is optional — never block sign-up on it */
 				}
 			}
+			// Registration succeeded — invite them to install the app. If the welcome
+			// bonus sheet is up, defer the install prompt until that's closed so the
+			// two sheets never stack.
+			if (!shownBonus) offerInstall();
 		} catch (e: any) {
 			errorMsg = e?.message ?? String(e);
 		} finally {
@@ -245,16 +352,17 @@
 				amount,
 				shop,
 				shopName: resolveShop(shop).name,
+				// `firstPurchase` is still true here — it's flipped after addOrder below.
+				offerLabel: firstPurchase ? 'Welcome offer' : 'Follow-up offer',
 				txHash: String(hash),
 				at: Date.now()
 			};
 			receipt = data;
 			showReceipt = true;
-			try {
-				localStorage.setItem(receiptKey(a), JSON.stringify(data));
-			} catch {
-				/* ignore */
-			}
+			// Append to order history and advance out of the first-purchase stage, so
+			// the offer flips from the 48-dAMS signup deal to the 100-dAMS follow-up.
+			orders = addOrder(a, data);
+			firstPurchase = isFirstPurchase(a);
 			await loadState(a);
 		} catch (e: any) {
 			const m = e?.message ?? 'Payment failed.';
@@ -264,12 +372,22 @@
 		}
 	}
 
+	// Dismiss the receipt and return to the home screen (participating shops), so
+	// the user sees the next offer rather than staying on the just-redeemed shop.
+	function closeReceipt() {
+		showReceipt = false;
+		selectedShop = null;
+	}
+
 	function signOut() {
 		menuOpen = false;
 		wallet.disconnect();
 		userState = null;
 		loadedFor = '';
 		receipt = null;
+		orders = [];
+		firstPurchase = true;
+		showHistory = false;
 	}
 
 	// ----- Boost: double-tap the coin to convert existing Circles into dAMS -----
@@ -335,6 +453,7 @@
 			await loadState(a);
 			boostDone = bonusAmount; // reuse the success toast
 			bonusPhase = 'idle';
+			offerInstall(); // now that the bonus sheet is gone, offer install
 		} catch (e: any) {
 			const m = e?.message ?? 'Could not collect your bonus.';
 			bonusError = /reject|cancel|denied|rejected/i.test(m) ? 'Cancelled.' : m;
@@ -345,6 +464,43 @@
 	function dismissBonus() {
 		bonusPhase = 'idle';
 		bonusError = '';
+		offerInstall(); // offer install after the bonus sheet is dismissed
+	}
+
+	// ----- PWA install -----
+	// Open the "Add to home screen" sheet after sign-up. Shown once per device
+	// (remembered in a cookie) and never when already installed. Works on all
+	// mobile browsers: if the native prompt isn't available we show manual steps.
+	function offerInstall() {
+		if (isStandalone) return;
+		if (getCookie(INSTALL_COOKIE) === '1') return;
+		setCookie(INSTALL_COOKIE, '1'); // shown once — don't offer again on this device
+		showInstall = true;
+	}
+
+	// Manually open the sheet from the account menu (ignores the once-only cookie).
+	function openInstall() {
+		menuOpen = false;
+		showInstall = true;
+	}
+
+	// Fire the native Chromium install prompt if we have it; otherwise the sheet
+	// shows platform instructions and this just closes it.
+	async function confirmInstall() {
+		if (installEvent) {
+			try {
+				installEvent.prompt();
+				await installEvent.userChoice;
+			} catch {
+				/* user dismissed — nothing to do */
+			}
+			installEvent = null;
+		}
+		showInstall = false;
+	}
+
+	function dismissInstall() {
+		showInstall = false;
 	}
 
 	// ----- Lifecycle -----
@@ -355,9 +511,51 @@
 		const amt = url.searchParams.get('amount');
 		if (amt && Number(amt) > 0) amountOverride = Number(amt);
 
-		// Silent session restore — only when a Safe is already saved (never prompt
-		// the passkey on a cold landing; newcomers use the explicit buttons).
-		if (wallet.getSavedSafeAddress()) wallet.autoConnect();
+		accountAlreadyCreated = hasCreatedAccount();
+
+		// ----- PWA install wiring -----
+		// Point the installable app at this pilot ("Circles Amsterdam") instead of
+		// the generic app-wide manifest, and colour the standalone chrome purple.
+		try {
+			document
+				.querySelectorAll('link[rel="manifest"]')
+				.forEach((el) => el.setAttribute('href', '/pilots/dams/manifest.webmanifest'));
+			const themeMeta = document.querySelector('meta[name="theme-color"]');
+			if (themeMeta) themeMeta.setAttribute('content', '#4428d4');
+		} catch {
+			/* head not writable — non-fatal */
+		}
+		// Are we already installed / running standalone?
+		isStandalone =
+			window.matchMedia?.('(display-mode: standalone)').matches ||
+			(navigator as any).standalone === true;
+		// iOS never fires beforeinstallprompt — detect it so we can show manual steps.
+		const ua = navigator.userAgent || '';
+		isIos = /iPad|iPhone|iPod/.test(ua) || (ua.includes('Macintosh') && 'ontouchend' in document);
+		// Capture the Chromium install prompt so we can trigger it on our terms.
+		const onBeforeInstall = (e: Event) => {
+			e.preventDefault();
+			installEvent = e;
+		};
+		const onInstalled = () => {
+			installEvent = null;
+			showInstall = false;
+			isStandalone = true;
+		};
+		window.addEventListener('beforeinstallprompt', onBeforeInstall);
+		window.addEventListener('appinstalled', onInstalled);
+
+		if (wallet.getSavedSafeAddress()) {
+			// Silent session restore — a Safe is already saved locally.
+			wallet.autoConnect();
+		} else if (accountAlreadyCreated) {
+			// Known returning user (URL/flag says registered) but no saved Safe on this
+			// device — prompt the passkey to log them in rather than let them create a
+			// second account. handleLogin() surfaces any error and loads their state.
+			handleLogin();
+		}
+		// Otherwise it's a genuine cold landing for a newcomer — show the explicit
+		// Join / "I already have an account" buttons; never auto-prompt the passkey.
 
 		const tick = setInterval(() => {
 			const t = Date.now();
@@ -374,6 +572,8 @@
 		return () => {
 			clearInterval(tick);
 			clearInterval(refresh);
+			window.removeEventListener('beforeinstallprompt', onBeforeInstall);
+			window.removeEventListener('appinstalled', onInstalled);
 		};
 	});
 
@@ -382,12 +582,10 @@
 		const a = connectedAddress;
 		if (a && a !== loadedFor) {
 			loadedFor = a;
-			try {
-				const raw = localStorage.getItem(receiptKey(a));
-				if (raw) receipt = JSON.parse(raw);
-			} catch {
-				/* ignore */
-			}
+			// Rehydrate this account's history + offer stage from local storage.
+			orders = readOrders(a);
+			firstPurchase = orders.length === 0;
+			receipt = orders[0] ?? null;
 			loadState(a).then((s) => {
 				if (!s.isMember) ensureMembership(a).then(() => loadState(a));
 			});
@@ -414,6 +612,10 @@
 </script>
 
 <svelte:head>
+	<title>Circles Amsterdam</title>
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+	<meta name="apple-mobile-web-app-title" content="Circles AMS" />
 	<link rel="preconnect" href="https://fonts.googleapis.com" />
 	<link
 		href="https://fonts.googleapis.com/css2?family=Archivo:wght@800;900&family=Inter:wght@400;600&family=Poppins:wght@500;600;700&display=swap"
@@ -461,38 +663,30 @@
 				{/if}
 
 				<div class="block">
-					<h2 class="eyebrow">Participating shops</h2>
+					<h2 class="eyebrow">Available offers</h2>
 					<div class="carousel">
 						{#each SHOPS as s (s.address)}
 							<div class="shop-card">
 								<div class="coin coin-sm"></div>
-								<p class="shop-name">{s.name}</p>
-								<p class="shop-offer">{offerSentence(s.offer)}</p>
+								<div class="shop-card-text">
+									<p class="shop-name">{s.name}</p>
+									<p class="shop-offer">{offerSentence(SIGNUP_OFFER)}</p>
+								</div>
 							</div>
 						{/each}
 					</div>
 				</div>
 
 				<div class="actions">
-					{#if showNameField}
-						<label class="field">
-							<span class="field-label">Pick a username</span>
-							<div class="field-row">
-								<input
-									bind:value={username}
-									maxlength="24"
-									spellcheck="false"
-									autocomplete="off"
-									placeholder="Choose one — or leave blank"
-								/>
-								<button class="shuffle" aria-label="Suggest a random name" onclick={shuffleUsername}>⟳</button>
-							</div>
-							<span class="field-hint">Leave blank for a random name. No email required.</span>
-						</label>
-						<button class="btn-primary" onclick={handleSignup}>Create account</button>
-						<button class="btn-text" onclick={() => (showNameField = false)}>Back</button>
+					{#if accountAlreadyCreated}
+						<!-- Already registered (local flag or ?registered=1 in the URL) —
+						     log in with the passkey instead of creating a second account. -->
+						<button class="btn-primary stacked" onclick={handleLogin}>
+							<span>{wallet.connecting ? 'Connecting…' : 'Log in'}</span>
+							<span class="sub">welcome back</span>
+						</button>
 					{:else}
-						<button class="btn-primary stacked" onclick={() => (showNameField = true)}>
+						<button class="btn-primary stacked" onclick={handleSignup}>
 							<span>Join the community</span>
 							<span class="sub">no email required</span>
 						</button>
@@ -529,9 +723,19 @@
 				</div>
 				<h1 class="display sm">{shopName ?? shortAddress(selectedShop)}</h1>
 				<div class="card offer">
+					{#if firstPurchase}
+						<span class="offer-badge">Welcome offer</span>
+					{/if}
 					<p class="offer-big">{offer.discountEuro}€ off</p>
 					<p class="offer-sub">
-						for <strong>{offer.amountDams} dAMS</strong> when purchasing above {offer.minPurchaseEuro}€
+						for <strong>{offer.amountDams} dAMS</strong>
+						{#if firstPurchase}
+							on your first purchase
+						{:else if offer.minPurchaseEuro > 0}
+							when purchasing above {offer.minPurchaseEuro}€
+						{:else}
+							on any purchase
+						{/if}
 					</p>
 				</div>
 
@@ -583,14 +787,14 @@
 				</div>
 
 				<div class="block">
-					<h2 class="eyebrow">Participating shops</h2>
+					<h2 class="eyebrow">Available offers</h2>
 					<ul class="shop-list">
 						{#each SHOPS as s (s.address)}
 							<li>
 								<button class="shop-row" onclick={() => (selectedShop = s.address)}>
 									<span>
 										<span class="shop-name">{s.name}</span>
-										<span class="shop-offer">{offerSentence(s.offer)}</span>
+										<span class="shop-offer">{offerSentence(activeOffer(s, firstPurchase))}</span>
 									</span>
 									<span class="chev" aria-hidden="true">›</span>
 								</button>
@@ -598,10 +802,6 @@
 						{/each}
 					</ul>
 				</div>
-
-				{#if receipt}
-					<button class="btn-secondary" onclick={() => (showReceipt = true)}>Show last receipt</button>
-				{/if}
 			</section>
 		{/if}
 
@@ -636,7 +836,7 @@
 				</div>
 				<p class="muted small">Show this to the cashier to claim your discount.</p>
 			</div>
-			<button class="btn-secondary wide" onclick={() => (showReceipt = false)}>Done</button>
+			<button class="btn-secondary wide" onclick={closeReceipt}>Done</button>
 		</div>
 	{/if}
 
@@ -646,7 +846,48 @@
 		<div class="menu">
 			<p class="menu-name">{wallet.avatarName || 'Your account'}</p>
 			{#if connectedAddress}<p class="menu-addr">{shortAddress(connectedAddress)}</p>{/if}
+			<button
+				class="btn-secondary wide"
+				onclick={() => {
+					menuOpen = false;
+					showHistory = true;
+				}}
+			>
+				Redeemed Offers
+			</button>
+			{#if !isStandalone}
+				<button class="btn-secondary wide" onclick={openInstall}>Add to home screen</button>
+			{/if}
 			<button class="btn-secondary wide" onclick={signOut}>Sign out</button>
+		</div>
+	{/if}
+
+	<!-- Redeem history -->
+	{#if showHistory}
+		<button class="sheet-backdrop" aria-label="Close" onclick={() => (showHistory = false)}></button>
+		<div class="sheet" role="dialog" aria-modal="true">
+			<div class="grab"></div>
+			<h2 class="sheet-title">Redeemed Offers</h2>
+			{#if orders.length === 0}
+				<p class="muted">No offers redeemed yet. Redeem an offer and it'll show up here.</p>
+			{:else}
+				<ul class="order-list">
+					{#each orders as o (o.txHash + o.at)}
+						<li class="order-row">
+							<span class="order-info">
+								<span class="order-datetime">
+									{new Date(o.at).toLocaleDateString([], { day: 'numeric', month: 'short' })}
+									· {new Date(o.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+								</span>
+								<span class="order-shop">{o.shopName}</span>
+								{#if o.offerLabel}<span class="order-offer">{o.offerLabel}</span>{/if}
+							</span>
+							<span class="order-amount">{o.amount} <span class="order-unit">dAMS</span></span>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+			<button class="btn-secondary wide" onclick={() => (showHistory = false)}>Close</button>
 		</div>
 	{/if}
 
@@ -742,6 +983,42 @@
 		<button class="toast" onclick={() => (boostDone = 0)}>
 			✅ Added {boostDone} dAMS to your balance
 		</button>
+	{/if}
+
+	<!-- Add to home screen -->
+	{#if showInstall}
+		<button class="sheet-backdrop" aria-label="Close" onclick={dismissInstall}></button>
+		<div class="sheet" role="dialog" aria-modal="true">
+			<div class="grab"></div>
+			<div class="install">
+				<div class="coin coin-md drift"></div>
+				<h2 class="sheet-title">Add to your home screen</h2>
+				<p class="muted">
+					Install Circles Amsterdam for one-tap access and a full-screen app — no app store,
+					no download.
+				</p>
+				{#if installEvent}
+					<!-- Native prompt available (Chromium / Android). -->
+					<button class="btn-primary" onclick={confirmInstall}>Add to home screen</button>
+					<button class="btn-text" onclick={dismissInstall}>Maybe later</button>
+				{:else if isIos}
+					<ol class="install-steps">
+						<li>Tap the <strong>Share</strong> button <span aria-hidden="true">⬆️</span> in the toolbar.</li>
+						<li>Scroll down and choose <strong>Add to Home Screen</strong>.</li>
+						<li>Tap <strong>Add</strong> — done!</li>
+					</ol>
+					<button class="btn-secondary wide" onclick={dismissInstall}>Got it</button>
+				{:else}
+					<!-- Other browsers: generic manual steps. -->
+					<ol class="install-steps">
+						<li>Open your browser’s <strong>menu</strong> (⋮ or ⋯).</li>
+						<li>Choose <strong>Add to Home screen</strong> or <strong>Install app</strong>.</li>
+						<li>Confirm — done!</li>
+					</ol>
+					<button class="btn-secondary wide" onclick={dismissInstall}>Got it</button>
+				{/if}
+			</div>
+		</div>
 	{/if}
 </div>
 
@@ -962,13 +1239,23 @@
 		scroll-snap-type: x mandatory;
 	}
 	.shop-card {
-		min-width: 78%;
+		width: 100%;
 		scroll-snap-align: center;
 		background: rgba(255, 255, 255, 0.06);
 		border: 1px solid rgba(255, 255, 255, 0.14);
 		border-radius: 22px;
 		padding: 16px 18px;
 		backdrop-filter: blur(12px);
+		display: flex;
+		align-items: center;
+		gap: 14px;
+	}
+	/* On the carousel card the coin sits beside the text, not above it. */
+	.shop-card .coin-sm {
+		margin-bottom: 0;
+	}
+	.shop-card-text {
+		min-width: 0;
 	}
 	.shop-name {
 		font-family: 'Poppins', sans-serif;
@@ -979,6 +1266,10 @@
 		margin: 2px 0 0;
 		font-size: 0.88rem;
 		color: #76cd9c;
+	}
+	/* Keep the offer line on the carousel card to a single line. */
+	.shop-card .shop-offer {
+		white-space: nowrap;
 	}
 
 	.shop-list {
@@ -1016,54 +1307,6 @@
 		color: rgba(255, 255, 255, 0.4);
 	}
 
-	/* Field */
-	.field {
-		width: 100%;
-		margin-top: 22px;
-	}
-	.field-label {
-		display: block;
-		font-size: 0.85rem;
-		color: rgba(255, 255, 255, 0.6);
-		margin-bottom: 6px;
-	}
-	.field-hint {
-		display: block;
-		margin-top: 8px;
-		margin-bottom: 4px;
-		font-size: 0.8rem;
-		color: rgba(255, 255, 255, 0.5);
-	}
-	.field-row {
-		display: flex;
-		gap: 8px;
-	}
-	.field-row input {
-		flex: 1;
-		height: 50px;
-		border-radius: 14px;
-		border: 1px solid rgba(255, 255, 255, 0.18);
-		background: rgba(255, 255, 255, 0.07);
-		color: #fff;
-		padding: 0 16px;
-		font-size: 1rem;
-		font-family: 'Poppins', sans-serif;
-	}
-	.field-row input:focus {
-		outline: none;
-		border-color: #9991ef;
-	}
-	.shuffle {
-		width: 50px;
-		height: 50px;
-		border-radius: 14px;
-		border: 1px solid rgba(153, 145, 239, 0.6);
-		background: transparent;
-		color: #fff;
-		font-size: 1.2rem;
-		cursor: pointer;
-	}
-
 	/* Cards */
 	.card {
 		background: rgba(255, 255, 255, 0.06);
@@ -1076,6 +1319,20 @@
 		margin-top: 18px;
 		padding: 20px;
 		text-align: center;
+	}
+	.offer-badge {
+		display: inline-block;
+		margin-bottom: 8px;
+		padding: 4px 12px;
+		border-radius: 999px;
+		background: rgba(118, 205, 156, 0.18);
+		border: 1px solid rgba(118, 205, 156, 0.5);
+		color: #76cd9c;
+		font-family: 'Poppins', sans-serif;
+		font-size: 0.72rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.06em;
 	}
 	.offer-big {
 		font-family: 'Archivo', sans-serif;
@@ -1372,6 +1629,70 @@
 		gap: 12px;
 		padding: 24px 0 8px;
 	}
+
+	/* Order history */
+	.order-list {
+		list-style: none;
+		margin: 14px 0 18px;
+		padding: 0;
+		max-height: 46vh;
+		overflow-y: auto;
+		display: flex;
+		flex-direction: column;
+	}
+	.order-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 14px 2px;
+		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+	}
+	.order-row:last-child {
+		border-bottom: none;
+	}
+	.order-info {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		line-height: 1.25;
+		min-width: 0;
+	}
+	.order-datetime {
+		font-size: 0.82rem;
+		color: rgba(255, 255, 255, 0.5);
+	}
+	.order-shop {
+		font-family: 'Poppins', sans-serif;
+		font-weight: 600;
+		font-size: 0.98rem;
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	.order-offer {
+		align-self: flex-start;
+		margin-top: 2px;
+		padding: 2px 9px;
+		border-radius: 999px;
+		background: rgba(153, 145, 239, 0.16);
+		border: 1px solid rgba(153, 145, 239, 0.4);
+		color: #b7b1f5;
+		font-size: 0.72rem;
+		font-weight: 600;
+	}
+	.order-amount {
+		flex: none;
+		padding-left: 12px;
+		font-family: 'Archivo', sans-serif;
+		font-weight: 900;
+		font-size: 1.5rem;
+	}
+	.order-unit {
+		font-family: 'Poppins', sans-serif;
+		font-weight: 600;
+		font-size: 0.8rem;
+		color: #9991ef;
+	}
 	.bonus {
 		display: flex;
 		flex-direction: column;
@@ -1384,6 +1705,32 @@
 	}
 	.bonus .btn-primary {
 		margin-top: 14px;
+	}
+
+	/* Install / add-to-home-screen sheet */
+	.install {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		text-align: center;
+		gap: 6px;
+	}
+	.install .coin-md {
+		margin: 4px 0 10px;
+	}
+	.install .btn-primary {
+		margin-top: 14px;
+	}
+	.install-steps {
+		text-align: left;
+		margin: 14px 0 18px;
+		padding-left: 20px;
+		color: rgba(255, 255, 255, 0.85);
+		line-height: 1.6;
+		font-size: 0.95rem;
+	}
+	.install-steps li {
+		margin-bottom: 4px;
 	}
 	.boost-amount {
 		display: flex;

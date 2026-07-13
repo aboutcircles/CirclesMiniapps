@@ -165,10 +165,26 @@ export async function readUserState(address: Address): Promise<UserState> {
 	return { registered, isMember, mintable, damsDemurraged, personalCrc, damsErc1155 };
 }
 
-// The balance the user sees: demurraged dAMS they already hold plus what they can
-// mint right now (Hub issuance). All read on-chain.
+// The balance the user sees: everything that can become spendable dAMS, all read
+// on-chain. That's dAMS they already hold (demurraged ERC20 + unwrapped ERC1155)
+// PLUS personal Circles that the claim batch converts 1:1 into dAMS via group-mint
+// (their held personal CRC + what they can mint right now from Hub issuance).
+//
+// The signup welcome bonus lands as personal CRC (ERC1155), so it must be counted
+// here — otherwise a freshly-registered user with 48 CRC sees "0 dAMS" even though
+// those 48 are immediately redeemable. This mirrors buildClaimTxs()'s collateral.
 export function totalAvailableWei(s: UserState): bigint {
-	return s.damsDemurraged + s.mintable;
+	return s.damsDemurraged + s.damsErc1155 + s.personalCrc + s.mintable;
+}
+
+// Whole dAMS the claim batch could actually deliver right now — computed exactly
+// like buildClaimTxs() floors things, so the headline number and the "Redeem"
+// eligibility never disagree (never show N available then fail to deliver N).
+export function deliverableWholeDams(s: UserState): number {
+	const collateralWei = floorToWhole(s.personalCrc + s.mintable);
+	const wrapWei = floorToWhole(s.damsErc1155 + collateralWei);
+	const deliverableWei = s.damsDemurraged + wrapWei;
+	return Number(deliverableWei / ONE);
 }
 
 function floorToWhole(wei: bigint): bigint {

@@ -13,15 +13,27 @@ export interface Shop {
 	offer: Offer;
 }
 
-export const DEFAULT_OFFER: Offer = { amountDams: 100, discountEuro: 1, minPurchaseEuro: 10 };
+// The follow-up (returning-customer) offer, shown once the signup offer is used.
+export const DEFAULT_OFFER: Offer = { amountDams: 100, discountEuro: 1, minPurchaseEuro: 0 };
+
+// The one-time signup offer: 2€ off for 48 dAMS. Shown until the account makes its
+// first redemption, then it's replaced by the shop's follow-up offer (DEFAULT_OFFER,
+// 1€ off for 100 dAMS).
+export const SIGNUP_OFFER: Offer = { amountDams: 48, discountEuro: 2, minPurchaseEuro: 0 };
 
 const SEED_SHOPS: Shop[] = [
 	{
 		address: getAddress('0xb4b558FA01FDB4dd5D2F43134fe5012EAE675401'),
 		name: 'Sauvage Space Cafe',
-		offer: { amountDams: 100, discountEuro: 1, minPurchaseEuro: 10 }
+		offer: { amountDams: 100, discountEuro: 1, minPurchaseEuro: 0 }
 	}
 ];
+
+// Which offer is active for a shop given whether the customer is a first-timer.
+// First purchase → the 48-dAMS signup offer; afterwards → the shop's follow-up.
+export function activeOffer(shop: Shop, isFirstPurchase: boolean): Offer {
+	return isFirstPurchase ? SIGNUP_OFFER : shop.offer;
+}
 
 // Optional override without a code change: VITE_DAMS_SHOPS = JSON array of
 // { address, name, offer?: { amountDams, discountEuro, minPurchaseEuro } }.
@@ -62,7 +74,17 @@ export function resolveShop(address: Address): Shop {
 	);
 }
 
-// "1€ off for 100 dAMS when purchasing above 10€"
+// "1€ off for 100 dAMS on any purchase" (or "…when purchasing above 10€" if a
+// minimum is set). The one-time signup offer reads "on your first purchase" so it's
+// clear the bigger discount only applies once.
 export function offerSentence(o: Offer): string {
-	return `${o.discountEuro}€ off for ${o.amountDams} dAMS when purchasing above ${o.minPurchaseEuro}€`;
+	let tail: string;
+	if (o === SIGNUP_OFFER) {
+		tail = 'on your first purchase';
+	} else if (o.minPurchaseEuro > 0) {
+		tail = `when purchasing above ${o.minPurchaseEuro}€`;
+	} else {
+		tail = 'on any purchase';
+	}
+	return `${o.discountEuro}€ off for ${o.amountDams} dAMS ${tail}`;
 }
