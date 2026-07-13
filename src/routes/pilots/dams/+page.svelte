@@ -16,9 +16,10 @@
 		SHOPS,
 		resolveShop,
 		offerSentence,
-		activeOffer,
+		activeOffers,
 		SIGNUP_OFFER,
 		DEFAULT_OFFER,
+		SECOND_OFFER,
 		type Offer
 	} from './shops';
 	import { maxConvertibleToDams, buildBoostTxs } from './boost';
@@ -204,9 +205,17 @@
 	const connectedAddress = $derived(
 		wallet.connected && wallet.address ? (getAddress(wallet.address) as Address) : null
 	);
-	const offer = $derived<Offer>(
-		selectedShop ? offerFor(selectedShop) : firstPurchase ? SIGNUP_OFFER : DEFAULT_OFFER
+	// After the first redemption there are two offers to pick from (1€/100 and
+	// 2€/200); the index selects which one the Redeem button acts on.
+	let selectedOfferIdx = $state(0);
+	const offers = $derived<Offer[]>(
+		selectedShop
+			? offersFor(selectedShop)
+			: firstPurchase
+				? [SIGNUP_OFFER]
+				: [DEFAULT_OFFER, SECOND_OFFER]
 	);
+	const offer = $derived<Offer>(offers[Math.min(selectedOfferIdx, offers.length - 1)]);
 	// Balance comes straight from chain — never synthesized. It counts everything
 	// redeemable as dAMS: held dAMS, personal Circles convertible 1:1 via group-mint
 	// (this is where the 48-CRC signup bonus lives), and what's mintable right now.
@@ -228,10 +237,11 @@
 		return `${a}${n}${Math.floor(Math.random() * 90 + 10)}`;
 	}
 
-	function offerFor(shop: Address): Offer {
-		// Two-stage: first purchase → 48-dAMS signup offer, then the shop's follow-up.
-		const base = activeOffer(resolveShop(shop), firstPurchase);
-		return amountOverride ? { ...base, amountDams: amountOverride } : base;
+	function offersFor(shop: Address): Offer[] {
+		// Two-stage: first purchase → 48-dAMS signup offer, then the shop's follow-up
+		// offers. A ?amount= override collapses the list to one custom-amount offer.
+		const base = activeOffers(resolveShop(shop), firstPurchase);
+		return amountOverride ? [{ ...base[0], amountDams: amountOverride }] : base;
 	}
 
 	function isEnoughDeliver(s: UserState, shop: Address, amountDams: number): boolean {
@@ -644,6 +654,8 @@
 	// Resolve the selected shop's display name (config first, then profile).
 	$effect(() => {
 		const shop = selectedShop;
+		// Entering (or leaving) a shop always starts back at the first offer.
+		selectedOfferIdx = 0;
 		if (!shop) {
 			shopName = null;
 			return;
@@ -775,22 +787,47 @@
 					</div>
 				</div>
 				<h1 class="display sm">{shopName ?? shortAddress(selectedShop)}</h1>
-				<div class="card offer">
-					{#if firstPurchase}
-						<span class="offer-badge">Welcome offer</span>
-					{/if}
-					<p class="offer-big">{offer.discountEuro}€ off</p>
-					<p class="offer-sub">
-						for <strong>{offer.amountDams} dAMS</strong>
+				{#if offers.length > 1}
+					<!-- Follow-up stage: two offers to pick from — tap a card to select. -->
+					<div class="offer-select" role="radiogroup" aria-label="Choose an offer">
+						{#each offers as o, i (o.amountDams)}
+							<button
+								class="card offer selectable"
+								class:selected={i === selectedOfferIdx}
+								role="radio"
+								aria-checked={i === selectedOfferIdx}
+								onclick={() => (selectedOfferIdx = i)}
+							>
+								<p class="offer-big">{o.discountEuro}€ off</p>
+								<p class="offer-sub">
+									for <strong>{o.amountDams} dAMS</strong>
+									{#if o.minPurchaseEuro > 0}
+										when purchasing above {o.minPurchaseEuro}€
+									{:else}
+										on any purchase
+									{/if}
+								</p>
+							</button>
+						{/each}
+					</div>
+				{:else}
+					<div class="card offer">
 						{#if firstPurchase}
-							on your first purchase
-						{:else if offer.minPurchaseEuro > 0}
-							when purchasing above {offer.minPurchaseEuro}€
-						{:else}
-							on any purchase
+							<span class="offer-badge">Welcome offer</span>
 						{/if}
-					</p>
-				</div>
+						<p class="offer-big">{offer.discountEuro}€ off</p>
+						<p class="offer-sub">
+							for <strong>{offer.amountDams} dAMS</strong>
+							{#if firstPurchase}
+								on your first purchase
+							{:else if offer.minPurchaseEuro > 0}
+								when purchasing above {offer.minPurchaseEuro}€
+							{:else}
+								on any purchase
+							{/if}
+						</p>
+					</div>
+				{/if}
 
 				<div class="actions">
 					<button class="btn-primary" disabled={claiming || !enough} onclick={handleRedeem}>
@@ -847,7 +884,9 @@
 								<button class="shop-row" onclick={() => (selectedShop = s.address)}>
 									<span>
 										<span class="shop-name">{s.name}</span>
-										<span class="shop-offer">{offerSentence(activeOffer(s, firstPurchase))}</span>
+										{#each activeOffers(s, firstPurchase) as o (o.amountDams)}
+											<span class="shop-offer">{offerSentence(o)}</span>
+										{/each}
 									</span>
 									<span class="chev" aria-hidden="true">›</span>
 								</button>
@@ -1353,6 +1392,7 @@
 		margin: 0;
 	}
 	.shop-offer {
+		display: block;
 		margin: 2px 0 0;
 		font-size: 0.88rem;
 		color: #76cd9c;
@@ -1434,6 +1474,37 @@
 	.offer-sub {
 		margin: 4px 0 0;
 		color: rgba(255, 255, 255, 0.8);
+	}
+
+	/* Follow-up stage: two offers side by side, tap to pick one. */
+	.offer-select {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 12px;
+		width: 100%;
+		margin-top: 18px;
+	}
+	.offer.selectable {
+		margin-top: 0;
+		padding: 18px 12px;
+		color: inherit;
+		font: inherit;
+		cursor: pointer;
+		opacity: 0.75;
+		transition:
+			opacity 0.15s ease,
+			border-color 0.15s ease;
+	}
+	.offer.selectable .offer-big {
+		font-size: 1.6rem;
+	}
+	.offer.selectable .offer-sub {
+		font-size: 0.88rem;
+	}
+	.offer.selectable.selected {
+		opacity: 1;
+		border-color: #76cd9c;
+		box-shadow: 0 0 0 1px #76cd9c inset;
 	}
 
 	/* Countdown */

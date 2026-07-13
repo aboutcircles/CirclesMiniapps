@@ -16,9 +16,13 @@ export interface Shop {
 // The follow-up (returning-customer) offer, shown once the signup offer is used.
 export const DEFAULT_OFFER: Offer = { amountDams: 100, discountEuro: 1, minPurchaseEuro: 0 };
 
+// The bigger follow-up offer, shown alongside DEFAULT_OFFER after the first
+// redemption: 2€ off for 200 dAMS.
+export const SECOND_OFFER: Offer = { amountDams: 200, discountEuro: 2, minPurchaseEuro: 0 };
+
 // The one-time signup offer: 2€ off for 48 dAMS. Shown until the account makes its
-// first redemption, then it's replaced by the shop's follow-up offer (DEFAULT_OFFER,
-// 1€ off for 100 dAMS).
+// first redemption, then it's replaced by the follow-up offers (1€ off for 100 dAMS
+// and 2€ off for 200 dAMS).
 export const SIGNUP_OFFER: Offer = { amountDams: 48, discountEuro: 2, minPurchaseEuro: 0 };
 
 const SEED_SHOPS: Shop[] = [
@@ -29,10 +33,11 @@ const SEED_SHOPS: Shop[] = [
 	}
 ];
 
-// Which offer is active for a shop given whether the customer is a first-timer.
-// First purchase → the 48-dAMS signup offer; afterwards → the shop's follow-up.
-export function activeOffer(shop: Shop, isFirstPurchase: boolean): Offer {
-	return isFirstPurchase ? SIGNUP_OFFER : shop.offer;
+// Which offers are active for a shop given whether the customer is a first-timer.
+// First purchase → only the 48-dAMS signup offer; afterwards → the shop's
+// follow-up plus the bigger 200-dAMS deal.
+export function activeOffers(shop: Shop, isFirstPurchase: boolean): Offer[] {
+	return isFirstPurchase ? [SIGNUP_OFFER] : [shop.offer, SECOND_OFFER];
 }
 
 // Optional override without a code change: VITE_DAMS_SHOPS = JSON array of
