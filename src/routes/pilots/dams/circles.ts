@@ -12,6 +12,7 @@ import {
 	http,
 	encodeFunctionData,
 	getAddress,
+	parseAbiItem,
 	type Address,
 	type Hex
 } from 'viem';
@@ -119,6 +120,65 @@ function toTokenId(avatar: Address): bigint {
 
 export function publicClient() {
 	return createPublicClient({ chain: gnosis, transport: http(CIRCLES_RPC) });
+}
+
+// ---- On-chain redemption history --------------------------------------------
+// Every redemption (in every version of this pilot) pays the shop with a plain
+// dAMS-ERC20 `transfer`, so the token's Transfer logs are the durable record of
+// who redeemed what — it survives new devices and cleared storage, unlike the
+// localStorage order cache. Transfers to the zero address are unwrap burns and
+// never match a shop filter.
+
+// The dAMS ERC20 deployment block (2026-03-09); no transfers exist before it.
+const DAMS_ERC20_DEPLOY_BLOCK = 45066513n;
+// rpc.aboutcircles.com cancels wide eth_getLogs queries with a timeout; the
+// public Gnosis RPC answers them fine, so history reads go there.
+const LOGS_RPC = 'https://rpc.gnosischain.com';
+
+const transferEvent = parseAbiItem(
+	'event Transfer(address indexed from, address indexed to, uint256 value)'
+);
+
+export interface ShopPayment {
+	shop: Address;
+	amountWei: bigint;
+	txHash: string;
+	at: number; // block timestamp, epoch ms
+}
+
+// All dAMS the user ever paid to one of `shops`, newest first.
+export async function fetchShopPayments(
+	user: Address,
+	shops: Address[]
+): Promise<ShopPayment[]> {
+	const client = createPublicClient({ chain: gnosis, transport: http(LOGS_RPC) });
+	const logs = await client.getLogs({
+		address: DAMS_ERC20,
+		event: transferEvent,
+		args: { from: user },
+		fromBlock: DAMS_ERC20_DEPLOY_BLOCK,
+		toBlock: 'latest'
+	});
+	const wanted = new Set(shops.map((s) => s.toLowerCase()));
+	const hits = logs.filter((l) => l.args.to && wanted.has(l.args.to.toLowerCase()));
+	// One timestamp lookup per unique block (redemptions are few).
+	const blockNums = [...new Set(hits.map((l) => l.blockNumber))];
+	const times = new Map(
+		await Promise.all(
+			blockNums.map(async (bn) => {
+				const b = await client.getBlock({ blockNumber: bn });
+				return [bn, Number(b.timestamp) * 1000] as const;
+			})
+		)
+	);
+	return hits
+		.map((l) => ({
+			shop: getAddress(l.args.to!),
+			amountWei: l.args.value!,
+			txHash: l.transactionHash,
+			at: times.get(l.blockNumber) ?? 0
+		}))
+		.sort((a, b) => b.at - a.at);
 }
 
 export interface UserState {

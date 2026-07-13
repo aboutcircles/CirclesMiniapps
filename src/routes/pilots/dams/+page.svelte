@@ -8,6 +8,7 @@
 		buildClaimTxs,
 		deliverableWholeDams,
 		fetchProfileName,
+		fetchShopPayments,
 		shortAddress,
 		ONE,
 		type UserState
@@ -23,7 +24,14 @@
 		type Offer
 	} from './shops';
 	import { maxConvertibleToDams, buildBoostTxs } from './boost';
-	import { addOrder, readOrders, isFirstPurchase, type Order } from './orders';
+	import {
+		addOrder,
+		readOrders,
+		writeOrders,
+		mergeOrders,
+		isFirstPurchase,
+		type Order
+	} from './orders';
 
 	// Server (service EOA) that adds new users to the Circles Amsterdam group so
 	// they can mint dAMS. Defaults to the deployed pilot endpoint; override with
@@ -569,12 +577,10 @@
 		accountAlreadyCreated = hasCreatedAccount();
 
 		// ----- PWA install wiring -----
-		// Point the installable app at this pilot ("Circles Amsterdam") instead of
-		// the generic app-wide manifest, and colour the standalone chrome purple.
+		// The pilot's own manifest link is prerendered by the root layout (a JS
+		// swap here came too late for install-time evaluation and pinned the
+		// Miniapps manifest to the shortcut). Only the chrome colour is set here.
 		try {
-			document
-				.querySelectorAll('link[rel="manifest"]')
-				.forEach((el) => el.setAttribute('href', '/pilots/dams.webmanifest'));
 			const themeMeta = document.querySelector('meta[name="theme-color"]');
 			if (themeMeta) themeMeta.setAttribute('content', '#4428d4');
 		} catch {
@@ -641,10 +647,39 @@
 		const a = connectedAddress;
 		if (a && a !== loadedFor) {
 			loadedFor = a;
-			// Rehydrate this account's history + offer stage from local storage.
+			// Rehydrate this account's history + offer stage from local storage for an
+			// instant render; the on-chain read below corrects it.
 			orders = readOrders(a);
 			firstPurchase = orders.length === 0;
 			receipt = orders[0] ?? null;
+			// The durable truth is on-chain: dAMS transfers to shop addresses. This
+			// survives new devices and cleared storage, and recognizes redemptions
+			// made before local history existed — so the welcome offer can't be
+			// claimed twice just because localStorage is fresh.
+			fetchShopPayments(
+				a,
+				SHOPS.map((s) => s.address)
+			)
+				.then((pays) => {
+					if (loadedFor !== a) return; // account changed while fetching
+					const chainOrders: Order[] = pays.map((p) => ({
+						amount: Math.round(Number(p.amountWei) / 1e18),
+						shop: p.shop,
+						shopName: resolveShop(p.shop).name,
+						offerLabel:
+							Math.round(Number(p.amountWei) / 1e18) === SIGNUP_OFFER.amountDams
+								? 'Welcome offer'
+								: 'Follow-up offer',
+						txHash: p.txHash,
+						at: p.at
+					}));
+					orders = mergeOrders(readOrders(a), chainOrders);
+					writeOrders(a, orders);
+					firstPurchase = orders.length === 0;
+				})
+				.catch(() => {
+					/* RPC down/offline — the local cache keeps working */
+				});
 			loadState(a).then((s) => {
 				if (!s.isMember) ensureMembership(a).then(() => loadState(a));
 			});

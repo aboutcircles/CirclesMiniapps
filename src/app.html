@@ -23,7 +23,8 @@
 		<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
 		<link rel="icon" type="image/svg+xml" href="/circles-token.svg" />
 		<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-		<link rel="manifest" href="/manifest.webmanifest" />
+		<!-- The web-app manifest is emitted per page by the root layout so pilot
+		     pages (e.g. /pilots/dams) install as their own app, not as Miniapps. -->
 		<meta name="theme-color" content="#0e00a8" />
 		%sveltekit.head%
 	</head>

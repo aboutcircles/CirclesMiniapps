@@ -39,12 +39,35 @@ export function readOrders(addr: string): Order[] {
 // Prepend a new order; returns the updated (newest-first) list.
 export function addOrder(addr: string, order: Order): Order[] {
 	const next = [order, ...readOrders(addr)];
+	writeOrders(addr, next);
+	return next;
+}
+
+export function writeOrders(addr: string, orders: Order[]) {
 	try {
-		localStorage.setItem(ordersKey(addr), JSON.stringify(next));
+		localStorage.setItem(ordersKey(addr), JSON.stringify(orders));
 	} catch {
 		/* ignore quota/serialization errors — history is best-effort */
 	}
-	return next;
+}
+
+// Merge the on-chain history (the durable truth) with the local cache. Local
+// entries survive only when nothing on-chain matches them — a redemption's
+// local txHash can be the Safe user-op hash rather than the mined tx hash, so
+// dedup also matches by shop + amount within a 20-minute window.
+export function mergeOrders(local: Order[], chain: Order[]): Order[] {
+	const merged = [...chain];
+	for (const o of local) {
+		const dup = chain.some(
+			(c) =>
+				c.txHash === o.txHash ||
+				(c.shop.toLowerCase() === o.shop.toLowerCase() &&
+					c.amount === o.amount &&
+					Math.abs(c.at - o.at) < 20 * 60_000)
+		);
+		if (!dup) merged.push(o);
+	}
+	return merged.sort((a, b) => b.at - a.at);
 }
 
 // True until the account has redeemed at least once (drives the signup offer).
