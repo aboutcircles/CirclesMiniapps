@@ -117,6 +117,11 @@
 	// The signup welcome offer: 48 dAMS, per the pilot spec.
 	const SIGNUP_BONUS_DAMS = 48;
 	let accountAlreadyCreated = $state(false);
+	// True only when THIS device created the account (the localStorage flag is set
+	// exclusively during signup — the ?registered=1 URL marker doesn't count).
+	// Users who log in with "I already have an account" never see the welcome
+	// offer: it's reserved for fresh signups that haven't redeemed yet.
+	let signupDevice = $state(false);
 
 	// ----- Conditions of Participation (Pilot Terms) -----
 	// Acceptance is stored per terms version (the date at the top of the terms);
@@ -207,19 +212,32 @@
 		}
 		markRegisteredInUrl();
 		accountAlreadyCreated = true;
+		signupDevice = true;
+	}
+
+	function createdAccountLocally(): boolean {
+		try {
+			return localStorage.getItem(ACCOUNT_CREATED_KEY) === '1';
+		} catch {
+			return false;
+		}
 	}
 
 	// ----- Derived -----
 	const connectedAddress = $derived(
 		wallet.connected && wallet.address ? (getAddress(wallet.address) as Address) : null
 	);
-	// After the first redemption there are two offers to pick from (1€/100 and
+	// The welcome offer shows only while the account has never redeemed AND was
+	// created on this device — logging in with an existing account goes straight
+	// to the follow-up offers.
+	const welcomeStage = $derived(firstPurchase && signupDevice);
+	// Past the welcome stage there are two offers to pick from (1€/100 and
 	// 2€/200); the index selects which one the Redeem button acts on.
 	let selectedOfferIdx = $state(0);
 	const offers = $derived<Offer[]>(
 		selectedShop
 			? offersFor(selectedShop)
-			: firstPurchase
+			: welcomeStage
 				? [SIGNUP_OFFER]
 				: [DEFAULT_OFFER, SECOND_OFFER]
 	);
@@ -246,9 +264,9 @@
 	}
 
 	function offersFor(shop: Address): Offer[] {
-		// Two-stage: first purchase → 48-dAMS signup offer, then the shop's follow-up
+		// Two-stage: welcome stage → 48-dAMS signup offer, then the shop's follow-up
 		// offers. A ?amount= override collapses the list to one custom-amount offer.
-		const base = activeOffers(resolveShop(shop), firstPurchase);
+		const base = activeOffers(resolveShop(shop), welcomeStage);
 		return amountOverride ? [{ ...base[0], amountDams: amountOverride }] : base;
 	}
 
@@ -415,8 +433,8 @@
 				amount,
 				shop,
 				shopName: resolveShop(shop).name,
-				// `firstPurchase` is still true here — it's flipped after addOrder below.
-				offerLabel: firstPurchase ? 'Welcome offer' : 'Follow-up offer',
+				// `welcomeStage` is still true here — orders flip it after addOrder below.
+				offerLabel: welcomeStage ? 'Welcome offer' : 'Follow-up offer',
 				txHash: String(hash),
 				at: Date.now()
 			};
@@ -575,6 +593,7 @@
 		if (amt && Number(amt) > 0) amountOverride = Number(amt);
 
 		accountAlreadyCreated = hasCreatedAccount();
+		signupDevice = createdAccountLocally();
 
 		// ----- PWA install wiring -----
 		// The pilot's own manifest link is prerendered by the root layout (a JS
@@ -847,13 +866,13 @@
 					</div>
 				{:else}
 					<div class="card offer">
-						{#if firstPurchase}
+						{#if welcomeStage}
 							<span class="offer-badge">Welcome offer</span>
 						{/if}
 						<p class="offer-big">{offer.discountEuro}€ off</p>
 						<p class="offer-sub">
 							for <strong>{offer.amountDams} dAMS</strong>
-							{#if firstPurchase}
+							{#if welcomeStage}
 								on your first purchase
 							{:else if offer.minPurchaseEuro > 0}
 								when purchasing above {offer.minPurchaseEuro}€
@@ -919,9 +938,8 @@
 								<button class="shop-row" onclick={() => (selectedShop = s.address)}>
 									<span>
 										<span class="shop-name">{s.name}</span>
-										{#each activeOffers(s, firstPurchase) as o (o.amountDams)}
-											<span class="shop-offer">{offerSentence(o)}</span>
-										{/each}
+										<!-- Just the headline deal — the full choice opens on the shop screen. -->
+										<span class="shop-offer">{offerSentence(activeOffers(s, welcomeStage)[0])}</span>
 									</span>
 									<span class="chev" aria-hidden="true">›</span>
 								</button>
