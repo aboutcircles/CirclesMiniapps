@@ -909,25 +909,39 @@
 
 				<div class="block">
 					<h2 class="eyebrow">Available offers</h2>
-					<!-- Signed-in home shows just the shop's headline follow-up deal (the
-					     welcome-offer pitch lives on the logged-out landing page); the full
-					     choice — including the welcome offer when still unused — opens on
-					     the shop screen. -->
-					<ul class="shop-list">
-						{#each SHOPS as s (s.address)}
-							<li>
-								<button class="shop-row" onclick={() => (selectedShop = s.address)}>
-									<span>
-										<span class="shop-name">{s.name}</span>
-										<span class="shop-offer"
-											>{s.offer.discountEuro}€ off for {s.offer.amountDams} dAMS</span
-										>
-									</span>
-									<span class="chev" aria-hidden="true">›</span>
-								</button>
-							</li>
-						{/each}
-					</ul>
+					{#if offersPending}
+						<!-- Don't flash a possibly-outdated offer while the on-chain history
+						     check is still running. -->
+						<div class="offers-loading">
+							<div class="spinner"></div>
+							<p class="muted small">Checking your offers…</p>
+						</div>
+					{:else}
+						<!-- One line per shop, matching the offer that's actually active:
+						     the welcome offer while unused, else the headline follow-up.
+						     The full choice opens on the shop screen. -->
+						<ul class="shop-list">
+							{#each SHOPS as s (s.address)}
+								<li>
+									<button class="shop-row" onclick={() => (selectedShop = s.address)}>
+										<span>
+											<span class="shop-name">{s.name}</span>
+											{#if welcomeStage}
+												<span class="shop-offer"
+													>{SIGNUP_OFFER.discountEuro}€ off on welcome offer</span
+												>
+											{:else}
+												<span class="shop-offer"
+													>{s.offer.discountEuro}€ off for {s.offer.amountDams} dAMS</span
+												>
+											{/if}
+										</span>
+										<span class="chev" aria-hidden="true">›</span>
+									</button>
+								</li>
+							{/each}
+						</ul>
+					{/if}
 				</div>
 			</section>
 		{/if}
