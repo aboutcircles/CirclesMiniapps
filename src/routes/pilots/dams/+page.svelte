@@ -600,9 +600,12 @@
 				loadState(getAddress(wallet.address) as Address);
 			}
 		}, 1000);
+		// Keep the displayed balance fresh: re-read the on-chain state every few
+		// seconds while signed in (a handful of cheap eth_calls; the heavier
+		// pathfinder amount refreshes on events — connect, membership, spends).
 		const refresh = setInterval(() => {
 			if (wallet.connected && wallet.address) loadState(getAddress(wallet.address) as Address);
-		}, 60_000);
+		}, 3_500);
 		return () => {
 			clearInterval(tick);
 			clearInterval(refresh);
@@ -746,8 +749,11 @@
 								<div class="coin coin-sm"></div>
 								<div class="shop-card-text">
 									<p class="shop-name">{s.name}</p>
-									<p class="shop-offer">{SIGNUP_OFFER.discountEuro}€ off on welcome offer</p>
-									<p class="shop-offer">{s.offer.discountEuro}€ off for {s.offer.amountDams} dAMS</p>
+									<p class="shop-offer">{SIGNUP_OFFER.discountEuro}€ off on signup</p>
+									<p class="shop-offer">
+										{s.offer.discountEuro}€ off for {s.offer.amountDams} dAMS or {SECOND_OFFER.discountEuro}€
+										off for {SECOND_OFFER.amountDams} dAMS
+									</p>
 								</div>
 							</div>
 						{/each}
@@ -935,13 +941,12 @@
 										<span>
 											<span class="shop-name">{s.name}</span>
 											{#if welcomeStage}
-												<span class="shop-offer"
-													>{SIGNUP_OFFER.discountEuro}€ off on welcome offer</span
-												>
+												<span class="shop-offer">{SIGNUP_OFFER.discountEuro}€ off on signup</span>
 											{:else}
-												<span class="shop-offer"
-													>{s.offer.discountEuro}€ off for {s.offer.amountDams} dAMS</span
-												>
+												<span class="shop-offer">
+													{s.offer.discountEuro}€ off for {s.offer.amountDams} dAMS or {SECOND_OFFER.discountEuro}€
+													off for {SECOND_OFFER.amountDams} dAMS
+												</span>
 											{/if}
 										</span>
 										<span class="chev" aria-hidden="true">›</span>
@@ -976,16 +981,10 @@
 						<span>When</span>
 						<strong>{new Date(receipt.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>
 					</div>
-					<div class="rrow">
-						<span>Tx</span>
-						<a href={`https://gnosisscan.io/tx/${receipt.txHash}`} target="_blank" rel="noreferrer"
-							>{shortAddress(receipt.txHash)}</a
-						>
-					</div>
 				</div>
 				<p class="muted small">Show this to the cashier to claim your discount.</p>
 			</div>
-			<button class="btn-secondary wide" onclick={closeReceipt}>Done</button>
+			<button class="btn-secondary receipt-done" onclick={closeReceipt}>Done</button>
 		</div>
 	{/if}
 
@@ -1432,10 +1431,10 @@
 		color: rgba(255, 255, 255, 0.8);
 	}
 
-	/* Follow-up stage: two offers side by side, tap to pick one. */
+	/* Follow-up stage: the two offers stack as full-width rows, tap to pick one. */
 	.offer-select {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: 1fr;
 		gap: 12px;
 		width: 100%;
 		margin-top: 18px;
@@ -1619,6 +1618,11 @@
 		backdrop-filter: blur(6px);
 		padding: 24px;
 	}
+	/* Contained, centered — not a full-width bar. */
+	.receipt-done {
+		align-self: center;
+		min-width: 180px;
+	}
 	.receipt-body {
 		flex: 1;
 		display: flex;
@@ -1670,11 +1674,6 @@
 		color: rgba(255, 255, 255, 0.55);
 		font-size: 0.9rem;
 	}
-	.rrow a {
-		color: #76cd9c;
-		text-decoration: underline dotted;
-	}
-
 	/* Account menu */
 	.menu-backdrop {
 		position: fixed;
@@ -1686,7 +1685,9 @@
 	.menu {
 		position: fixed;
 		top: 70px;
-		right: 22px;
+		/* Stay inside the app column (max-width 460px, centered) instead of
+		   hugging the viewport's right edge on wide screens. */
+		right: max(22px, calc((100vw - 460px) / 2 + 22px));
 		z-index: 41;
 		width: 220px;
 		background: #3a2aaf;
