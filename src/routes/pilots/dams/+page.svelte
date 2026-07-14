@@ -208,13 +208,12 @@
 	//   pathfinder graph lags the chain, so right after a spend it still reports
 	//   the old routable amount — without the clamp the main page kept showing
 	//   the pre-purchase balance.
-	// - For DISPLAY, tolerate the ~1e-6 the pathfinder shaves off (demurrage
-	//   projection: an exact 48 reads as 47.999952) before flooring, so the
-	//   signup bonus shows as 48. Eligibility uses the untolerated floor so
-	//   "Redeem" never promises more than the pathfinder can actually route.
+	// - Tolerate the ~1e-6 the pathfinder shaves off (demurrage projection: an
+	//   exact 48 reads as 47.999952) before flooring, so the signup bonus shows
+	//   as 48. Eligibility uses the same tolerant number; at redeem the dust the
+	//   pathfinder can't route (≤0.01 dAMS) is shaved off the transfer.
 	const personalWhole = $derived(userState ? Math.floor(Number(userState.personalCrc) / 1e18) : 0);
 	const convertibleShown = $derived(Math.min(Math.floor(convertibleRaw * 1.0005), personalWhole));
-	const convertibleReal = $derived(Math.min(Math.floor(convertibleRaw), personalWhole));
 	const availableWhole = $derived(
 		(userState ? deliverableWholeDams(userState) : 0) + convertibleShown
 	);
@@ -252,8 +251,10 @@
 
 	function isEnoughDeliver(s: UserState, shop: Address, amountDams: number): boolean {
 		const amountWei = BigInt(amountDams) * ONE;
-		// Untolerated pathfinder capacity — what the shortfall txs can actually route.
-		const extraWei = BigInt(convertibleReal) * ONE;
+		// Tolerant capacity, matching the displayed balance — never say "Almost
+		// there" while the ball shows enough. The dust the pathfinder can't route
+		// (≤ DUST_WEI) is shaved off the transfer at redeem instead of failing.
+		const extraWei = BigInt(convertibleShown) * ONE;
 		return buildClaimTxs(shop, s, shop, amountWei).deliverableErc20 + extraWei >= amountWei;
 	}
 
@@ -404,21 +405,32 @@
 			const s = await loadState(a);
 			if (!s.isMember) await ensureMembership(a);
 			const amountWei = BigInt(amount) * ONE;
-			let plan = buildClaimTxs(a, s, shop, amountWei);
+			let payWei = amountWei;
+			let plan = buildClaimTxs(a, s, shop, payWei);
 			let boostTxs: typeof plan.txs = [];
-			if (plan.deliverableErc20 < amountWei) {
+			if (plan.deliverableErc20 < payWei) {
 				// Held dAMS + fresh issuance don't cover the offer — route the shortfall
 				// from the user's own personal CRC via the pathfinder (this is how the
 				// 48-CRC signup bonus pays for the welcome offer). The pathfinder txs run
 				// first and deliver demurraged ERC20, so the claim batch is re-planned as
 				// if that ERC20 were already held.
-				const shortfallWei = amountWei - plan.deliverableErc20;
+				let shortfallWei = payWei - plan.deliverableErc20;
+				// The pathfinder routes a hair less than the nominal bonus (demurrage:
+				// 48 reads as 47.9999… on day 0, 47.99… after a day). Neglect that dust:
+				// cap the request at what's actually routable and shave the difference
+				// off the transfer, rather than failing the whole redemption.
+				const DUST_WEI = ONE / 100n; // 0.01 dAMS
+				const routableWei = await maxConvertibleToDams(a);
+				if (routableWei < shortfallWei && shortfallWei - routableWei <= DUST_WEI) {
+					payWei -= shortfallWei - routableWei;
+					shortfallWei = routableWei;
+				}
 				boostTxs = await buildBoostTxs(a, shortfallWei);
 				plan = buildClaimTxs(
 					a,
 					{ ...s, damsDemurraged: s.damsDemurraged + shortfallWei },
 					shop,
-					amountWei
+					payWei
 				);
 			}
 			const hash = await wallet.sendTransactions([...boostTxs, ...plan.txs]);
@@ -1159,8 +1171,12 @@
 		color: #f26e2e;
 	}
 	.iconbtn {
-		display: grid;
-		place-items: center;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		/* iOS Safari applies default button padding asymmetrically, nudging the
+		   icon off-centre — zero it and let flex do the centering. */
+		padding: 0;
 		width: 36px;
 		height: 36px;
 		border-radius: 999px;
@@ -1168,6 +1184,9 @@
 		background: transparent;
 		color: rgba(255, 255, 255, 0.85);
 		cursor: pointer;
+	}
+	.iconbtn svg {
+		display: block;
 	}
 	.avatar {
 		width: 40px;
