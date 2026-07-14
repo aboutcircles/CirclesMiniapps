@@ -76,14 +76,19 @@ export async function maxConvertibleToDams(user: Address): Promise<bigint> {
 }
 
 // Build the path that mints `amountWei` dAMS to the user from their own personal
-// CRC only. The DEMURRAGE_MINT_DATA payload makes the mint handler return it as
-// demurraged ERC20 directly.
-export async function buildBoostTxs(user: Address, amountWei: bigint): Promise<Transaction[]> {
+// CRC only. By default the DEMURRAGE_MINT_DATA payload makes the mint handler
+// return demurraged ERC20; pass `erc1155: true` to receive plain group ERC1155
+// instead (used by the send-to-org flow, which transfers 1155).
+export async function buildBoostTxs(
+	user: Address,
+	amountWei: bigint,
+	opts?: { erc1155?: boolean }
+): Promise<Transaction[]> {
 	const sink = await mintHandler();
 	const pathTxs = (await transferBuilder.constructAdvancedTransfer(user, sink, amountWei, {
 		useWrappedBalances: true,
 		fromTokens: [user],
-		txData: hexToBytes(DEMURRAGE_MINT_DATA)
+		...(opts?.erc1155 ? {} : { txData: hexToBytes(DEMURRAGE_MINT_DATA) })
 	})) as Array<{ to: string; data?: string; value?: bigint }>;
 
 	return pathTxs.map((tx) => ({ to: tx.to, data: tx.data, value: tx.value?.toString() }));

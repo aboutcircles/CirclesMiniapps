@@ -55,6 +55,19 @@ const hubAbi = [
 	},
 	{
 		type: 'function',
+		name: 'safeTransferFrom',
+		inputs: [
+			{ name: '_from', type: 'address' },
+			{ name: '_to', type: 'address' },
+			{ name: '_id', type: 'uint256' },
+			{ name: '_value', type: 'uint256' },
+			{ name: '_data', type: 'bytes' }
+		],
+		outputs: [],
+		stateMutability: 'nonpayable'
+	},
+	{
+		type: 'function',
 		name: 'wrap',
 		inputs: [
 			{ name: '_avatar', type: 'address' },
@@ -109,6 +122,13 @@ const erc20Abi = [
 			{ name: 'amount', type: 'uint256' }
 		],
 		outputs: [{ type: 'bool' }],
+		stateMutability: 'nonpayable'
+	},
+	{
+		type: 'function',
+		name: 'unwrap',
+		inputs: [{ name: '_amount', type: 'uint256' }],
+		outputs: [],
 		stateMutability: 'nonpayable'
 	}
 ] as const;
@@ -356,6 +376,81 @@ export function buildClaimTxs(
 export function isEnough(s: UserState, shop: Address, amountDams: number): boolean {
 	const amountWei = BigInt(amountDams) * ONE;
 	return buildClaimTxs(shop, s, shop, amountWei).deliverableErc20 >= amountWei;
+}
+
+// ---- Sending to the org ------------------------------------------------------
+// Manual transfers to the org travel as GROUP ERC1155 tokens (Hub
+// safeTransferFrom), deliberately NOT as the dAMS ERC20 that offer redemptions
+// use: the redemption history and the first-purchase stage are derived from the
+// ERC20 Transfer logs, so 1155 sends stay naturally invisible to them.
+
+export interface SendGather {
+	txs: Transaction[];
+	// What these txs can't source directly — the caller covers it with
+	// pathfinder txs (boost.ts, ERC1155 mode) placed before the final transfer.
+	shortfallWei: bigint;
+}
+
+// Gather `amountWei` of group ERC1155 in the user's wallet: held group tokens
+// first, then fresh issuance via personalMint + groupMint, then unwrapping held
+// dAMS ERC20. Whatever remains is returned as the pathfinder shortfall.
+export function buildSendGatherTxs(user: Address, s: UserState, amountWei: bigint): SendGather {
+	const txs: Transaction[] = [];
+	let need = amountWei;
+
+	// Held group 1155 needs no tx — it just reduces what must be gathered.
+	const have1155 = floorToWhole(s.damsErc1155);
+	need -= need < have1155 ? need : have1155;
+
+	if (s.mintable > 0n) {
+		txs.push({
+			to: HUB_V2,
+			data: encodeFunctionData({ abi: hubAbi, functionName: 'personalMint', args: [] })
+		});
+	}
+	const collWei = (() => {
+		const avail = floorToWhole(s.mintable);
+		return need < avail ? need : avail;
+	})();
+	if (collWei > 0n) {
+		txs.push({
+			to: HUB_V2,
+			data: encodeFunctionData({
+				abi: hubAbi,
+				functionName: 'groupMint',
+				args: [GROUP, [user], [collWei], '0x' as Hex]
+			})
+		});
+		need -= collWei;
+	}
+
+	if (need > 0n && s.damsDemurraged > 0n) {
+		// Same drift buffer as the claim batch: held ERC20 demurrages slightly
+		// between read and execution.
+		const usable20 = s.damsDemurraged - s.damsDemurraged / 50_000n;
+		const unwrapWei = need < usable20 ? need : usable20;
+		if (unwrapWei > 0n) {
+			txs.push({
+				to: DAMS_ERC20,
+				data: encodeFunctionData({ abi: erc20Abi, functionName: 'unwrap', args: [unwrapWei] })
+			});
+			need -= unwrapWei;
+		}
+	}
+
+	return { txs, shortfallWei: need };
+}
+
+// The final hop of a send: move `amountWei` of group ERC1155 to the org.
+export function transferGroup1155Tx(user: Address, to: Address, amountWei: bigint): Transaction {
+	return {
+		to: HUB_V2,
+		data: encodeFunctionData({
+			abi: hubAbi,
+			functionName: 'safeTransferFrom',
+			args: [user, to, toTokenId(GROUP), amountWei, '0x' as Hex]
+		})
+	};
 }
 
 // ---- Profiles -------------------------------------------------------------
