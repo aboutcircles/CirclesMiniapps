@@ -1675,8 +1675,11 @@
 	}
 	/* Contained, centered — not a full-width bar. */
 	.receipt-done {
+		/* btn-secondary is width:100% — contain this one instead. */
+		width: auto;
 		align-self: center;
 		min-width: 180px;
+		padding: 0 36px;
 	}
 	.receipt-body {
 		flex: 1;
