@@ -433,8 +433,16 @@
 			// the offer flips from the 48-dAMS signup deal to the 100-dAMS follow-up.
 			orders = addOrder(a, data);
 			firstPurchase = isFirstPurchase(a);
-			await loadState(a);
-			refreshConvertible(a);
+			// Reload the balance until the redemption is reflected — an immediate
+			// read often still sees pre-transaction state (RPC/indexer lag), which
+			// left the ball showing the old number until the minute refresh.
+			const before = availableWhole;
+			for (let i = 0; i < 6; i++) {
+				await loadState(a);
+				await refreshConvertible(a);
+				if (availableWhole !== before) break;
+				await new Promise((r) => setTimeout(r, 2500));
+			}
 		} catch (e: any) {
 			const m = e?.message ?? 'Payment failed.';
 			errorMsg = /reject|cancel|denied|rejected/i.test(m) ? 'Payment cancelled.' : m;
