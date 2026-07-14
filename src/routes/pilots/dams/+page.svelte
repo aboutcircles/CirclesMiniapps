@@ -213,7 +213,16 @@
 	//   as 48. Eligibility uses the same tolerant number; at redeem the dust the
 	//   pathfinder can't route (≤0.01 dAMS) is shaved off the transfer.
 	const personalWhole = $derived(userState ? Math.floor(Number(userState.personalCrc) / 1e18) : 0);
-	const convertibleShown = $derived(Math.min(Math.floor(convertibleRaw * 1.0005), personalWhole));
+	// For established accounts (registered + group member) trust the chain over
+	// the pathfinder: right after signup the pathfinder's graph hasn't indexed
+	// the fresh trust yet and reports 0 routable — showing 0 (or needing a
+	// reload) for an account that visibly holds its 48-CRC bonus is wrong. The
+	// pathfinder number still rules for non-members, where trust limits bite.
+	const convertibleShown = $derived(
+		userState?.isMember && userState.registered
+			? personalWhole
+			: Math.min(Math.floor(convertibleRaw * 1.0005), personalWhole)
+	);
 	const availableWhole = $derived(
 		(userState ? deliverableWholeDams(userState) : 0) + convertibleShown
 	);
@@ -438,6 +447,10 @@
 				if (routableWei < shortfallWei && shortfallWei - routableWei <= DUST_WEI) {
 					payWei -= shortfallWei - routableWei;
 					shortfallWei = routableWei;
+				} else if (routableWei < shortfallWei) {
+					// The balance counts the member's personal CRC from the chain, but
+					// the pathfinder graph hasn't indexed the fresh trust/mint yet.
+					throw new Error('Your dAMS are still syncing — try again in a moment.');
 				}
 				boostTxs = await buildBoostTxs(a, shortfallWei);
 				plan = buildClaimTxs(

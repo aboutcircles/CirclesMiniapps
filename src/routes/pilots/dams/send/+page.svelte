@@ -40,7 +40,13 @@
 	// the user's own personal CRC as far as the pathfinder routes it (clamped by
 	// what's actually held; display-tolerant of the pathfinder's ~1e-6 shave).
 	const personalWhole = $derived(userState ? Math.floor(Number(userState.personalCrc) / 1e18) : 0);
-	const convertibleShown = $derived(Math.min(Math.floor(convertibleRaw * 1.0005), personalWhole));
+	// Established accounts show their personal CRC from the chain even before
+	// the pathfinder graph catches up (mirrors the main pilot page).
+	const convertibleShown = $derived(
+		userState?.isMember && userState.registered
+			? personalWhole
+			: Math.min(Math.floor(convertibleRaw * 1.0005), personalWhole)
+	);
 	const availableWhole = $derived(
 		(userState ? deliverableWholeDams(userState) : 0) + convertibleShown
 	);
