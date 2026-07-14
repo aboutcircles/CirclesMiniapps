@@ -258,6 +258,20 @@
 		return buildClaimTxs(shop, s, shop, amountWei).deliverableErc20 + extraWei >= amountWei;
 	}
 
+	// After a spend, re-read state + pathfinder until the displayed balance
+	// reflects it — an immediate read often still sees pre-transaction values.
+	// Runs detached so the redeem button frees up as soon as the tx is done.
+	async function pollBalanceAfterSpend(a: Address) {
+		const before = availableWhole;
+		for (let i = 0; i < 6; i++) {
+			if (connectedAddress !== a) return; // account changed meanwhile
+			await loadState(a);
+			await refreshConvertible(a);
+			if (availableWhole !== before) break;
+			await new Promise((r) => setTimeout(r, 2500));
+		}
+	}
+
 	// Refresh how much of the user's own personal CRC the pathfinder can route
 	// into dAMS (raw — the deriveds above clamp and round it). Failures read as
 	// 0 (balance degrades to held + mintable).
@@ -449,16 +463,10 @@
 			// the offer flips from the 48-dAMS signup deal to the 100-dAMS follow-up.
 			orders = addOrder(a, data);
 			firstPurchase = isFirstPurchase(a);
-			// Reload the balance until the redemption is reflected — an immediate
-			// read often still sees pre-transaction state (RPC/indexer lag), which
-			// left the ball showing the old number until the minute refresh.
-			const before = availableWhole;
-			for (let i = 0; i < 6; i++) {
-				await loadState(a);
-				await refreshConvertible(a);
-				if (availableWhole !== before) break;
-				await new Promise((r) => setTimeout(r, 2500));
-			}
+			// Reload the balance until the redemption is reflected (RPC/indexer
+			// lag) — in the background: awaiting it here kept `claiming` true, so
+			// the button read "Sending…" for seconds after the receipt was up.
+			pollBalanceAfterSpend(a);
 		} catch (e: any) {
 			const m = e?.message ?? 'Payment failed.';
 			errorMsg = /reject|cancel|denied|rejected/i.test(m) ? 'Payment cancelled.' : m;
