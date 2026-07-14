@@ -628,7 +628,18 @@
 		// seconds while signed in (a handful of cheap eth_calls; the heavier
 		// pathfinder amount refreshes on events — connect, membership, spends).
 		const refresh = setInterval(() => {
-			if (wallet.connected && wallet.address) loadState(getAddress(wallet.address) as Address);
+			if (wallet.connected && wallet.address) {
+				const a = getAddress(wallet.address) as Address;
+				loadState(a).then((s) => {
+					// The pathfinder graph lags the chain by blocks: right after signup
+					// the one-shot refresh can run before it sees the fresh group trust,
+					// reading 0 routable for an account that holds its 48-CRC bonus —
+					// the balance then showed 0. Re-ask until it catches up.
+					if (s.isMember && s.personalCrc >= ONE && convertibleRaw === 0) {
+						refreshConvertible(a);
+					}
+				});
+			}
 		}, 3_500);
 		return () => {
 			clearInterval(tick);
