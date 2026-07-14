@@ -60,13 +60,12 @@
 	let showReceipt = $state(false);
 	let menuOpen = $state(false);
 
-	// Whole dAMS the pathfinder can route from the user's OWN personal CRC into
-	// the group (fromTokens-restricted). For members the claim batch converts
-	// personal CRC directly (exact), so only the pathfinder SURPLUS beyond that
-	// (e.g. wrapped personal CRC) is added to the balance — see pathfinderExtra.
-	// Refreshed per account, after membership lands, and after spends.
-	let convertiblePersonal = $state(0);
-
+	// dAMS the pathfinder can route from the user's OWN personal CRC into the
+	// group (fromTokens = the user's personal token). Raw float; the derived
+	// values below clamp it by the personal CRC actually still held, so a stale
+	// pathfinder graph (it lags the chain by blocks) can never resurrect tokens
+	// that were just spent — the 3.5s state refresh zeroes the clamp instantly.
+	let convertibleRaw = $state(0);
 
 	// Change-name sheet (opened from the avatar menu).
 	let showNameEdit = $state(false);
@@ -199,18 +198,25 @@
 				: [DEFAULT_OFFER, SECOND_OFFER]
 	);
 	const offer = $derived<Offer>(offers[Math.min(selectedOfferIdx, offers.length - 1)]);
-	// Balance comes straight from chain — never synthesized. It counts everything
-	// redeemable as dAMS: held dAMS + mintable issuance + (for members) personal
-	// CRC via direct group-mint (deliverableWholeDams — this is where the 48-CRC
-	// signup bonus lives), plus any pathfinder-only surplus from the user's own
-	// personal token. Uses the same flooring as the claim batch so the number
-	// matches what "Redeem" delivers.
-	const directPersonalWhole = $derived(
-		userState?.isMember ? Math.floor(Number(userState.personalCrc) / 1e18) : 0
-	);
-	const pathfinderExtra = $derived(Math.max(0, convertiblePersonal - directPersonalWhole));
+	// Balance comes straight from chain — never synthesized. It counts held dAMS
+	// + mintable issuance (deliverableWholeDams) plus the user's own personal CRC
+	// as far as the pathfinder can route it into the group (fromTokens-restricted
+	// — this is where the 48-CRC signup bonus lives).
+	//
+	// Two corrections on the pathfinder number:
+	// - CLAMP by the personal CRC actually still held (fresh 3.5s read): the
+	//   pathfinder graph lags the chain, so right after a spend it still reports
+	//   the old routable amount — without the clamp the main page kept showing
+	//   the pre-purchase balance.
+	// - For DISPLAY, tolerate the ~1e-6 the pathfinder shaves off (demurrage
+	//   projection: an exact 48 reads as 47.999952) before flooring, so the
+	//   signup bonus shows as 48. Eligibility uses the untolerated floor so
+	//   "Redeem" never promises more than the pathfinder can actually route.
+	const personalWhole = $derived(userState ? Math.floor(Number(userState.personalCrc) / 1e18) : 0);
+	const convertibleShown = $derived(Math.min(Math.floor(convertibleRaw * 1.0005), personalWhole));
+	const convertibleReal = $derived(Math.min(Math.floor(convertibleRaw), personalWhole));
 	const availableWhole = $derived(
-		(userState ? deliverableWholeDams(userState) : 0) + pathfinderExtra
+		(userState ? deliverableWholeDams(userState) : 0) + convertibleShown
 	);
 	const nextMint = $derived(mintCountdown(now));
 	// The Hub caps unclaimed issuance at two weeks (MAX_CLAIM_DURATION; the
@@ -246,21 +252,19 @@
 
 	function isEnoughDeliver(s: UserState, shop: Address, amountDams: number): boolean {
 		const amountWei = BigInt(amountDams) * ONE;
-		const extraWei = BigInt(pathfinderExtra) * ONE;
+		// Untolerated pathfinder capacity — what the shortfall txs can actually route.
+		const extraWei = BigInt(convertibleReal) * ONE;
 		return buildClaimTxs(shop, s, shop, amountWei).deliverableErc20 + extraWei >= amountWei;
 	}
 
 	// Refresh how much of the user's own personal CRC the pathfinder can route
-	// into dAMS. The pathfinder projects demurrage and reports a hair under the
-	// actual balance (e.g. 47.999952 for an exact 48), so tolerate 0.05% before
-	// flooring — the claim batch converts members' personal CRC directly and
-	// exactly anyway. Failures read as 0 (balance degrades to the direct parts).
+	// into dAMS (raw — the deriveds above clamp and round it). Failures read as
+	// 0 (balance degrades to held + mintable).
 	async function refreshConvertible(a: Address) {
 		try {
-			const whole = Number(await maxConvertibleToDams(a)) / 1e18;
-			convertiblePersonal = Math.floor(whole * 1.0005);
+			convertibleRaw = Number(await maxConvertibleToDams(a)) / 1e18;
 		} catch {
-			convertiblePersonal = 0;
+			convertibleRaw = 0;
 		}
 	}
 
@@ -468,7 +472,7 @@
 		firstPurchase = true;
 		historyResolved = false;
 		showHistory = false;
-		convertiblePersonal = 0;
+		convertibleRaw = 0;
 	}
 
 	// ----- Change name -----

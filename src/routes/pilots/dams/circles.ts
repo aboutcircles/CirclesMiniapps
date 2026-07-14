@@ -226,23 +226,21 @@ export async function readUserState(address: Address): Promise<UserState> {
 }
 
 // The base balance: dAMS the user already holds (demurraged ERC20 + unwrapped
-// group ERC1155), what they can mint right now from Hub issuance, and — for
-// group members — their held personal CRC, which group-mints 1:1 (this is where
-// the 48-CRC signup bonus lives). Non-members' personal CRC is excluded here
-// and only enters via the pathfinder (boost.ts, fromTokens-restricted), which
-// honestly reflects the trust limits on converting it. The direct route matters
-// for exactness too: the pathfinder shaves ~1e-6 off (demurrage projection), so
-// routing a member's 48-CRC bonus through it yields 47.999952 — enough to break
-// the 48-dAMS welcome offer — while a direct groupMint converts the full 48.
+// group ERC1155) plus what they can mint right now from Hub issuance. Held
+// personal CRC is NOT counted here — it enters the balance only via the
+// pathfinder (boost.ts, fromTokens = the user's personal token), which honestly
+// reflects the trust limits on converting it into dAMS. The page clamps that
+// pathfinder amount by the personal CRC actually still held so a stale
+// pathfinder graph can't resurrect spent tokens.
 export function totalAvailableWei(s: UserState): bigint {
-	return s.damsDemurraged + s.damsErc1155 + (s.isMember ? s.personalCrc : 0n) + s.mintable;
+	return s.damsDemurraged + s.damsErc1155 + s.mintable;
 }
 
 // Whole dAMS the claim batch could actually deliver right now — computed exactly
 // like buildClaimTxs() floors things, so the headline number and the "Redeem"
 // eligibility never disagree (never show N available then fail to deliver N).
 export function deliverableWholeDams(s: UserState): number {
-	const collateralWei = floorToWhole((s.isMember ? s.personalCrc : 0n) + s.mintable);
+	const collateralWei = floorToWhole(s.mintable);
 	const wrapWei = floorToWhole(s.damsErc1155 + collateralWei);
 	const deliverableWei = s.damsDemurraged + wrapWei;
 	return Number(deliverableWei / ONE);
@@ -283,11 +281,10 @@ export interface ClaimPlan {
 //
 // The batch is sized to the offer, not to the whole balance: it converts only
 // what the payment needs, drawing on held ERC20 first, then held group tokens,
-// then group-mint collateral (fresh issuance plus, for members, held personal
-// CRC — the direct 1:1 route, exact where the pathfinder shaves a margin).
-// When the offer needs more than this batch can cover, the caller prepends
-// pathfinder transactions (boost.ts, restricted to the user's own personal
-// token) that deliver the shortfall as dAMS ERC20 first.
+// then fresh issuance as group-mint collateral. Held personal CRC is never
+// converted directly here — when the offer needs more than this batch can
+// cover, the caller prepends pathfinder transactions (boost.ts, fromTokens =
+// the user's personal token) that deliver the shortfall as dAMS ERC20 first.
 export function buildClaimTxs(
 	user: Address,
 	s: UserState,
@@ -313,7 +310,7 @@ export function buildClaimTxs(
 	const held1155 = floorToWhole(s.damsErc1155);
 	// Collateral to group-mint: only the part the held group tokens can't cover.
 	const collNeed = wrapNeed > held1155 ? wrapNeed - held1155 : 0n;
-	const collAvailable = floorToWhole((s.isMember ? s.personalCrc : 0n) + s.mintable);
+	const collAvailable = floorToWhole(s.mintable);
 	const collateralWei = collNeed < collAvailable ? collNeed : collAvailable;
 	if (collateralWei > 0n) {
 		txs.push({
