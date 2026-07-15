@@ -673,7 +673,9 @@
               font-weight: 500;
               letter-spacing: 0.01em;
               border-bottom: 1px solid rgba(255,255,255,0.08);
-          margin-bottom: 16px;
+              /* Escape the app wrapper's 24px/16px padding: in the standalone
+                 app this banner sat edge-to-edge above the padded body. */
+              margin: -24px -16px 16px;
           }
           .beta-badge {
               display: inline-flex;
