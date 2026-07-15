@@ -35,12 +35,6 @@ function parseRoute(): string {
   return hash || '';
 }
 
-function setActiveNav(route: string): void {
-  document.querySelectorAll<HTMLAnchorElement>('.mm-nav-link').forEach((a) => {
-    a.classList.toggle('active', a.dataset.route === route);
-  });
-}
-
 function renderLanding(): void {
   ROOT.innerHTML = `
     <div class="mm-landing">
@@ -72,7 +66,6 @@ function hideAllContainers(): void {
 
 async function navigate(): Promise<void> {
   const route = parseRoute();
-  setActiveNav(route);
 
   // Landing page.
   if (!route) {

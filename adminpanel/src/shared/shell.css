@@ -32,66 +32,6 @@ body {
     min-height: 100vh;
 }
 
-.mm-topbar {
-    position: sticky;
-    top: 0;
-    z-index: 50;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    padding: 12px clamp(14px, 4vw, 40px);
-    background: rgba(255, 255, 255, 0.82);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid var(--mm-line);
-}
-
-.mm-brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 9px;
-    font-weight: 700;
-    font-size: 15px;
-    letter-spacing: 0.01em;
-    color: var(--mm-ink);
-    text-decoration: none;
-}
-
-.mm-brand-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--mm-accent) 0%, #4335df 100%);
-    box-shadow: 0 0 0 4px var(--mm-accent-soft);
-}
-
-.mm-nav {
-    display: flex;
-    gap: 6px;
-}
-
-.mm-nav-link {
-    padding: 7px 14px;
-    border-radius: 999px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--mm-muted);
-    text-decoration: none;
-    border: 1px solid transparent;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
-}
-
-.mm-nav-link:hover {
-    color: var(--mm-ink);
-    background: rgba(14, 0, 168, 0.05);
-}
-
-.mm-nav-link.active {
-    color: var(--mm-accent);
-    background: var(--mm-accent-soft);
-    border-color: #d6d1ff;
-}
-
 #mm-app-root {
     width: 100%;
 }
