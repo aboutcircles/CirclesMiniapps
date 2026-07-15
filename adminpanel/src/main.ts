@@ -126,6 +126,21 @@ async function navigate(): Promise<void> {
     }
   } catch (err) {
     loadingEl.remove();
+
+    // A failed dynamic import means this page's hashed chunk names no longer
+    // exist on the server (a deploy replaced them while this tab held the old
+    // index.html). Reload once to pick up the fresh HTML — guarded through
+    // sessionStorage so a genuinely broken deploy can't reload-loop.
+    const isStaleChunk =
+      err instanceof TypeError && /dynamically imported module|module script/i.test(String(err));
+    const reloadGuard = `mm-chunk-reload:${route}`;
+    if (isStaleChunk && !sessionStorage.getItem(reloadGuard)) {
+      sessionStorage.setItem(reloadGuard, '1');
+      window.location.reload();
+      return;
+    }
+    sessionStorage.removeItem(reloadGuard);
+
     const errEl = document.createElement('div');
     errEl.className = 'mm-loading';
     errEl.textContent = `Failed to load the "${route}" app. Check the console for details.`;
