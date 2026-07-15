@@ -62,7 +62,7 @@
 	<IframeHost
 		src={iframeSrc}
 		iframeTitle="Playground Mini App"
-		sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-top-navigation-by-user-activation"
+		sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
 		onBack={goBack}
 		backLabel="mini apps"
 		title="Playground"

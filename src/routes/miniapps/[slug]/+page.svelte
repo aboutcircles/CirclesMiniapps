@@ -92,7 +92,7 @@
 		<IframeHost
 			src={iframeSrc}
 			iframeTitle={app ? app.name : 'Mini App'}
-			sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-top-navigation-by-user-activation"
+			sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"
 			onBack={goBack}
 			getAppData={() => $page.url.searchParams.get('data')}
 			enforceTxPolicy={app?.category === 'garage'}

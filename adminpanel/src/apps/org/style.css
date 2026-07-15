@@ -746,6 +746,71 @@
 
   /* ── Responsive ─────────────────────────────────────────────────── */
 
+/* ── Organization Explorer ─────────────────────────────────────── */
+
+  .activity-item {
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .activity-main {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .activity-top {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .activity-direction {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+  }
+
+  .activity-direction.activity-in {
+    background: var(--success-bg);
+    border-color: var(--success-line);
+    color: var(--success-ink);
+  }
+
+  .activity-direction.activity-out {
+    background: var(--error-bg);
+    border-color: var(--error-line);
+    color: var(--error-ink);
+  }
+
+  .activity-meta {
+    margin-top: 4px;
+    font-size: 0.82rem;
+    overflow-wrap: anywhere;
+  }
+
+  .activity-amount {
+    font-family: "JetBrains Mono", monospace;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .activity-amount.activity-in {
+    color: var(--success-ink);
+  }
+
+  .activity-amount.activity-out {
+    color: var(--error-ink);
+  }
+
+  #explorer-load-more-btn {
+    margin-top: 12px;
+  }
+
   @media (max-width: 560px) {
     & {
       padding: 14px 10px 24px;
@@ -807,69 +872,6 @@
       width: 100%;
     }
   
-    /* ── Organization Explorer ─────────────────────────────────────── */
 
-    .activity-item {
-      align-items: flex-start;
-      gap: 12px;
-    }
-
-    .activity-main {
-      min-width: 0;
-      flex: 1;
-    }
-
-    .activity-top {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .activity-direction {
-      font-size: 0.72rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      padding: 2px 8px;
-      border-radius: 999px;
-      border: 1px solid var(--line);
-    }
-
-    .activity-direction.activity-in {
-      background: var(--success-bg);
-      border-color: var(--success-line);
-      color: var(--success-ink);
-    }
-
-    .activity-direction.activity-out {
-      background: var(--error-bg);
-      border-color: var(--error-line);
-      color: var(--error-ink);
-    }
-
-    .activity-meta {
-      margin-top: 4px;
-      font-size: 0.82rem;
-      overflow-wrap: anywhere;
-    }
-
-    .activity-amount {
-      font-family: "JetBrains Mono", monospace;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-
-    .activity-amount.activity-in {
-      color: var(--success-ink);
-    }
-
-    .activity-amount.activity-out {
-      color: var(--error-ink);
-    }
-
-    #explorer-load-more-btn {
-      margin-top: 12px;
-    }
 }
 }

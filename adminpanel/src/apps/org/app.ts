@@ -2764,7 +2764,14 @@ function describeTransferToken(row: TransferRow): {
       } catch {
         /* fall back to the raw static amount */
       }
-      return { amount: demurraged, kindLabel: 'ERC20 · inflationary', avatarBehind };
+      // The main number is the demurraged value at transfer time; the static
+      // (inflationary-unit) amount stays visible in the label for clarity.
+      const staticWhole = Number(rawValue) / 1e18;
+      return {
+        amount: demurraged,
+        kindLabel: `ERC20 · inflationary (${staticWhole.toFixed(2)} static)`,
+        avatarBehind,
+      };
     }
     return { amount: rawValue, kindLabel: 'ERC20 · demurraged', avatarBehind };
   }
