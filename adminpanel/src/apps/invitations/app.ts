@@ -269,9 +269,11 @@ export function boot(): void {
 
   async function fetchGroupsByOwners(ownerAddresses: string[]): Promise<GroupEntry[]> {
     if (!ownerAddresses.length) return [];
-    // SDK 0.1.52: findGroups returns PagedResponse { results, hasMore, nextCursor }.
-    const page = await rpc.group.findGroups(200, { ownerIn: normalizeAddressList(ownerAddresses) });
-    return (page?.results ?? []) as unknown as GroupEntry[];
+    // getGroups queries the V_CrcV2 Groups view directly — the server-side
+    // circles_findGroups method returns an empty set for ownerIn filters.
+    const query = rpc.group.getGroups(200, { ownerIn: normalizeAddressList(ownerAddresses) });
+    await query.queryNextPage();
+    return (query.currentPage?.results ?? []) as unknown as GroupEntry[];
   }
 
   async function fetchControlledGroups(address: string): Promise<GroupEntry[]> {

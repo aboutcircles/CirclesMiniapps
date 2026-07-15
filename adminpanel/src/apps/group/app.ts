@@ -1754,10 +1754,14 @@ function mergeGroups(...groupLists) {
 
 async function fetchGroupsByOwners(ownerIn) {
   if (!humanSdk || !ownerIn.length) return [];
-  const page = await humanSdk.rpc.group.findGroups(GROUP_PAGE_LIMIT, {
+  // getGroups queries the V_CrcV2 Groups view directly. The server-side
+  // circles_findGroups method returns an empty set for ownerIn filters (and
+  // silently drops groupAddressIn), so findGroups() must not be used here.
+  const query = humanSdk.rpc.group.getGroups(GROUP_PAGE_LIMIT, {
     ownerIn: normalizeAddressList(ownerIn),
   });
-  return normalizeGroups(page?.results || []);
+  await query.queryNextPage();
+  return normalizeGroups(query.currentPage?.results || []);
 }
 
 async function loadAllPages(query, maxPages = 6) {
@@ -3667,10 +3671,12 @@ async function openGroup(groupAddress, preserveResult = false) {
 
   let groupMeta = getResolvedGroupMeta(groupAddress);
   if (!groupMeta) {
-    const lookupPage = await humanSdk.rpc.group.findGroups(1, {
+    // getGroups, not findGroups: the latter drops the groupAddressIn filter.
+    const lookupQuery = humanSdk.rpc.group.getGroups(1, {
       groupAddressIn: [getAddress(groupAddress)],
     });
-    groupMeta = lookupPage?.results?.[0] || null;
+    await lookupQuery.queryNextPage();
+    groupMeta = lookupQuery.currentPage?.results?.[0] || null;
   }
 
   if (!groupMeta) {
