@@ -2793,11 +2793,12 @@ function describeTransferToken(row: TransferRow): {
 // they represent, instead of a puzzling 47.999.
 function formatActivityAmount(atto: bigint): string {
   const HUNDREDTH = 10n ** 16n;
+  // Below one cent: show "<0.01" instead of a misleading 0 or 0.01.
+  if (atto > 0n && atto < HUNDREDTH) return '<0.01';
   const rounded = (atto + HUNDREDTH / 2n) / HUNDREDTH; // half-up, in hundredths
   const whole = rounded / 100n;
   const cents = rounded % 100n;
-  if (cents === 0n) return whole.toString();
-  return `${whole}.${cents.toString().padStart(2, '0').replace(/0$/, '')}`;
+  return `${whole}.${cents.toString().padStart(2, '0')}`;
 }
 
 function explorerNameFor(address: string | null): string | null {
