@@ -10,6 +10,9 @@
 	let iframeSrc = $state('');
 	let urlInput = $state('');
 	let isOffline = $state(false);
+	// Bumped on every Load click: keys the IframeHost so the embedded app
+	// reloads even when the URL didn't change (same-src assignment is a no-op).
+	let reloadNonce = $state(0);
 
 	onMount(() => {
 		const syncOnlineState = () => {
@@ -34,7 +37,9 @@
 	async function handleLoad() {
 		const nextUrl = urlInput.trim();
 		iframeSrc = nextUrl;
+		reloadNonce += 1;
 
+		// Keep the shareable ?url= param in sync with what's loaded.
 		const search = nextUrl ? `?url=${encodeURIComponent(nextUrl)}` : '';
 		await goto(`/playground${search}`, {
 			replaceState: true,
@@ -53,6 +58,7 @@
 </svelte:head>
 
 <div class="page">
+	{#key reloadNonce}
 	<IframeHost
 		src={iframeSrc}
 		iframeTitle="Playground Mini App"
@@ -93,6 +99,7 @@
 			</div>
 		{/snippet}
 	</IframeHost>
+	{/key}
 </div>
 
 <style>
