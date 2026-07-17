@@ -4,8 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build && npm run build:adminpanel",
-    "build:adminpanel": "npm ci --prefix adminpanel && npm run build --prefix adminpanel && rm -rf build/adminpanel && cp -R adminpanel/dist build/adminpanel",
+    "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest",

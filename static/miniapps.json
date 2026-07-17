@@ -90,7 +90,7 @@
     "slug": "miniapps-org-manager",
     "name": "MiniApps Builders Org Manager",
     "logo": "/app-logos/org.png",
-    "url": "https://circles.gnosis.io/adminpanel/#/org",
+    "url": "https://aboutcircles.github.io/admin-apps/#/org",
     "description": "Builder-focused tool to manage miniapp organizations",
     "tags": [],
     "category": "admin"
@@ -112,7 +112,7 @@
     "slug": "invitations-manager",
     "name": "Invitations Manager",
     "logo": "/app-logos/invitations.png",
-    "url": "https://circles.gnosis.io/adminpanel/#/invitations",
+    "url": "https://aboutcircles.github.io/admin-apps/#/invitations",
     "description": "Manage invitations",
     "tags": [],
     "category": "admin"
@@ -121,7 +121,7 @@
     "slug": "circles-groups",
     "name": "Circles Groups",
     "logo": "/app-logos/groups.png",
-    "url": "https://circles.gnosis.io/adminpanel/#/group",
+    "url": "https://aboutcircles.github.io/admin-apps/#/group",
     "description": "Manage Circles groups",
     "tags": [],
     "category": "admin"
