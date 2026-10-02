@@ -20,15 +20,6 @@
 	// close affordance. Every other route keeps the default bottom-sheet treatment.
 	const isCrcSignin = $derived(page.url.pathname === '/crc-signin');
 
-	// The per-page manifest link is baked into the prerendered HTML by
-	// hooks.server.ts (%manifest% in app.html). This keeps it correct across
-	// client-side navigations too — must mirror manifestFor() in hooks.server.ts.
-	function updateManifestLink(pathname: string) {
-		const href =
-			pathname === '/pilots/dams' ? '/pilots/dams.webmanifest' : '/manifest.webmanifest';
-		document.querySelector('link[rel="manifest"]')?.setAttribute('href', href);
-	}
-
 	// Run synchronously so localStorage is set before any onMount (including child pages) calls autoConnect.
 	if (typeof window !== 'undefined') {
 		const addressParam = new URLSearchParams(window.location.search).get('address');
@@ -56,10 +47,7 @@
 	});
 
 	afterNavigate((nav) => {
-		if (nav.to?.url) {
-			trackPageView(nav.to.url.pathname);
-			updateManifestLink(nav.to.url.pathname);
-		}
+		if (nav.to?.url) trackPageView(nav.to.url.pathname);
 	});
 </script>
 
