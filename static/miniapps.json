@@ -1,5 +1,17 @@
 [
   {
+    "slug": "ghost-wolf-cyber-run",
+    "name": "Ghost Wolf: Cyber Run",
+    "logo": "ghost_wolf_logo.png",
+    "url": "https://ghost-game-l5o2.onrender.com/",
+    "description": "3D Cyberpunk Endless Runner game. Survive the matrix and collect crypto-coins!",
+    "tags": [
+      "game",
+      "garage"
+    ],
+    "category": "garage"
+  },
+  {
     "slug": "sign-message-demo",
     "name": "Sign Message Demo",
     "logo": "/app-logos/sign.png",
@@ -397,3 +409,4 @@
     "category": "garage"
   }
 ]
+
