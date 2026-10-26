@@ -22,3 +22,22 @@ jobs:
             git reset --hard origin/master
             npm install
             npm run build
+
+            # invite-backend runs as its own service; see invite-backend/README.md.
+            # .env and data/ live only on the server and are never synced.
+            SRC=/var/www/circles-miniapps/invite-backend/
+            APP=/opt/invite-backend/app
+            deps=0
+            if [ ! -d "$APP/node_modules" ] || ! cmp -s "$SRC/package-lock.json" "$APP/package-lock.json"; then
+              deps=1
+            fi
+            rsync -a --delete --exclude=.env --exclude=data/ --exclude=node_modules/ "$SRC" "$APP/"
+            if [ "$deps" = 1 ]; then
+              (cd "$APP" && npm ci --ignore-scripts)
+            fi
+            sudo -n systemctl restart invite-backend
+            for _ in 1 2 3 4 5 6 7 8 9 10; do
+              curl -fs -o /dev/null http://127.0.0.1:8787/health && break
+              sleep 3
+            done
+            curl -fsS http://127.0.0.1:8787/health

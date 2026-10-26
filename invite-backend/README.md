@@ -33,3 +33,20 @@ npm run dev            # http://localhost:8787
   iframe origin) is recorded for attribution.
 - `GET /health` — `{ ok: true }`.
 - `GET /stats` — per-app signup counts (JSON file store).
+
+## Deployment
+The `Deploy to Droplet` workflow ships this folder on every push to `master`:
+it rsyncs `invite-backend/` into `/opt/invite-backend/app` (never `.env`,
+`data/` or `node_modules/`), runs `npm ci --ignore-scripts` when
+`package-lock.json` changed, restarts the service and waits for `/health`.
+
+One-time server setup:
+- Service user: `useradd --system --no-create-home --shell /usr/sbin/nologin invite-backend`.
+- Ownership: the code in `/opt/invite-backend/app` belongs to the deploy user;
+  `.env` (mode 600) and `data/` belong to `invite-backend`, so the service can
+  read its code but only write `data/`.
+- Unit: install [`deploy/invite-backend.service`](deploy/invite-backend.service)
+  to `/etc/systemd/system/`, then `systemctl daemon-reload` and
+  `systemctl enable --now invite-backend`.
+- Sudoers drop-in so the deploy user can restart it and nothing else:
+  `<deploy user> ALL=(root) NOPASSWD: /usr/bin/systemctl restart invite-backend`.
