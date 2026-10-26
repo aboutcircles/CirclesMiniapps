@@ -10,7 +10,7 @@
 import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { isAddress, type Address } from 'viem';
+import { readAccount } from './account.js';
 import { inviteAccount, loadEnv } from './invite.js';
 import { getStats, initStats, recordSignup } from './stats.js';
 
@@ -152,23 +152,23 @@ app.post('/invite', async (c) => {
 		);
 	}
 
-	let body: { account?: string; app?: string };
+	let body: unknown;
 	try {
 		body = await c.req.json();
 	} catch {
 		return c.json({ error: 'Invalid JSON body' }, 400);
 	}
 
-	const account = body.account;
-	if (!account || !isAddress(account, { strict: false })) {
+	const account = readAccount(body);
+	if (!account) {
 		return c.json({ error: 'Body must be { account: "0x<address>" }' }, 400);
 	}
 	// The app identifier is supplied by the trusted host (iframe origin), not the
 	// miniapp itself, so it can't be spoofed.
-	const appId = normalizeApp(body.app);
+	const appId = normalizeApp((body as { app?: unknown }).app);
 
 	try {
-		const result = await inviteAccount(account as Address, env);
+		const result = await inviteAccount(account, env);
 		// Only count actual registrations (not 'already' / skipped).
 		if (result.status === 'invited') {
 			await recordSignup(appId, new Date().toISOString());
