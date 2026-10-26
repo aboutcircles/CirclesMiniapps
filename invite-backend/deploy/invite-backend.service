@@ -1,0 +1,42 @@
+# systemd unit for invite-backend. Install to /etc/systemd/system/.
+# Code is owned by the deploy user; the service user can read it but only
+# write to data/. .env (holds the inviter key) is owned by the service user, mode 600.
+[Unit]
+Description=Circles invite-backend
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=invite-backend
+Group=invite-backend
+WorkingDirectory=/opt/invite-backend/app
+# Same command as `npm start`, without npm in front.
+ExecStart=/opt/invite-backend/app/node_modules/.bin/tsx --env-file=.env src/index.ts
+Restart=on-failure
+RestartSec=5
+Environment=NODE_ENV=production
+UMask=0027
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/opt/invite-backend/app/data
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
